@@ -1,6 +1,6 @@
 # Themes
 
-StoneLight Launcher v0.5.31 includes the first visual theme system.
+StoneLight Launcher v0.5.32 includes the first visual theme system.
 
 ## Themes
 
@@ -44,7 +44,7 @@ accent:     #ffb347 / #ff8c42
 The launcher uses `customtkinter` appearance mode plus tuple colors for light/dark theme-aware widgets.
 
 
-## v0.5.31 additional themes
+## v0.5.32 additional themes
 
 ### Laconic
 
@@ -88,4 +88,40 @@ line:          #4a315f
 accent:        #ff9f45
 accent_hover:  #ff6f3c
 danger:        #ff5c7a
+```
+
+
+## v0.5.32 palette revision
+
+### Laconic revised
+
+Laconic is now a pastel minimal theme instead of another dark graphite theme.
+
+```text
+window:        #f4f1ec
+panel:         #fbf8f2
+panel_strong:  #ffffff
+input:         #f0ece4
+text:          #2f3440
+muted:         #7c8792
+line:          #d7d0c5
+accent:        #8fb8a8
+accent_hover:  #7aa895
+```
+
+### Retro Future revised
+
+Retro Future keeps the purple synthwave background, but the main button color is now magenta with cyan hover to make it visually different from Dark/Light/StoneLight orange themes.
+
+```text
+window:        #1a1026
+panel:         #261936
+panel_strong:  #332046
+input:         #21152f
+text:          #fff1dc
+muted:         #c9a9b8
+line:          #4a315f
+accent:        #ff4fd8
+accent_hover:  #00d4ff
+danger:        #ff6b8a
 ```

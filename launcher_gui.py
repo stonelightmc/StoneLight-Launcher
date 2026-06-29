@@ -53,7 +53,7 @@ from launcher_core import (
 )
 
 
-APP_TITLE = "StoneLight Launcher v0.5.31"
+APP_TITLE = "StoneLight Launcher v0.5.32"
 JAVA_PRESET_VALUES = ["auto", "global", "java8", "java16", "java17", "java21", "java25", "manual"]
 
 GITHUB_URL = "https://github.com/stonelightmc/StoneLight-Launcher"
@@ -70,9 +70,9 @@ THEME_NAMES = {
 # light: #fff7ea / #f4e6d2 / #2d2118 / #6b5747 / #ffb347 / #f47c38
 # dark:  #0b1118 / #111a25 / #edf3ff / #9fb0c8 / #ffb347 / #ff8c42
 # Extra themes:
-# laconic      - calm graphite UI with warm amber accent
+# laconic      - pastel minimal UI with sage accent
 # neon         - dark cyber/arcade palette
-# retro_future - warm synthwave/sunset palette
+# retro_future - synthwave purple UI with magenta/cyan buttons
 THEME_PALETTE = {
     "light": {
         "appearance": "light",
@@ -109,21 +109,21 @@ THEME_PALETTE = {
         "danger_hover": "#e05252",
     },
     "laconic": {
-        "appearance": "dark",
-        "window": "#0f141b",
-        "panel": "#171d26",
-        "panel_strong": "#202834",
-        "input": "#111821",
-        "text": "#eef3f8",
-        "muted": "#9aa8b8",
-        "line": "#2c3644",
-        "accent": "#f2b45a",
-        "accent_hover": "#e39a35",
-        "accent_text": "#241500",
-        "secondary": "#263141",
-        "secondary_hover": "#313d50",
-        "danger": "#e05f5f",
-        "danger_hover": "#c94d4d",
+        "appearance": "light",
+        "window": "#f4f1ec",
+        "panel": "#fbf8f2",
+        "panel_strong": "#ffffff",
+        "input": "#f0ece4",
+        "text": "#2f3440",
+        "muted": "#7c8792",
+        "line": "#d7d0c5",
+        "accent": "#8fb8a8",
+        "accent_hover": "#7aa895",
+        "accent_text": "#11251f",
+        "secondary": "#e8e1d7",
+        "secondary_hover": "#dcd4c8",
+        "danger": "#d97878",
+        "danger_hover": "#c86161",
     },
     "neon": {
         "appearance": "dark",
@@ -151,13 +151,13 @@ THEME_PALETTE = {
         "text": "#fff1dc",
         "muted": "#c9a9b8",
         "line": "#4a315f",
-        "accent": "#ff9f45",
-        "accent_hover": "#ff6f3c",
-        "accent_text": "#261000",
+        "accent": "#ff4fd8",
+        "accent_hover": "#00d4ff",
+        "accent_text": "#17001a",
         "secondary": "#3a2850",
         "secondary_hover": "#4b3466",
-        "danger": "#ff5c7a",
-        "danger_hover": "#df4864",
+        "danger": "#ff6b8a",
+        "danger_hover": "#e14f70",
     },
 }
 
@@ -2527,7 +2527,7 @@ class StoneLightLauncherApp(ctk.CTk):
 
         self.log_box = ctk.CTkTextbox(status_frame, height=140)
         self.log_box.grid(row=2, column=0, padx=16, pady=(0, 16), sticky="nsew")
-        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.31\n")
+        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.32\n")
         self.log_box.configure(state="disabled")
 
     def open_github(self):
