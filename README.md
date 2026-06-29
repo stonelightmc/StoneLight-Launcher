@@ -1,6 +1,6 @@
 # StoneLight Launcher v0.5.26
 
-Unofficial Minecraft launcher for the StoneLight community.
+Unofficial AI-coded Minecraft launcher for the StoneLight community.
 
 Still in development. This build is not fully functional. Minecraft API permission is pending.
 
