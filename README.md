@@ -1,6 +1,7 @@
-# StoneLight Launcher
+# StoneLight Launcher 0.5.24
 
 Unofficial Minecraft launcher for the StoneLight community.
+Still in development. This build is not fully functional.
 
 ## Features
 
