@@ -53,7 +53,7 @@ from launcher_core import (
 )
 
 
-APP_TITLE = "StoneLight Launcher v0.5.33"
+APP_TITLE = "StoneLight Launcher v0.5.34"
 JAVA_PRESET_VALUES = ["auto", "global", "java8", "java16", "java17", "java21", "java25", "manual"]
 
 UI_FONT = "Segoe UI Variable"
@@ -258,8 +258,10 @@ def style_kwargs(cls_name: str, kwargs: dict) -> dict:
         kwargs.setdefault("border_color", theme_pair("line"))
         kwargs.setdefault("corner_radius", 20)
         kwargs.setdefault("segmented_button_fg_color", theme_pair("secondary"))
-        kwargs.setdefault("segmented_button_selected_color", theme_pair("accent"))
-        kwargs.setdefault("segmented_button_selected_hover_color", theme_pair("accent_hover"))
+        # CTkTabview uses one text color for selected and unselected tab buttons.
+        # Therefore selected tab should stay on a readable panel color, not accent.
+        kwargs.setdefault("segmented_button_selected_color", theme_pair("panel_strong"))
+        kwargs.setdefault("segmented_button_selected_hover_color", theme_pair("secondary_hover"))
         kwargs.setdefault("segmented_button_unselected_color", theme_pair("secondary"))
         kwargs.setdefault("segmented_button_unselected_hover_color", theme_pair("secondary_hover"))
         kwargs.setdefault("text_color", theme_pair("text"))
@@ -2377,33 +2379,41 @@ class StoneLightLauncherApp(ctk.CTk):
 
         self.open_instance_button = ctk.CTkButton(
             instance_frame,
+            font=ui_font(13, "bold"),
+            height=40,
             text="Открыть окно сборки",
             command=self.on_open_instance_window
         )
-        self.open_instance_button.grid(row=2, column=0, padx=16, pady=(8, 16), sticky="ew")
+        self.open_instance_button.grid(row=2, column=0, columnspan=2, padx=(16, 8), pady=(8, 8), sticky="ew")
 
         self.create_instance_button = ctk.CTkButton(
             instance_frame,
+            font=ui_font(13, "bold"),
+            height=40,
             text="Создать сборку",
             command=self.on_create_instance
         )
-        self.create_instance_button.grid(row=2, column=1, padx=8, pady=(8, 16), sticky="ew")
+        self.create_instance_button.grid(row=2, column=2, columnspan=2, padx=(8, 16), pady=(8, 8), sticky="ew")
 
         self.delete_instance_button = ctk.CTkButton(
             instance_frame,
+            font=ui_font(13, "bold"),
+            height=40,
             text="Удалить сборку",
             fg_color="#7a1f1f",
             hover_color="#9b2929",
             command=self.on_delete_instance
         )
-        self.delete_instance_button.grid(row=2, column=2, padx=8, pady=(8, 16), sticky="ew")
+        self.delete_instance_button.grid(row=3, column=0, columnspan=2, padx=(16, 8), pady=(0, 12), sticky="ew")
 
         self.open_instance_folder_button = ctk.CTkButton(
             instance_frame,
+            font=ui_font(13, "bold"),
+            height=40,
             text="Папка",
             command=self.on_open_instance_folder
         )
-        self.open_instance_folder_button.grid(row=2, column=3, padx=(8, 16), pady=(8, 16), sticky="ew")
+        self.open_instance_folder_button.grid(row=3, column=2, columnspan=2, padx=(8, 16), pady=(0, 12), sticky="ew")
 
         self.instance_info = ctk.CTkLabel(
             instance_frame,
@@ -2411,7 +2421,7 @@ class StoneLightLauncherApp(ctk.CTk):
             text_color="#a9a9a9",
             anchor="w"
         )
-        self.instance_info.grid(row=3, column=0, columnspan=4, padx=16, pady=(0, 16), sticky="ew")
+        self.instance_info.grid(row=4, column=0, columnspan=4, padx=16, pady=(0, 16), sticky="ew")
 
         account_frame = ctk.CTkFrame(dashboard, corner_radius=22)
         account_frame.grid(row=0, column=1, padx=(8, 0), pady=0, sticky="nsew")
@@ -2434,46 +2444,54 @@ class StoneLightLauncherApp(ctk.CTk):
 
         self.microsoft_login_button = ctk.CTkButton(
             account_frame,
+            font=ui_font(13, "bold"),
+            height=40,
             text="Войти Microsoft",
             command=self.on_microsoft_login
         )
-        self.microsoft_login_button.grid(row=2, column=0, padx=16, pady=(8, 8), sticky="ew")
+        self.microsoft_login_button.grid(row=2, column=0, columnspan=2, padx=(16, 8), pady=(8, 8), sticky="ew")
 
         self.refresh_license_button = ctk.CTkButton(
             account_frame,
+            font=ui_font(13, "bold"),
+            height=40,
             text="Обновить лицензию",
             command=self.on_refresh_microsoft
         )
-        self.refresh_license_button.grid(row=2, column=1, padx=8, pady=(8, 8), sticky="ew")
+        self.refresh_license_button.grid(row=2, column=2, columnspan=2, padx=(8, 16), pady=(8, 8), sticky="ew")
 
         self.delete_account_button = ctk.CTkButton(
             account_frame,
+            font=ui_font(13, "bold"),
+            height=40,
             text="Удалить аккаунт",
             fg_color="#7a1f1f",
             hover_color="#9b2929",
             command=self.on_delete_account
         )
-        self.delete_account_button.grid(row=2, column=2, columnspan=2, padx=(8, 16), pady=(8, 8), sticky="ew")
+        self.delete_account_button.grid(row=3, column=0, columnspan=4, padx=16, pady=(0, 10), sticky="ew")
 
-        ctk.CTkLabel(account_frame, text="Offline-ник").grid(row=3, column=0, padx=16, pady=(8, 16), sticky="w")
+        ctk.CTkLabel(account_frame, text="Offline-ник").grid(row=4, column=0, padx=16, pady=(8, 8), sticky="w")
         self.new_account_entry = ctk.CTkEntry(account_frame, placeholder_text="Доступно после входа в лицензионный аккаунт")
-        self.new_account_entry.grid(row=3, column=1, padx=(16, 8), pady=(8, 16), sticky="ew")
+        self.new_account_entry.grid(row=4, column=1, columnspan=2, padx=(16, 8), pady=(8, 8), sticky="ew")
 
         self.add_account_button = ctk.CTkButton(
             account_frame,
+            font=ui_font(13, "bold"),
+            height=40,
             text="Добавить offline",
             command=self.on_add_account
         )
-        self.add_account_button.grid(row=3, column=2, padx=8, pady=(8, 16), sticky="ew")
+        self.add_account_button.grid(row=4, column=3, padx=(8, 16), pady=(8, 8), sticky="ew")
 
         self.account_policy_label = ctk.CTkLabel(
             account_frame,
             text="Offline-аккаунты разрешены только после входа хотя бы в один лицензионный аккаунт.",
             text_color="#bdbdbd",
-            wraplength=260,
+            wraplength=480,
             justify="left"
         )
-        self.account_policy_label.grid(row=3, column=3, padx=(8, 16), pady=(8, 16), sticky="w")
+        self.account_policy_label.grid(row=5, column=0, columnspan=4, padx=16, pady=(0, 16), sticky="ew")
 
         form = ctk.CTkFrame(self, corner_radius=18)
         form.grid(row=2, column=0, padx=18, pady=8, sticky="ew")
@@ -2565,7 +2583,7 @@ class StoneLightLauncherApp(ctk.CTk):
 
         self.log_box = ctk.CTkTextbox(status_frame, height=92)
         self.log_box.grid(row=2, column=0, padx=16, pady=(0, 12), sticky="nsew")
-        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.33\n")
+        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.34\n")
         self.log_box.configure(state="disabled")
 
     def open_github(self):
