@@ -1,0 +1,29 @@
+# Runtime user data - never commit
+accounts.json
+user_settings.json
+instances.json
+data/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+build/
+dist/
+*.egg-info/
+
+# Local/editor
+.vscode/
+.idea/
+*.swp
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Release archives
+*.zip
+*.7z
+*.rar
