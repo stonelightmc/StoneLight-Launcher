@@ -4,10 +4,11 @@ import os
 import re
 import subprocess
 from pathlib import Path
+from app_paths import app_root
 
 import requests
 
-ROOT = Path(__file__).resolve().parent
+ROOT = app_root()
 CONFIG_PATH = ROOT / "config.json"
 
 
@@ -271,7 +272,7 @@ if not defined SRC set "SRC=%TMP%"
 
 echo.
 echo Copying files...
-robocopy "%SRC%" "%ROOT%" /MIR /XD ".git" "data" "__pycache__" ".venv" "venv" "env" /XF "accounts.json" "user_settings.json" "instances.json" "*.log" "*.zip" "apply_launcher_update.cmd"
+robocopy "%SRC%" "%ROOT%" /MIR /XD ".git" "data" "__pycache__" ".venv" "venv" "env" "_internal" /XF "accounts.json" "user_settings.json" "instances.json" "*.log" "*.zip" "apply_launcher_update.cmd"
 set "RC=%ERRORLEVEL%"
 
 if %RC% GEQ 8 (

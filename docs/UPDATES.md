@@ -1,6 +1,6 @@
 # Updates
 
-StoneLight Launcher v0.5.49 adds the first update system.
+StoneLight Launcher v0.5.51 adds the first update system.
 
 ## Launcher updates
 
@@ -60,7 +60,7 @@ data/
 ```
 
 
-## v0.5.49 official pre-launch update
+## v0.5.51 official pre-launch update
 
 When the selected instance is the official `StoneLight` instance, the launcher now checks the official modpack release before launching the game.
 
@@ -88,7 +88,7 @@ server settings
 ```
 
 
-## v0.5.49
+## v0.5.51
 
 Manual update check behavior:
 
@@ -98,7 +98,7 @@ Manual update check behavior:
 - The Install button performs only local install/reinstall using current metadata.
 
 
-## v0.5.49
+## v0.5.51
 
 Update check timeout:
 

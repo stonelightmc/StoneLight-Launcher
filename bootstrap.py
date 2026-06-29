@@ -3,8 +3,9 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from app_paths import app_root
 
-ROOT = Path(__file__).resolve().parent
+ROOT = app_root()
 REQUIREMENTS = ROOT / "requirements.txt"
 
 REQUIRED_MODULES = [

@@ -2,8 +2,9 @@ import json
 import re
 import time
 from pathlib import Path
+from app_paths import app_root
 
-ROOT = Path(__file__).resolve().parent
+ROOT = app_root()
 INSTANCES_PATH = ROOT / "instances.json"
 
 INSTANCE_NAME_RE = re.compile(r"^[A-Za-zА-Яа-яЁёІіЇїЄєҐґ0-9 _.-]{2,32}$")

@@ -1,8 +1,9 @@
 import json
 import re
 from pathlib import Path
+from app_paths import app_root
 
-ROOT = Path(__file__).resolve().parent
+ROOT = app_root()
 ACCOUNTS_PATH = ROOT / "accounts.json"
 
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_]{3,16}$")

@@ -11,6 +11,7 @@ import uuid
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
+from app_paths import app_root, ensure_runtime_files
 from typing import Callable, Optional
 
 import requests
@@ -26,7 +27,8 @@ except ImportError as exc:
     ) from exc
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = app_root()
+ensure_runtime_files()
 CONFIG_PATH = ROOT / "config.json"
 USER_SETTINGS_PATH = ROOT / "user_settings.json"
 
@@ -243,7 +245,7 @@ class LauncherCore:
 
     def load_config(self) -> dict:
         if not self.config_path.exists():
-            raise LauncherError("Не найден config.json рядом с launcher_core.py")
+            raise LauncherError(f"Не найден config.json в папке лаунчера: {CONFIG_PATH}")
         return json.loads(self.config_path.read_text(encoding="utf-8"))
 
     def make_effective_config(self, config: dict, instance: dict) -> dict:
