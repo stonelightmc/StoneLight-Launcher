@@ -1,6 +1,6 @@
 # UI Design
 
-StoneLight Launcher v0.5.34 starts a modernized UI pass.
+StoneLight Launcher v0.5.35 starts a modernized UI pass.
 
 ## Changes
 
@@ -19,7 +19,7 @@ StoneLight Launcher v0.5.34 starts a modernized UI pass.
 CustomTkinter does not provide native real gradients or advanced animations for all widgets. These can be added later through canvas-based custom widgets without changing launcher functionality.
 
 
-## v0.5.34
+## v0.5.35
 
 Layout fixes:
 
@@ -27,3 +27,15 @@ Layout fixes:
 - Account policy text was moved below the offline nickname row.
 - Instance info row was moved lower after the second button row.
 - Tab buttons in instance windows no longer use accent color as selected background. This avoids unreadable text because `CTkTabview` uses one text color for all tab buttons.
+
+
+## v0.5.35
+
+Fix pass for instance windows:
+
+- Instance window title now uses localization:
+  - `Instance: name`
+  - `Збірка: name`
+  - `Жинақ: name`
+- Instance account selector now explicitly displays the localized `No accounts` placeholder when no accounts exist.
+- Tab buttons are forced to stable neutral theme colors, so switching tabs no longer makes them unexpectedly darker.

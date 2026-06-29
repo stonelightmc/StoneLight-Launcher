@@ -53,7 +53,7 @@ from launcher_core import (
 )
 
 
-APP_TITLE = "StoneLight Launcher v0.5.34"
+APP_TITLE = "StoneLight Launcher v0.5.35"
 JAVA_PRESET_VALUES = ["auto", "global", "java8", "java16", "java17", "java21", "java25", "manual"]
 
 UI_FONT = "Segoe UI Variable"
@@ -236,6 +236,22 @@ def apply_theme_to_window(window):
     except Exception:
         pass
 
+def apply_tabview_button_style(tabview):
+    try:
+        segmented = getattr(tabview, "_segmented_button", None)
+        if segmented is not None:
+            segmented.configure(
+                fg_color=theme_pair("secondary"),
+                selected_color=theme_pair("secondary"),
+                selected_hover_color=theme_pair("secondary_hover"),
+                unselected_color=theme_pair("secondary"),
+                unselected_hover_color=theme_pair("secondary_hover"),
+                text_color=theme_pair("text"),
+                font=ui_font(14, "bold"),
+            )
+    except Exception:
+        pass
+
 
 def is_transparent(value) -> bool:
     return isinstance(value, str) and value.lower() == "transparent"
@@ -257,10 +273,10 @@ def style_kwargs(cls_name: str, kwargs: dict) -> dict:
         kwargs.setdefault("fg_color", theme_pair("panel"))
         kwargs.setdefault("border_color", theme_pair("line"))
         kwargs.setdefault("corner_radius", 20)
+        # Keep tab buttons visually stable. CTkTabview has one text color for all tab buttons,
+        # and selected/unselected colors can look broken on some custom themes.
         kwargs.setdefault("segmented_button_fg_color", theme_pair("secondary"))
-        # CTkTabview uses one text color for selected and unselected tab buttons.
-        # Therefore selected tab should stay on a readable panel color, not accent.
-        kwargs.setdefault("segmented_button_selected_color", theme_pair("panel_strong"))
+        kwargs.setdefault("segmented_button_selected_color", theme_pair("secondary"))
         kwargs.setdefault("segmented_button_selected_hover_color", theme_pair("secondary_hover"))
         kwargs.setdefault("segmented_button_unselected_color", theme_pair("secondary"))
         kwargs.setdefault("segmented_button_unselected_hover_color", theme_pair("secondary_hover"))
@@ -1247,7 +1263,7 @@ class InstanceWindow(ctk.CTkToplevel):
         self.worker_thread = None
 
         self.instance = self.reload_instance()
-        self.title(f"Сборка: {self.instance.get('name', 'Instance')}")
+        self.title(tr(f"Сборка: {self.instance.get('name', 'Instance')}"))
         self.geometry("1120x860")
         self.minsize(1000, 780)
         self.transient(app)
@@ -1285,6 +1301,7 @@ class InstanceWindow(ctk.CTkToplevel):
 
         self.tabs = ctk.CTkTabview(self, corner_radius=18)
         self.tabs.grid(row=1, column=0, padx=18, pady=(8, 18), sticky="nsew")
+        apply_tabview_button_style(self.tabs)
 
         self.tab_launch_name = tr("Запуск")
         self.tab_files_name = tr("Папки")
@@ -1295,6 +1312,7 @@ class InstanceWindow(ctk.CTkToplevel):
         self.tab_files = self.tabs.add(self.tab_files_name)
         self.tab_settings = self.tabs.add(self.tab_settings_name)
         self.tab_console = self.tabs.add(self.tab_console_name)
+        apply_tabview_button_style(self.tabs)
 
         self.build_launch_tab()
         self.build_files_tab()
@@ -1588,6 +1606,7 @@ class InstanceWindow(ctk.CTkToplevel):
 
     def refresh_all(self):
         self.instance = self.reload_instance()
+        self.title(tr(f"Сборка: {self.instance.get('name', 'Instance')}"))
         self.refresh_launch_info()
         self.refresh_manual_forge_button()
 
@@ -1607,11 +1626,17 @@ class InstanceWindow(ctk.CTkToplevel):
         self.app.accounts_data = load_accounts()
         accounts = self.app.accounts_data.get("accounts", [])
         labels = [account_label(acc) for acc in accounts]
-        self.account_combo.configure(values=labels or [tr("Нет аккаунтов")])
+
+        if not labels:
+            self.account_combo.configure(values=[tr("Нет аккаунтов")])
+            self.account_combo.set(tr("Нет аккаунтов"))
+            return
+
+        self.account_combo.configure(values=labels)
         selected = get_selected_account(self.app.accounts_data)
         if selected:
             self.account_combo.set(account_label(selected))
-        elif labels:
+        else:
             self.account_combo.set(labels[0])
 
     def get_settings_java_values(self) -> tuple[str, str]:
@@ -2583,7 +2608,7 @@ class StoneLightLauncherApp(ctk.CTk):
 
         self.log_box = ctk.CTkTextbox(status_frame, height=92)
         self.log_box.grid(row=2, column=0, padx=16, pady=(0, 12), sticky="nsew")
-        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.34\n")
+        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.35\n")
         self.log_box.configure(state="disabled")
 
     def open_github(self):
