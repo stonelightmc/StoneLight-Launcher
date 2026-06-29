@@ -53,7 +53,7 @@ from launcher_core import (
 )
 
 
-APP_TITLE = "StoneLight Launcher v0.5.29"
+APP_TITLE = "StoneLight Launcher v0.5.30"
 JAVA_PRESET_VALUES = ["auto", "global", "java8", "java16", "java17", "java21", "java25", "manual"]
 
 GITHUB_URL = "https://github.com/stonelightmc/StoneLight-Launcher"
@@ -2446,7 +2446,7 @@ class StoneLightLauncherApp(ctk.CTk):
 
         self.log_box = ctk.CTkTextbox(status_frame, height=140)
         self.log_box.grid(row=2, column=0, padx=16, pady=(0, 16), sticky="nsew")
-        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.29\n")
+        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.30\n")
         self.log_box.configure(state="disabled")
 
     def open_github(self):

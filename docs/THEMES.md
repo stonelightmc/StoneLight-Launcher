@@ -1,6 +1,6 @@
 # Themes
 
-StoneLight Launcher v0.5.29 includes the first visual theme system.
+StoneLight Launcher v0.5.30 includes the first visual theme system.
 
 ## Themes
 

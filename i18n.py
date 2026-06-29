@@ -140,7 +140,7 @@ TRANSLATIONS = {
         "Обновить / установить": "Update / install",
         "Открыть лог": "Open log",
         "Готов к запуску.": "Ready to launch.",
-        "Добро пожаловать в StoneLight Launcher v0.5.29\n": "Welcome to StoneLight Launcher v0.5.29\n",
+        "Добро пожаловать в StoneLight Launcher v0.5.30\n": "Welcome to StoneLight Launcher v0.5.30\n",
         "полноэкранный": "fullscreen",
         "оконный": "windowed",
         "Полноэкранный": "Fullscreen",
@@ -257,7 +257,7 @@ TRANSLATIONS = {
         "Обновить / установить": "Оновити / встановити",
         "Открыть лог": "Відкрити лог",
         "Готов к запуску.": "Готовий до запуску.",
-        "Добро пожаловать в StoneLight Launcher v0.5.29\n": "Ласкаво просимо до StoneLight Launcher v0.5.29\n",
+        "Добро пожаловать в StoneLight Launcher v0.5.30\n": "Ласкаво просимо до StoneLight Launcher v0.5.30\n",
         "полноэкранный": "повноекранний",
         "оконный": "віконний",
         "Полноэкранный": "Повноекранний",
@@ -364,7 +364,7 @@ TRANSLATIONS = {
         "Обновить / установить": "Жаңарту / орнату",
         "Открыть лог": "Логты ашу",
         "Готов к запуску.": "Іске қосуға дайын.",
-        "Добро пожаловать в StoneLight Launcher v0.5.29\n": "StoneLight Launcher v0.5.29-ға қош келдіңіз\n",
+        "Добро пожаловать в StoneLight Launcher v0.5.30\n": "StoneLight Launcher v0.5.30-ға қош келдіңіз\n",
         "полноэкранный": "толық экран",
         "оконный": "терезелік",
         "Полноэкранный": "Толық экран",
@@ -393,7 +393,7 @@ TRANSLATIONS = {
     }
 }
 
-# Extra UI translations added in v0.5.29.
+# Extra UI translations added in v0.5.30.
 # These cover helper comments, small grey hints, dynamic status text, and common diagnostic fragments.
 SUPPLEMENTAL_TRANSLATIONS = {'en': {'\n\nЛаунчер заранее создаст launcher_profiles.json, чтобы старый Forge принял папку.\nПосле установки в открывшемся окне нажми «Проверить Forge» или «Играть».': '\n'
                                                                                                                                                                           '\n'
@@ -896,7 +896,7 @@ for _language, _mapping in SUPPLEMENTAL_TRANSLATIONS.items():
     TRANSLATIONS.setdefault(_language, {}).update(_mapping)
 
 
-# v0.5.29: account ComboBox placeholder capitalization fallback.
+# v0.5.30: account ComboBox placeholder capitalization fallback.
 for _lang, _value in {
     "en": "No accounts",
     "uk": "Немає акаунтів",
@@ -905,7 +905,7 @@ for _lang, _value in {
     TRANSLATIONS.setdefault(_lang, {})["Нет Аккаунтов"] = _value
 
 
-# v0.5.29: theme selector.
+# v0.5.30: theme selector.
 for _lang, _mapping in {
     "en": {
         "Theme": "Theme",
@@ -928,6 +928,36 @@ for _lang, _mapping in {
 }.items():
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
+
+# v0.5.30: protect brand names and translate instance type suffixes.
+for _lang, _mapping in {
+    "en": {
+        "StoneLight": "StoneLight",
+        "StoneLight Launcher": "StoneLight Launcher",
+        "официальная": "official",
+        "пользовательская": "custom",
+        "официальная сборка": "official instance",
+        "пользовательская сборка": "custom instance",
+    },
+    "uk": {
+        "StoneLight": "StoneLight",
+        "StoneLight Launcher": "StoneLight Launcher",
+        "официальная": "офіційна",
+        "пользовательская": "користувацька",
+        "официальная сборка": "офіційна збірка",
+        "пользовательская сборка": "користувацька збірка",
+    },
+    "kk": {
+        "StoneLight": "StoneLight",
+        "StoneLight Launcher": "StoneLight Launcher",
+        "официальная": "ресми",
+        "пользовательская": "пайдаланушы",
+        "официальная сборка": "ресми жинақ",
+        "пользовательская сборка": "пайдаланушы жинағы",
+    },
+}.items():
+    TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
+
 def tr(text: str | None) -> str | None:
     if text is None:
         return None
@@ -940,11 +970,28 @@ def tr(text: str | None) -> str | None:
     if exact is not None:
         return exact
 
-    # Deep fallback: translate known Russian fragments inside dynamic UI/status strings.
-    # This catches small helper labels and texts assembled from several string parts.
+    # Deep fallback translates only Russian/Cyrillic source fragments.
+    # English UI keys such as "Light" must not be replaced inside brand names
+    # like "StoneLight Launcher".
+    def has_cyrillic(value: str) -> bool:
+        return any(("А" <= ch <= "я") or ch in "ЁёІіЇїЄєҐґ" for ch in value)
+
+    protected_fragments = ("StoneLight", "Minecraft", "GitHub", "Microsoft", "Java", "Forge", "Fabric", "Quilt", "NeoForge")
     result = source
+
     for src, dst in sorted(mapping.items(), key=lambda item: len(item[0]), reverse=True):
-        if src and src in result:
+        if not src or src not in result:
+            continue
+
+        # Exact translations above still handle normal English labels.
+        # Substring fallback is intentionally limited to Cyrillic fragments.
+        if not has_cyrillic(src):
+            continue
+
+        for protected in protected_fragments:
+            if protected in src:
+                break
+        else:
             result = result.replace(src, dst)
 
     return result
