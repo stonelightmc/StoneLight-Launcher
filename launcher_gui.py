@@ -53,7 +53,7 @@ from launcher_core import (
 )
 
 
-APP_TITLE = "StoneLight Launcher v0.5.37"
+APP_TITLE = "StoneLight Launcher v0.5.38"
 JAVA_PRESET_VALUES = ["auto", "global", "java8", "java16", "java17", "java21", "java25", "manual"]
 
 UI_FONT = "Segoe UI Variable"
@@ -278,6 +278,37 @@ def style_danger_button(button):
             hover_color=theme_pair("danger_hover"),
             text_color=theme_pair("danger_text"),
         )
+    except Exception:
+        pass
+
+
+def style_custom_tab_button(button, active: bool):
+    try:
+        if active:
+            button.configure(
+                fg_color=theme_pair("accent"),
+                hover_color=theme_pair("accent_hover"),
+                text_color=theme_pair("accent_text"),
+                border_width=0,
+            )
+        else:
+            button.configure(
+                fg_color=theme_pair("secondary"),
+                hover_color=theme_pair("secondary_hover"),
+                text_color=theme_pair("text"),
+                border_width=1,
+                border_color=theme_pair("line"),
+            )
+    except Exception:
+        pass
+
+
+def hide_tabview_internal_tabs(tabview):
+    try:
+        segmented = getattr(tabview, "_segmented_button", None)
+        if segmented is not None:
+            segmented.grid_forget()
+            segmented.configure(height=0)
     except Exception:
         pass
 
@@ -1327,8 +1358,9 @@ class InstanceWindow(ctk.CTkToplevel):
 
         self.build_ui()
         self.apply_danger_button_styles()
-        apply_tabview_button_style(self.tabs)
-        self.after(50, lambda: apply_tabview_button_style(self.tabs))
+        self.update_custom_tab_buttons()
+        hide_tabview_internal_tabs(self.tabs)
+        self.after(50, lambda: hide_tabview_internal_tabs(self.tabs))
         self.refresh_all()
         self.subscribe_console_history()
         self.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -1348,7 +1380,7 @@ class InstanceWindow(ctk.CTkToplevel):
 
     def build_ui(self):
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(2, weight=1)
 
         header = ctk.CTkFrame(self, corner_radius=18)
         header.grid(row=0, column=0, padx=18, pady=(18, 10), sticky="ew")
@@ -1360,8 +1392,12 @@ class InstanceWindow(ctk.CTkToplevel):
         self.subtitle_label = ctk.CTkLabel(header, text="", text_color="#bdbdbd")
         self.subtitle_label.grid(row=1, column=0, padx=18, pady=(0, 16), sticky="w")
 
+        self.custom_tab_bar = ctk.CTkFrame(self, fg_color="transparent", border_width=0)
+        self.custom_tab_bar.grid(row=1, column=0, padx=18, pady=(0, 8), sticky="ew")
+        self.custom_tab_bar.grid_columnconfigure((0, 1, 2, 3), weight=1, uniform="instance_tabs")
+
         self.tabs = ctk.CTkTabview(self, corner_radius=18)
-        self.tabs.grid(row=1, column=0, padx=18, pady=(8, 18), sticky="nsew")
+        self.tabs.grid(row=2, column=0, padx=18, pady=(0, 18), sticky="nsew")
         apply_tabview_button_style(self.tabs)
 
         self.tab_launch_name = tr("Запуск")
@@ -1373,14 +1409,45 @@ class InstanceWindow(ctk.CTkToplevel):
         self.tab_files = self.tabs.add(self.tab_files_name)
         self.tab_settings = self.tabs.add(self.tab_settings_name)
         self.tab_console = self.tabs.add(self.tab_console_name)
+        hide_tabview_internal_tabs(self.tabs)
         apply_tabview_button_style(self.tabs)
-        self.after(50, lambda: apply_tabview_button_style(self.tabs))
-        self.after(200, lambda: apply_tabview_button_style(self.tabs))
+        self.after(50, lambda: hide_tabview_internal_tabs(self.tabs))
+        self.after(200, lambda: hide_tabview_internal_tabs(self.tabs))
+
+        self.custom_tab_buttons = {}
+        self.active_tab_name = self.tab_launch_name
+        self.create_custom_tab_button(self.tab_launch_name, 0)
+        self.create_custom_tab_button(self.tab_files_name, 1)
+        self.create_custom_tab_button(self.tab_settings_name, 2)
+        self.create_custom_tab_button(self.tab_console_name, 3)
+        self.select_custom_tab(self.tab_launch_name)
 
         self.build_launch_tab()
         self.build_files_tab()
         self.build_settings_tab()
         self.build_console_tab()
+
+    def create_custom_tab_button(self, tab_name: str, column: int):
+        button = ctk.CTkButton(
+            self.custom_tab_bar,
+            text=tab_name,
+            height=38,
+            font=ui_font(14, "bold"),
+            command=lambda name=tab_name: self.select_custom_tab(name),
+        )
+        button.grid(row=0, column=column, padx=5, pady=0, sticky="ew")
+        self.custom_tab_buttons[tab_name] = button
+        style_custom_tab_button(button, active=False)
+
+    def select_custom_tab(self, tab_name: str):
+        self.active_tab_name = tab_name
+        safe_tab_set(self.tabs, tab_name)
+        hide_tabview_internal_tabs(self.tabs)
+        self.update_custom_tab_buttons()
+
+    def update_custom_tab_buttons(self):
+        for name, button in getattr(self, "custom_tab_buttons", {}).items():
+            style_custom_tab_button(button, active=(name == getattr(self, "active_tab_name", None)))
 
     def build_launch_tab(self):
         tab = self.tab_launch
@@ -2675,7 +2742,7 @@ class StoneLightLauncherApp(ctk.CTk):
 
         self.log_box = ctk.CTkTextbox(status_frame, height=92)
         self.log_box.grid(row=2, column=0, padx=16, pady=(0, 12), sticky="nsew")
-        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.37\n")
+        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.38\n")
         self.log_box.configure(state="disabled")
         self.apply_danger_button_styles()
 

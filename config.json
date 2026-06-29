@@ -1,6 +1,6 @@
 {
   "launcher_name": "StoneLight Launcher",
-  "launcher_version": "0.5.37",
+  "launcher_version": "0.5.38",
   "minecraft_version": "26.1.2",
   "loader": "fabric",
   "fabric_loader_version": "0.19.3",
@@ -51,5 +51,5 @@
     "neon",
     "retro_future"
   ],
-  "ui_style": "modern_cards_tabs_danger_fixed"
+  "ui_style": "modern_cards_custom_tabs"
 }
