@@ -1,0 +1,128 @@
+# Localization
+
+StoneLight Launcher v0.5.47 includes a first localization layer.
+
+Supported languages:
+
+```text
+en - English, default
+uk - Ukrainian
+kk - Kazakh
+```
+
+The selected language is stored in:
+
+```text
+user_settings.json
+```
+
+Translations are stored in:
+
+```text
+i18n.py
+```
+
+This first pass covers the main launcher UI, account controls, instance controls, global settings, common buttons, and Microsoft login window. Some dynamic diagnostic messages and low-level logs may still appear in Russian/English and can be migrated gradually.
+
+
+## v0.5.47 deeper pass
+
+The localization layer now also translates:
+
+```text
+- CTkTextbox.insert() content
+- common dynamic status fragments
+- grey helper comments in instance/settings/login windows
+- Microsoft OAuth callback success page
+```
+
+Some low-level technical logs from installers/loaders may still remain untranslated because they are intended for diagnostics.
+
+
+## v0.5.47
+
+Fixed localization of `CTkComboBox` values and selected text. This fixes the account selector placeholder:
+
+```text
+Нет аккаунтов
+```
+
+which is now translated as:
+
+```text
+No accounts
+Немає акаунтів
+Аккаунт жоқ
+```
+
+
+## v0.5.47
+
+Fixed two localization edge cases:
+
+```text
+StoneLight Launcher
+```
+
+is protected as a brand name and is no longer translated as `StoneСвітла Launcher` or similar.
+
+Instance type suffixes are now localized:
+
+```text
+официальная      → official / офіційна / ресми
+пользовательская → custom / користувацька / пайдаланушы
+```
+
+
+## v0.5.47
+
+Added localized theme names:
+
+```text
+Laconic / Лаконічна / Лаконикалық
+Neon / Неон / Неон
+Retro Future / Ретро-футуризм / Ретро-футуризм
+```
+
+
+## v0.5.47 update service localization
+
+Update-system service messages were added to localization dictionaries:
+
+- update auto-check status
+- launcher update availability
+- launcher update download/apply status
+- official StoneLight modpack update status
+- pre-launch update flow messages
+- update-related errors from `updater.py`
+- cancellation and fallback launch prompts
+
+
+## v0.5.47
+
+Added localization keys for:
+
+- shorter `Updates` button
+- shorter `Install` button
+- explicit no-update message for launcher + official StoneLight build
+- full launcher-update prompt with current/latest versions
+
+
+## v0.5.47
+
+Dynamic update errors are now translated with pattern matching.
+
+Fixed case:
+
+```text
+В репозитории stonelightmc/StoneLight-Launcher не найден latest release.
+```
+
+This message is now translated even though the repository name is inserted dynamically.
+
+Also, missing launcher GitHub Releases are treated as a non-fatal launcher-update warning so the official StoneLight build update check can continue.
+
+
+## v0.5.47
+
+Added localization keys for startup messages and install/update flow messages.
