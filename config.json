@@ -1,6 +1,6 @@
 {
   "launcher_name": "StoneLight Launcher",
-  "launcher_version": "0.5.38",
+  "launcher_version": "0.5.40",
   "minecraft_version": "26.1.2",
   "loader": "fabric",
   "fabric_loader_version": "0.19.3",
@@ -51,5 +51,14 @@
     "neon",
     "retro_future"
   ],
-  "ui_style": "modern_cards_custom_tabs"
+  "ui_style": "modern_cards_custom_tabs_updates_prelaunch",
+  "launcher_update_repo": "stonelightmc/StoneLight-Launcher",
+  "launcher_update_asset_keyword": "GitHub.zip",
+  "autocheck_updates": true,
+  "official_modpack_update_repo": "stonelightmc/stonelightmc.github.io",
+  "official_modpack_asset_prefix": "mods_",
+  "official_modpack_asset_suffix": ".zip",
+  "official_modpack_autocheck": true,
+  "official_modpack_check_before_launch": true,
+  "official_modpack_offer_skip_update": true
 }

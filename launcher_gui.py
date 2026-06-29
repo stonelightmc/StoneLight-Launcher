@@ -52,8 +52,18 @@ from launcher_core import (
     normalize_global_launch_settings,
 )
 
+from updater import (
+    UpdateError,
+    check_launcher_update,
+    check_official_modpack_update,
+    download_launcher_update,
+    apply_official_modpack_update_to_config,
+    create_launcher_update_script,
+    run_update_script_and_exit,
+)
 
-APP_TITLE = "StoneLight Launcher v0.5.38"
+
+APP_TITLE = "StoneLight Launcher v0.5.40"
 JAVA_PRESET_VALUES = ["auto", "global", "java8", "java16", "java17", "java21", "java25", "manual"]
 
 UI_FONT = "Segoe UI Variable"
@@ -2017,6 +2027,107 @@ class InstanceWindow(ctk.CTkToplevel):
         if not busy:
             self.refresh_manual_forge_button()
 
+    def on_check_updates(self, auto: bool = False):
+        if self.worker_thread and self.worker_thread.is_alive():
+            if not auto:
+                messagebox.showwarning("StoneLight Launcher", "Уже выполняется задача.")
+            return
+
+        if not auto:
+            self.append_log("Проверяю обновления...")
+            self.status_label.configure(text=tr("Проверяю обновления..."))
+            self.set_busy(True)
+            self.progress.set(0)
+
+        def wrapper():
+            try:
+                cfg = LauncherCore().base_config
+                launcher_info = check_launcher_update(cfg)
+                official_info = check_official_modpack_update(cfg)
+                self.ui_queue.put(("updates_result", launcher_info, official_info, auto))
+            except Exception as exc:
+                if auto:
+                    self.ui_queue.put(("log", "Автопроверка обновлений не удалась: " + str(exc)))
+                else:
+                    self.ui_queue.put(("error", str(exc)))
+
+        self.worker_thread = threading.Thread(target=wrapper, daemon=True)
+        self.worker_thread.start()
+
+    def handle_updates_result(self, launcher_info: dict, official_info: dict, auto: bool = False):
+        launcher_update = launcher_info.get("has_update", False)
+        official_update = official_info.get("has_update", False)
+
+        if not launcher_update and not official_update:
+            if not auto:
+                self.append_log("Обновлений не найдено.")
+                self.status_label.configure(text=tr("Обновлений не найдено."))
+                messagebox.showinfo("StoneLight Launcher", tr("Обновлений не найдено."))
+            return
+
+        if launcher_update:
+            message = (
+                f"Доступна новая версия лаунчера: {launcher_info.get('latest_version')}\n"
+                f"Текущая версия: {launcher_info.get('current_version')}\n\n"
+                "Скачать обновление лаунчера?"
+            )
+            if not auto:
+                if messagebox.askyesno("StoneLight Launcher", tr(message)):
+                    self.download_launcher_update_worker(launcher_info)
+                    return
+            else:
+                self.append_log(f"Доступна новая версия лаунчера: {launcher_info.get('latest_version')}")
+
+        if official_update:
+            message = (
+                "Доступно обновление официальной StoneLight-сборки.\n\n"
+                f"Новый архив: {official_info.get('asset_name')}\n"
+                f"Minecraft: {official_info.get('latest_minecraft_version') or official_info.get('current_minecraft_version')}\n\n"
+                "Применить метаданные и запустить обновление сборки?"
+            )
+            if (not auto) and messagebox.askyesno("StoneLight Launcher", tr(message)):
+                self.apply_official_update_and_run(official_info)
+            elif auto:
+                self.append_log("Доступно обновление официальной StoneLight-сборки.")
+
+    def download_launcher_update_worker(self, launcher_info: dict):
+        self.set_busy(True)
+        self.progress.set(0)
+        self.status_label.configure(text=tr("Скачиваю обновление лаунчера..."))
+
+        def progress(done, total):
+            self.ui_queue.put(("progress", done, total))
+
+        def wrapper():
+            try:
+                archive = download_launcher_update(launcher_info, progress_callback=progress)
+                script = create_launcher_update_script(archive)
+                self.ui_queue.put(("launcher_update_ready", str(script)))
+            except Exception as exc:
+                self.ui_queue.put(("error", str(exc)))
+
+        self.worker_thread = threading.Thread(target=wrapper, daemon=True)
+        self.worker_thread.start()
+
+    def apply_launcher_update_now(self, script_path: str):
+        message = (
+            "Лаунчер сейчас закроется, обновит файлы и запустится заново.\n\n"
+            "Продолжить?"
+        )
+        if messagebox.askyesno("StoneLight Launcher", tr(message)):
+            run_update_script_and_exit(Path(script_path))
+
+    def apply_official_update_and_run(self, official_info: dict):
+        try:
+            self.config = apply_official_modpack_update_to_config(official_info, self.config)
+            self.instances_data = load_instances(self.config)
+            self.refresh_instances_ui()
+            self.append_log("Метаданные официальной сборки обновлены. Запускаю обновление сборки...")
+            self.on_update()
+        except Exception as exc:
+            messagebox.showerror("StoneLight Launcher", str(exc))
+            self.append_log("ОШИБКА: " + str(exc))
+
     def start_worker(self, target, done_message: str):
         if self.worker_thread and self.worker_thread.is_alive():
             messagebox.showwarning("StoneLight Launcher", "Уже выполняется задача.")
@@ -2448,6 +2559,8 @@ class StoneLightLauncherApp(ctk.CTk):
         self.refresh_instances_ui()
         self.refresh_accounts_ui()
         self.poll_queue()
+        if self.settings.get("autocheck_updates", self.config.get("autocheck_updates", True)):
+            self.after(2500, lambda: self.on_check_updates(auto=True))
 
     def build_ui(self):
         apply_theme_to_window(self)
@@ -2728,6 +2841,14 @@ class StoneLightLauncherApp(ctk.CTk):
         )
         self.open_log_button.grid(row=0, column=3, padx=10, pady=10, sticky="ew")
 
+        self.check_updates_button = ctk.CTkButton(
+            actions,
+            text="Проверить обновления",
+            height=38,
+            command=lambda: self.on_check_updates(auto=False)
+        )
+        self.check_updates_button.grid(row=1, column=0, columnspan=4, padx=10, pady=(0, 10), sticky="ew")
+
         status_frame = ctk.CTkFrame(self, corner_radius=22)
         status_frame.grid(row=4, column=0, padx=18, pady=(8, 18), sticky="nsew")
         status_frame.grid_columnconfigure(0, weight=1)
@@ -2742,7 +2863,7 @@ class StoneLightLauncherApp(ctk.CTk):
 
         self.log_box = ctk.CTkTextbox(status_frame, height=92)
         self.log_box.grid(row=2, column=0, padx=16, pady=(0, 12), sticky="nsew")
-        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.38\n")
+        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.40\n")
         self.log_box.configure(state="disabled")
         self.apply_danger_button_styles()
 
@@ -3208,6 +3329,8 @@ class StoneLightLauncherApp(ctk.CTk):
             self.delete_instance_button, self.open_instance_button, self.open_instance_folder_button, self.global_settings_button
         ]:
             widget.configure(state=state)
+        if hasattr(self, "check_updates_button"):
+            self.check_updates_button.configure(state=state)
         if hasattr(self, "stop_button"):
             self.stop_button.configure(state="normal")
         if not busy:
@@ -3241,6 +3364,24 @@ class StoneLightLauncherApp(ctk.CTk):
                     self.set_busy(False)
                     self.progress.set(1)
                     self.append_log(event[1])
+                elif kind == "updates_result":
+                    self.set_busy(False)
+                    self.progress.set(0)
+                    self.handle_updates_result(event[1], event[2], event[3])
+                elif kind == "official_play_update_result":
+                    self.set_busy(False)
+                    self.progress.set(0)
+                    self.handle_official_play_update_result(event[1])
+                elif kind == "official_play_update_check_failed":
+                    self.set_busy(False)
+                    self.progress.set(0)
+                    self.handle_official_play_update_check_failed(event[1])
+                elif kind == "launcher_update_ready":
+                    self.set_busy(False)
+                    self.progress.set(1)
+                    self.append_log("Обновление лаунчера скачано. Скрипт применения: " + event[1])
+                    if messagebox.askyesno("StoneLight Launcher", tr("Обновление скачано. Применить и перезапустить лаунчер сейчас?")):
+                        self.apply_launcher_update_now(event[1])
                 elif kind == "error":
                     self.set_busy(False)
                     self.progress.set(0)
@@ -3256,6 +3397,215 @@ class StoneLightLauncherApp(ctk.CTk):
         self.log_box.insert("end", str(message).rstrip() + "\n")
         self.log_box.see("end")
         self.log_box.configure(state="disabled")
+
+    def on_check_updates(self, auto: bool = False):
+        if self.worker_thread and self.worker_thread.is_alive():
+            if not auto:
+                messagebox.showwarning("StoneLight Launcher", tr("Уже выполняется задача."))
+            return
+
+        if not auto:
+            self.append_log("Проверяю обновления...")
+            self.status_label.configure(text=tr("Проверяю обновления..."))
+            self.set_busy(True)
+            self.progress.set(0)
+
+        def wrapper():
+            try:
+                cfg = LauncherCore().base_config
+                launcher_info = check_launcher_update(cfg)
+                official_info = check_official_modpack_update(cfg)
+                self.ui_queue.put(("updates_result", launcher_info, official_info, auto))
+            except Exception as exc:
+                if auto:
+                    self.ui_queue.put(("log", "Автопроверка обновлений не удалась: " + str(exc)))
+                else:
+                    self.ui_queue.put(("error", str(exc)))
+
+        self.worker_thread = threading.Thread(target=wrapper, daemon=True)
+        self.worker_thread.start()
+
+    def handle_updates_result(self, launcher_info: dict, official_info: dict, auto: bool = False):
+        launcher_update = launcher_info.get("has_update", False)
+        official_update = official_info.get("has_update", False)
+
+        if not launcher_update and not official_update:
+            if not auto:
+                self.append_log("Обновлений не найдено.")
+                self.status_label.configure(text=tr("Обновлений не найдено."))
+                messagebox.showinfo("StoneLight Launcher", tr("Обновлений не найдено."))
+            return
+
+        if launcher_update:
+            message = (
+                f"Доступна новая версия лаунчера: {launcher_info.get('latest_version')}\n"
+                f"Текущая версия: {launcher_info.get('current_version')}\n\n"
+                "Скачать обновление лаунчера?"
+            )
+            if not auto:
+                if messagebox.askyesno("StoneLight Launcher", tr(message)):
+                    self.download_launcher_update_worker(launcher_info)
+                    return
+            else:
+                self.append_log(f"Доступна новая версия лаунчера: {launcher_info.get('latest_version')}")
+
+        if official_update:
+            message = self.official_update_message(official_info, suffix="Применить метаданные и запустить обновление сборки?")
+            if (not auto) and messagebox.askyesno("StoneLight Launcher", tr(message)):
+                self.apply_official_update_and_run(official_info)
+            elif auto:
+                self.append_log("Доступно обновление официальной StoneLight-сборки.")
+
+    def download_launcher_update_worker(self, launcher_info: dict):
+        self.set_busy(True)
+        self.progress.set(0)
+        self.status_label.configure(text=tr("Скачиваю обновление лаунчера..."))
+
+        def progress(done, total):
+            self.ui_queue.put(("progress", done, total))
+
+        def wrapper():
+            try:
+                archive = download_launcher_update(launcher_info, progress_callback=progress)
+                script = create_launcher_update_script(archive)
+                self.ui_queue.put(("launcher_update_ready", str(script)))
+            except Exception as exc:
+                self.ui_queue.put(("error", str(exc)))
+
+        self.worker_thread = threading.Thread(target=wrapper, daemon=True)
+        self.worker_thread.start()
+
+    def apply_launcher_update_now(self, script_path: str):
+        message = (
+            "Лаунчер сейчас закроется, обновит файлы и запустится заново.\n\n"
+            "Продолжить?"
+        )
+        if messagebox.askyesno("StoneLight Launcher", tr(message)):
+            run_update_script_and_exit(Path(script_path))
+
+    def official_update_message(self, official_info: dict, suffix: str = "") -> str:
+        latest = official_info.get("latest_minecraft_version") or official_info.get("current_minecraft_version") or "?"
+        asset_name = official_info.get("asset_name") or "mods_*.zip"
+        message = (
+            "Доступно обновление официальной StoneLight-сборки.\n\n"
+            f"Новый архив: {asset_name}\n"
+            f"Minecraft: {latest}"
+        )
+        if suffix:
+            message += "\n\n" + suffix
+        return message
+
+    def apply_official_update_metadata(self, official_info: dict, select_official: bool = True):
+        self.config = apply_official_modpack_update_to_config(official_info, self.config)
+
+        if select_official:
+            self.instances_data = select_instance(self.config, "stonelight")
+        else:
+            self.instances_data = load_instances(self.config)
+
+        self.refresh_instances_ui()
+        official = find_instance_by_id(self.instances_data, "stonelight")
+        existing = self.instance_windows.get("stonelight")
+        if existing and existing.winfo_exists():
+            existing.refresh_all()
+
+        latest = official_info.get("latest_minecraft_version") or (official or {}).get("minecraft_version", "?")
+        self.append_log(f"Официальная сборка StoneLight обновлена до {latest}.")
+        return official
+
+    def apply_official_update_and_run(self, official_info: dict):
+        try:
+            self.apply_official_update_metadata(official_info, select_official=True)
+            self.append_log("Метаданные официальной сборки обновлены. Запускаю обновление сборки...")
+            self.start_worker(
+                lambda core, username, ram_mb, java, account: core.update_only(java, force_download=True),
+                "Официальная сборка StoneLight обновлена."
+            )
+        except Exception as exc:
+            messagebox.showerror("StoneLight Launcher", str(exc))
+            self.append_log("ОШИБКА: " + str(exc))
+
+    def should_check_official_before_launch(self, instance: dict | None) -> bool:
+        if not instance:
+            return False
+        if not instance.get("official"):
+            return False
+        return bool(self.config.get("official_modpack_check_before_launch", True))
+
+    def check_official_before_play(self, instance: dict):
+        if self.worker_thread and self.worker_thread.is_alive():
+            messagebox.showwarning("StoneLight Launcher", tr("Уже выполняется задача."))
+            return
+
+        self.append_log("Проверяю обновление StoneLight перед запуском...")
+        self.status_label.configure(text=tr("Проверяю обновление StoneLight перед запуском..."))
+        self.set_busy(True)
+        self.progress.set(0)
+
+        def wrapper():
+            try:
+                cfg = LauncherCore().base_config
+                info = check_official_modpack_update(cfg)
+                self.ui_queue.put(("official_play_update_result", info))
+            except Exception as exc:
+                self.ui_queue.put(("official_play_update_check_failed", str(exc)))
+
+        self.worker_thread = threading.Thread(target=wrapper, daemon=True)
+        self.worker_thread.start()
+
+    def handle_official_play_update_result(self, official_info: dict):
+        if not official_info.get("has_update", False):
+            self.append_log("Обновлений StoneLight перед запуском не найдено.")
+            self.start_play_worker(force_modpack_download=False)
+            return
+
+        latest = official_info.get("latest_minecraft_version") or "?"
+        message = self.official_update_message(
+            official_info,
+            suffix=f"Обновить StoneLight до {latest} перед запуском?"
+        )
+
+        if messagebox.askyesno("StoneLight Launcher", tr(message)):
+            try:
+                self.apply_official_update_metadata(official_info, select_official=True)
+                self.append_log("Обновление StoneLight применено. Запускаю новую версию...")
+                self.start_play_worker(force_modpack_download=True)
+            except Exception as exc:
+                messagebox.showerror("StoneLight Launcher", str(exc))
+                self.append_log("ОШИБКА: " + str(exc))
+        else:
+            if self.config.get("official_modpack_offer_skip_update", True):
+                if messagebox.askyesno(
+                    "StoneLight Launcher",
+                    tr("Запустить текущую версию StoneLight без обновления?")
+                ):
+                    self.start_play_worker(force_modpack_download=False)
+                else:
+                    self.append_log("Запуск StoneLight отменён пользователем.")
+            else:
+                self.append_log("Запуск StoneLight отменён: обновление не применено.")
+
+    def handle_official_play_update_check_failed(self, error_text: str):
+        self.append_log("Не удалось проверить обновления StoneLight: " + str(error_text))
+        if messagebox.askyesno(
+            "StoneLight Launcher",
+            tr("Не удалось проверить обновления StoneLight. Запустить текущую версию?")
+        ):
+            self.start_play_worker(force_modpack_download=False)
+        else:
+            self.append_log("Запуск StoneLight отменён.")
+
+    def start_play_worker(self, force_modpack_download: bool = False):
+        self.start_worker(
+            lambda core, username, ram_mb, java, account: core.run_full(
+                username,
+                ram_mb,
+                java,
+                force_modpack_download=force_modpack_download,
+                account=account
+            ),
+            "Minecraft запущен."
+        )
 
     def start_worker(self, target, done_message: str):
         if self.worker_thread and self.worker_thread.is_alive():
@@ -3310,12 +3660,30 @@ class StoneLightLauncherApp(ctk.CTk):
             messagebox.showerror("StoneLight Launcher", str(exc))
 
     def on_play(self):
-        self.start_worker(
-            lambda core, username, ram_mb, java, account: core.run_full(username, ram_mb, java, force_modpack_download=False, account=account),
-            "Minecraft запущен."
-        )
+        try:
+            instance = self.get_selected_instance()
+        except Exception as exc:
+            messagebox.showerror("StoneLight Launcher", str(exc))
+            return
+
+        if self.should_check_official_before_launch(instance):
+            self.check_official_before_play(instance)
+            return
+
+        self.start_play_worker(force_modpack_download=False)
 
     def on_update(self):
+        try:
+            instance = self.get_selected_instance()
+        except Exception as exc:
+            messagebox.showerror("StoneLight Launcher", str(exc))
+            return
+
+        if instance.get("official"):
+            # Manual "Update" for the official StoneLight build also checks release metadata first.
+            self.on_check_updates(auto=False)
+            return
+
         self.start_worker(
             lambda core, username, ram_mb, java, account: core.update_only(java, force_download=True),
             "Сборка обновлена/установлена."
