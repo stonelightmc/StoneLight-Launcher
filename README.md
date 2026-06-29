@@ -1,4 +1,4 @@
-# StoneLight Launcher v0.5.48
+# StoneLight Launcher v0.5.49
 
 Unofficial Minecraft launcher for the StoneLight community.
 
@@ -60,7 +60,7 @@ data/
 StoneLight Launcher is not affiliated with Microsoft, Mojang Studios, or Minecraft.
 
 
-## v0.5.48
+## v0.5.49
 
 Deeper localization pass:
 
