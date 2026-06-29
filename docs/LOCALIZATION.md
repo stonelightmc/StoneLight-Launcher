@@ -1,6 +1,6 @@
 # Localization
 
-StoneLight Launcher v0.5.47 includes a first localization layer.
+StoneLight Launcher v0.5.48 includes a first localization layer.
 
 Supported languages:
 
@@ -25,7 +25,7 @@ i18n.py
 This first pass covers the main launcher UI, account controls, instance controls, global settings, common buttons, and Microsoft login window. Some dynamic diagnostic messages and low-level logs may still appear in Russian/English and can be migrated gradually.
 
 
-## v0.5.47 deeper pass
+## v0.5.48 deeper pass
 
 The localization layer now also translates:
 
@@ -39,7 +39,7 @@ The localization layer now also translates:
 Some low-level technical logs from installers/loaders may still remain untranslated because they are intended for diagnostics.
 
 
-## v0.5.47
+## v0.5.48
 
 Fixed localization of `CTkComboBox` values and selected text. This fixes the account selector placeholder:
 
@@ -56,7 +56,7 @@ No accounts
 ```
 
 
-## v0.5.47
+## v0.5.48
 
 Fixed two localization edge cases:
 
@@ -74,7 +74,7 @@ Instance type suffixes are now localized:
 ```
 
 
-## v0.5.47
+## v0.5.48
 
 Added localized theme names:
 
@@ -85,7 +85,7 @@ Retro Future / Ретро-футуризм / Ретро-футуризм
 ```
 
 
-## v0.5.47 update service localization
+## v0.5.48 update service localization
 
 Update-system service messages were added to localization dictionaries:
 
@@ -98,7 +98,7 @@ Update-system service messages were added to localization dictionaries:
 - cancellation and fallback launch prompts
 
 
-## v0.5.47
+## v0.5.48
 
 Added localization keys for:
 
@@ -108,7 +108,7 @@ Added localization keys for:
 - full launcher-update prompt with current/latest versions
 
 
-## v0.5.47
+## v0.5.48
 
 Dynamic update errors are now translated with pattern matching.
 
@@ -123,6 +123,16 @@ This message is now translated even though the repository name is inserted dynam
 Also, missing launcher GitHub Releases are treated as a non-fatal launcher-update warning so the official StoneLight build update check can continue.
 
 
-## v0.5.47
+## v0.5.48
 
 Added localization keys for startup messages and install/update flow messages.
+
+
+## v0.5.48
+
+Centralized service/status/log localization:
+
+- `append_log()` translates service messages.
+- `append_console()` translates short service messages.
+- `set_label_text()` translates status labels.
+- Dynamic service patterns are handled by `tr_service()`.

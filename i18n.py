@@ -980,7 +980,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.5.47: update manager UI.
+# v0.5.48: update manager UI.
 for _lang, _mapping in {
     "en": {
         "Проверить обновления": "Check updates",
@@ -1022,7 +1022,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.5.47: official StoneLight pre-launch update flow.
+# v0.5.48: official StoneLight pre-launch update flow.
 for _lang, _mapping in {
     "en": {
         "Проверяю обновление StoneLight перед запуском...": "Checking StoneLight update before launch...",
@@ -1061,7 +1061,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.5.47: update service messages.
+# v0.5.48: update service messages.
 for _lang, _mapping in {
     "en": {
         "Автопроверка обновлений не удалась: {error}": "Auto-check for updates failed: {error}",
@@ -1142,7 +1142,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.5.47: shorter update buttons and clearer update-service messages.
+# v0.5.48: shorter update buttons and clearer update-service messages.
 for _lang, _mapping in {
     "en": {
         "Обновления": "Updates",
@@ -1169,7 +1169,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.5.47: dynamic update-error localization and missing launcher release handling.
+# v0.5.48: dynamic update-error localization and missing launcher release handling.
 for _lang, _mapping in {
     "en": {
         "В репозитории {repo} не найден latest release.": "No latest release was found in repository {repo}.",
@@ -1193,7 +1193,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.5.47: update flow cleanup and startup message localization.
+# v0.5.48: update flow cleanup and startup message localization.
 for _lang, _mapping in {
     "en": {
         "Готов к запуску.": "Ready to launch.",
@@ -1230,6 +1230,51 @@ for _lang, _mapping in {
         "Автопроверка обновлений не удалась: {error}": "Жаңартуларды автоматты тексеру сәтсіз аяқталды: {error}",
         "Minecraft запущен.": "Minecraft іске қосылды.",
         "Repair завершён.": "Repair аяқталды.",
+    },
+}.items():
+    TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
+
+
+# v0.5.48: centralized service/status/log localization.
+for _lang, _mapping in {
+    "en": {
+        "Запущенный процесс этой сборки не найден.": "No running process was found for this instance.",
+        "Проверка обновлений заняла слишком много времени и была остановлена.": "Update check took too long and was stopped.",
+        "Проверка обновлений остановлена по таймауту.": "Update check stopped by timeout.",
+        "Проверяю обновления...": "Checking for updates...",
+        "Обновлений лаунчера и StoneLight-сборки не найдено.": "No launcher or StoneLight build updates found.",
+        "Доступно обновление официальной StoneLight-сборки.": "Official StoneLight instance update is available.",
+        "Обновлений StoneLight перед запуском не найдено.": "No StoneLight updates found before launch.",
+        "Запуск StoneLight отменён.": "StoneLight launch canceled.",
+        "Запуск StoneLight отменён пользователем.": "StoneLight launch canceled by user.",
+        "Готов к запуску.": "Ready to launch.",
+        "Готово.": "Ready.",
+    },
+    "uk": {
+        "Запущенный процесс этой сборки не найден.": "Запущений процес цієї збірки не знайдено.",
+        "Проверка обновлений заняла слишком много времени и была остановлена.": "Перевірка оновлень тривала занадто довго й була зупинена.",
+        "Проверка обновлений остановлена по таймауту.": "Перевірку оновлень зупинено за таймаутом.",
+        "Проверяю обновления...": "Перевіряю оновлення...",
+        "Обновлений лаунчера и StoneLight-сборки не найдено.": "Оновлень лаунчера та StoneLight-збірки не знайдено.",
+        "Доступно обновление официальной StoneLight-сборки.": "Доступне оновлення офіційної StoneLight-збірки.",
+        "Обновлений StoneLight перед запуском не найдено.": "Оновлень StoneLight перед запуском не знайдено.",
+        "Запуск StoneLight отменён.": "Запуск StoneLight скасовано.",
+        "Запуск StoneLight отменён пользователем.": "Запуск StoneLight скасовано користувачем.",
+        "Готов к запуску.": "Готовий до запуску.",
+        "Готово.": "Готово.",
+    },
+    "kk": {
+        "Запущенный процесс этой сборки не найден.": "Бұл жинақтың іске қосылған процесі табылмады.",
+        "Проверка обновлений заняла слишком много времени и была остановлена.": "Жаңартуларды тексеру тым ұзаққа созылып, тоқтатылды.",
+        "Проверка обновлений остановлена по таймауту.": "Жаңартуларды тексеру таймаут бойынша тоқтатылды.",
+        "Проверяю обновления...": "Жаңартулар тексерілуде...",
+        "Обновлений лаунчера и StoneLight-сборки не найдено.": "Лаунчер және StoneLight жинағы үшін жаңарту табылмады.",
+        "Доступно обновление официальной StoneLight-сборки.": "Ресми StoneLight жинағының жаңартуы қолжетімді.",
+        "Обновлений StoneLight перед запуском не найдено.": "Іске қосу алдында StoneLight жаңартуы табылмады.",
+        "Запуск StoneLight отменён.": "StoneLight іске қосылмады.",
+        "Запуск StoneLight отменён пользователем.": "StoneLight іске қосуын пайдаланушы тоқтатты.",
+        "Готов к запуску.": "Іске қосуға дайын.",
+        "Готово.": "Дайын.",
     },
 }.items():
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)

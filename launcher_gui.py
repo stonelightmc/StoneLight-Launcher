@@ -63,7 +63,7 @@ from updater import (
 )
 
 
-APP_TITLE = "StoneLight Launcher v0.5.47"
+APP_TITLE = "StoneLight Launcher v0.5.48"
 JAVA_PRESET_VALUES = ["auto", "global", "java8", "java16", "java17", "java21", "java25", "manual"]
 
 UI_FONT = "Segoe UI Variable"
@@ -137,6 +137,38 @@ def tr_update_error(text) -> str:
         return tr("ОШИБКА: {error}").format(error=match.group(1))
 
     return tr(text)
+
+
+def tr_service(text) -> str:
+    """Translate short human-facing service/status/log text."""
+    if text is None:
+        return ""
+    text = str(text)
+
+    translated = tr_update_error(text)
+    if translated != text:
+        return translated
+
+    patterns = [
+        (r"Добро пожаловать в StoneLight Launcher v(.+)", "Добро пожаловать в StoneLight Launcher v{version}", "version"),
+        (r"Запускаю локальную установку/обновление сборки: (.+)", "Запускаю локальную установку/обновление сборки: {name}", "name"),
+        (r"Доступна новая версия лаунчера: (.+)", "Доступна новая версия лаунчера: {version}", "version"),
+        (r"Официальная сборка StoneLight обновлена до (.+)\.", "Официальная сборка StoneLight обновлена до {latest}.", "latest"),
+        (r"Автопроверка обновлений не удалась: (.+)", "Автопроверка обновлений не удалась: {error}", "error"),
+    ]
+    for regex, key, group_name in patterns:
+        match = re.fullmatch(regex, text)
+        if match:
+            return tr(key).format(**{group_name: match.group(1)})
+
+    return tr(text)
+
+
+def set_label_text(label, text):
+    try:
+        label.configure(text=tr_service(text))
+    except Exception:
+        pass
 
 
 THEME_NAMES = {
@@ -2136,7 +2168,7 @@ class InstanceWindow(ctk.CTkToplevel):
 
         if not auto:
             self.append_log(tr("Проверяю обновления..."))
-            self.status_label.configure(text=tr("Проверяю обновления..."))
+            set_label_text(self.status_label, "Проверяю обновления...")
             self.set_busy(True)
             self.progress.set(0)
 
@@ -2166,7 +2198,7 @@ class InstanceWindow(ctk.CTkToplevel):
         if not launcher_update and not official_update:
             if not auto:
                 self.append_log(tr("Обновлений лаунчера и StoneLight-сборки не найдено."))
-                self.status_label.configure(text=tr("Обновлений лаунчера и StoneLight-сборки не найдено."))
+                set_label_text(self.status_label, "Обновлений лаунчера и StoneLight-сборки не найдено.")
                 messagebox.showinfo("StoneLight Launcher", tr("Обновлений лаунчера и StoneLight-сборки не найдено."))
             return
 
@@ -2201,7 +2233,7 @@ class InstanceWindow(ctk.CTkToplevel):
     def download_launcher_update_worker(self, launcher_info: dict):
         self.set_busy(True)
         self.progress.set(0)
-        self.status_label.configure(text=tr("Скачиваю обновление лаунчера..."))
+        set_label_text(self.status_label, "Скачиваю обновление лаунчера...")
 
         def progress(done, total):
             self.ui_queue.put(("progress", done, total))
@@ -2298,7 +2330,7 @@ class InstanceWindow(ctk.CTkToplevel):
             name=self.instance.get("name", "Instance")
         ))
         if hasattr(self, "status_label"):
-            self.status_label.configure(text=tr("Устанавливаю/обновляю выбранную сборку..."))
+            set_label_text(self.status_label, "Устанавливаю/обновляю выбранную сборку...")
         self.start_worker(
             lambda core, username, ram_mb, java, account: core.update_only(java, force_download=True),
             "Сборка обновлена/установлена."
@@ -2359,8 +2391,8 @@ class InstanceWindow(ctk.CTkToplevel):
                 if kind == "console":
                     self.append_console(event[1])
                 elif kind == "status":
-                    self.status_label.configure(text=tr_update_error(event[1]))
-                    self.append_console(tr_update_error(event[1]))
+                    set_label_text(self.status_label, event[1])
+                    self.append_console(event[1])
                 elif kind == "progress":
                     current, total = event[1], event[2]
                     if total > 0:
@@ -2390,8 +2422,11 @@ class InstanceWindow(ctk.CTkToplevel):
         self.after(100, self.poll_queue)
 
     def append_console(self, message: str):
+        display_message = message
+        if isinstance(message, str) and "\n" not in message and len(message) < 260:
+            display_message = tr_service(message)
         self.console_box.configure(state="normal")
-        self.console_box.insert("end", str(message).rstrip() + "\n")
+        self.console_box.insert("end", str(display_message).rstrip() + "\n")
         self.console_box.see("end")
         self.console_box.configure(state="disabled")
 
@@ -2984,7 +3019,7 @@ class StoneLightLauncherApp(ctk.CTk):
 
         self.log_box = ctk.CTkTextbox(status_frame, height=72)
         self.log_box.grid(row=2, column=0, padx=14, pady=(0, 8), sticky="ew")
-        self.log_box.insert("end", tr("Добро пожаловать в StoneLight Launcher v{version}").format(version="0.5.47") + "\n")
+        self.log_box.insert("end", tr_service("Добро пожаловать в StoneLight Launcher v0.5.48") + "\n")
         self.log_box.configure(state="disabled")
         self.apply_danger_button_styles()
 
@@ -3475,10 +3510,10 @@ class StoneLightLauncherApp(ctk.CTk):
                 kind = event[0]
 
                 if kind == "log":
-                    self.append_log(tr_update_error(event[1]))
+                    self.append_log(event[1])
                 elif kind == "status":
-                    self.status_label.configure(text=tr_update_error(event[1]))
-                    self.append_log(tr_update_error(event[1]))
+                    set_label_text(self.status_label, event[1])
+                    self.append_log(event[1])
                 elif kind == "progress":
                     current, total = event[1], event[2]
                     if total > 0:
@@ -3486,8 +3521,8 @@ class StoneLightLauncherApp(ctk.CTk):
                 elif kind == "done":
                     self.set_busy(False)
                     self.progress.set(1)
-                    self.append_log(tr(event[1]))
-                    self.status_label.configure(text=tr(event[1]))
+                    self.append_log(event[1])
+                    set_label_text(self.status_label, event[1])
                     self.apply_danger_button_styles()
                 elif kind == "updates_result":
                     self.set_busy(False)
@@ -3507,11 +3542,16 @@ class StoneLightLauncherApp(ctk.CTk):
                     self.append_log(tr("Обновление лаунчера скачано. Скрипт применения: {script}").format(script=event[1]))
                     if messagebox.askyesno("StoneLight Launcher", tr("Обновление скачано. Применить и перезапустить лаунчер сейчас?")):
                         self.apply_launcher_update_now(event[1])
+                elif kind == "update_check_timeout":
+                    self.set_busy(False)
+                    self.progress.set(0)
+                    self.append_log("Проверка обновлений заняла слишком много времени и была остановлена.")
+                    set_label_text(self.status_label, "Проверка обновлений остановлена по таймауту.")
                 elif kind == "error":
                     self.set_busy(False)
                     self.progress.set(0)
                     messagebox.showerror("StoneLight Launcher", tr_update_error(event[1]))
-                    self.append_log(tr_update_error("ОШИБКА: " + str(event[1])))
+                    self.append_log("ОШИБКА: " + str(event[1]))
         except queue.Empty:
             pass
 
@@ -3519,7 +3559,7 @@ class StoneLightLauncherApp(ctk.CTk):
 
     def append_log(self, message: str):
         self.log_box.configure(state="normal")
-        self.log_box.insert("end", str(message).rstrip() + "\n")
+        self.log_box.insert("end", tr_service(message).rstrip() + "\n")
         self.log_box.see("end")
         self.log_box.configure(state="disabled")
 
@@ -3530,10 +3570,21 @@ class StoneLightLauncherApp(ctk.CTk):
             return
 
         if not auto:
-            self.append_log(tr("Проверяю обновления..."))
-            self.status_label.configure(text=tr("Проверяю обновления..."))
+            self.append_log("Проверяю обновления...")
+            set_label_text(self.status_label, "Проверяю обновления...")
             self.set_busy(True)
             self.progress.set(0)
+
+        self._update_check_finished = False
+
+        def update_timeout_guard():
+            if getattr(self, "_update_check_finished", True):
+                return
+            self._update_check_finished = True
+            self.ui_queue.put(("update_check_timeout", auto))
+
+        timeout_seconds = int(self.config.get("update_check_timeout_seconds", 12) or 12)
+        threading.Timer(timeout_seconds, update_timeout_guard).start()
 
         def wrapper():
             try:
@@ -3554,11 +3605,14 @@ class StoneLightLauncherApp(ctk.CTk):
                         "skipped": True,
                     }
 
+                self._update_check_finished = True
                 self.ui_queue.put(("updates_result", launcher_info, official_info, auto))
             except Exception as exc:
                 if auto:
+                    self._update_check_finished = True
                     self.ui_queue.put(("log", tr_update_error("Автопроверка обновлений не удалась: " + str(exc))))
                 else:
+                    self._update_check_finished = True
                     self.ui_queue.put(("error", str(exc)))
 
         self.worker_thread = threading.Thread(target=wrapper, daemon=True)
@@ -3582,7 +3636,7 @@ class StoneLightLauncherApp(ctk.CTk):
         if not launcher_update and not official_update:
             if not auto:
                 self.append_log(tr("Обновлений лаунчера и StoneLight-сборки не найдено."))
-                self.status_label.configure(text=tr("Обновлений лаунчера и StoneLight-сборки не найдено."))
+                set_label_text(self.status_label, "Обновлений лаунчера и StoneLight-сборки не найдено.")
                 messagebox.showinfo("StoneLight Launcher", tr("Обновлений лаунчера и StoneLight-сборки не найдено."))
             return
 
@@ -3612,7 +3666,7 @@ class StoneLightLauncherApp(ctk.CTk):
     def download_launcher_update_worker(self, launcher_info: dict):
         self.set_busy(True)
         self.progress.set(0)
-        self.status_label.configure(text=tr("Скачиваю обновление лаунчера..."))
+        set_label_text(self.status_label, "Скачиваю обновление лаунчера...")
 
         def progress(done, total):
             self.ui_queue.put(("progress", done, total))
@@ -3694,7 +3748,7 @@ class StoneLightLauncherApp(ctk.CTk):
             return
 
         self.append_log(tr("Проверяю обновление StoneLight перед запуском..."))
-        self.status_label.configure(text=tr("Проверяю обновление StoneLight перед запуском..."))
+        set_label_text(self.status_label, "Проверяю обновление StoneLight перед запуском...")
         self.set_busy(True)
         self.progress.set(0)
 
@@ -3841,7 +3895,7 @@ class StoneLightLauncherApp(ctk.CTk):
         self.append_log(tr("Запускаю локальную установку/обновление сборки: {name}").format(
             name=instance.get("name", "Instance")
         ))
-        self.status_label.configure(text=tr("Устанавливаю/обновляю выбранную сборку..."))
+        set_label_text(self.status_label, "Устанавливаю/обновляю выбранную сборку...")
 
         # Local install/reinstall of the selected instance using current metadata.
         # Remote GitHub checks are handled only by the separate "Updates" button
