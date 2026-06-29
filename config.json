@@ -1,6 +1,6 @@
 {
   "launcher_name": "StoneLight Launcher",
-  "launcher_version": "0.5.24",
+  "launcher_version": "0.5.26",
   "minecraft_version": "26.1.2",
   "loader": "fabric",
   "fabric_loader_version": "0.19.3",
@@ -39,6 +39,8 @@
   "global_ram_max_mb": 4096,
   "global_fullscreen": false,
   "microsoft_client_id": "28e78bd7-fb55-4391-b9dd-5d596a718c65",
-  "microsoft_redirect_uri": "http://localhost",
-  "microsoft_client_secret": ""
+  "microsoft_redirect_uri": "http://localhost:8765/callback",
+  "microsoft_client_secret": "",
+  "language": "en",
+  "github_url": "https://github.com/stonelightmc/StoneLight-Launcher"
 }

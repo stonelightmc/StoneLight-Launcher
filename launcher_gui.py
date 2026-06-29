@@ -7,6 +7,7 @@ from tkinter import filedialog, messagebox
 import tkinter as tk
 
 import customtkinter as ctk
+import i18n
 
 from accounts import (
     account_label,
@@ -52,8 +53,66 @@ from launcher_core import (
 )
 
 
-APP_TITLE = "StoneLight Launcher v0.5.24"
+APP_TITLE = "StoneLight Launcher v0.5.26"
 JAVA_PRESET_VALUES = ["auto", "global", "java8", "java16", "java17", "java21", "java25", "manual"]
+
+GITHUB_URL = "https://github.com/stonelightmc/StoneLight-Launcher"
+
+
+def tr(text: str | None) -> str | None:
+    return i18n.tr(text)
+
+
+def patch_i18n_widgets():
+    def patch_text_widget(cls):
+        if getattr(cls, "_stonelight_i18n_patched", False):
+            return
+
+        original_init = cls.__init__
+        original_configure = cls.configure
+
+        def patched_init(self, *args, **kwargs):
+            if "text" in kwargs:
+                kwargs["text"] = tr(kwargs["text"])
+            if "placeholder_text" in kwargs:
+                kwargs["placeholder_text"] = tr(kwargs["placeholder_text"])
+            original_init(self, *args, **kwargs)
+
+        def patched_configure(self, *args, **kwargs):
+            if "text" in kwargs:
+                kwargs["text"] = tr(kwargs["text"])
+            if "placeholder_text" in kwargs:
+                kwargs["placeholder_text"] = tr(kwargs["placeholder_text"])
+            return original_configure(self, *args, **kwargs)
+
+        cls.__init__ = patched_init
+        cls.configure = patched_configure
+        cls._stonelight_i18n_patched = True
+
+    for widget_cls in (ctk.CTkLabel, ctk.CTkButton, ctk.CTkCheckBox, ctk.CTkEntry):
+        patch_text_widget(widget_cls)
+
+    if not getattr(messagebox, "_stonelight_i18n_patched", False):
+        original_showerror = messagebox.showerror
+        original_showinfo = messagebox.showinfo
+        original_askyesno = messagebox.askyesno
+
+        def showerror(title, message, *args, **kwargs):
+            return original_showerror(title, tr(str(message)), *args, **kwargs)
+
+        def showinfo(title, message, *args, **kwargs):
+            return original_showinfo(title, tr(str(message)), *args, **kwargs)
+
+        def askyesno(title, message, *args, **kwargs):
+            return original_askyesno(title, tr(str(message)), *args, **kwargs)
+
+        messagebox.showerror = showerror
+        messagebox.showinfo = showinfo
+        messagebox.askyesno = askyesno
+        messagebox._stonelight_i18n_patched = True
+
+
+patch_i18n_widgets()
 
 
 def safe_os_startfile(path: Path):
@@ -167,7 +226,7 @@ class VersionPickerDialog(ctk.CTkToplevel):
         self.on_select = on_select
         self.all_versions = []
 
-        self.title("Выбор версии Minecraft")
+        self.title(tr("Выбор версии Minecraft"))
         self.geometry("520x560")
         self.transient(parent)
         self.grab_set()
@@ -304,12 +363,16 @@ class VersionPickerDialog(ctk.CTkToplevel):
 
 
 class MicrosoftLoginDialog(ctk.CTkToplevel):
+    CALLBACK_HOST = "localhost"
+    CALLBACK_PORT = 8765
+    CALLBACK_PATH = "/callback"
+
     def __init__(self, app):
         super().__init__(app)
         self.app = app
-        self.title("Вход Microsoft / Minecraft")
-        self.geometry("760x560")
-        self.minsize(700, 520)
+        self.title(tr("Вход Microsoft / Minecraft"))
+        self.geometry("820x600")
+        self.minsize(760, 560)
         self.transient(app)
         self.grab_set()
         self.lift()
@@ -317,9 +380,12 @@ class MicrosoftLoginDialog(ctk.CTkToplevel):
 
         self.login_state = None
         self.code_verifier = None
+        self.callback_server = None
+        self.callback_thread = None
+        self.received_redirect_url = ""
 
         self.grid_columnconfigure(1, weight=1)
-        self.grid_rowconfigure(8, weight=1)
+        self.grid_rowconfigure(9, weight=1)
 
         ctk.CTkLabel(
             self,
@@ -328,11 +394,10 @@ class MicrosoftLoginDialog(ctk.CTkToplevel):
         ).grid(row=0, column=0, columnspan=3, padx=18, pady=(18, 8), sticky="w")
 
         note = (
-            "Для работы нужен Azure App Client ID с доступом к Minecraft API. "
             "Пароль в лаунчер не вводится: вход выполняется в браузере Microsoft. "
-            "После входа скопируй финальный redirect URL обратно сюда."
+            "После успешного входа лаунчер автоматически примет ответ через локальный callback."
         )
-        ctk.CTkLabel(self, text=note, text_color="#bdbdbd", wraplength=700, justify="left").grid(
+        ctk.CTkLabel(self, text=note, text_color="#bdbdbd", wraplength=760, justify="left").grid(
             row=1, column=0, columnspan=3, padx=18, pady=(0, 12), sticky="ew"
         )
 
@@ -343,44 +408,80 @@ class MicrosoftLoginDialog(ctk.CTkToplevel):
 
         ctk.CTkLabel(self, text="Redirect URI").grid(row=3, column=0, padx=18, pady=6, sticky="w")
         self.redirect_entry = ctk.CTkEntry(self)
-        self.redirect_entry.grid(row=3, column=1, columnspan=2, padx=18, pady=6, sticky="ew")
-        self.redirect_entry.insert(0, self.app.settings.get("microsoft_redirect_uri", self.app.config.get("microsoft_redirect_uri", "http://localhost")))
+        self.redirect_entry.grid(row=3, column=1, padx=18, pady=6, sticky="ew")
+        self.redirect_entry.insert(
+            0,
+            self.app.settings.get(
+                "microsoft_redirect_uri",
+                self.app.config.get("microsoft_redirect_uri", "http://localhost:8765/callback")
+            )
+        )
+
+        self.reset_redirect_button = ctk.CTkButton(
+            self,
+            text="Вернуть localhost:8765",
+            width=170,
+            command=self.reset_redirect_uri
+        )
+        self.reset_redirect_button.grid(row=3, column=2, padx=(0, 18), pady=6, sticky="ew")
 
         self.open_button = ctk.CTkButton(self, text="1. Открыть вход Microsoft", command=self.open_login)
         self.open_button.grid(row=4, column=0, columnspan=3, padx=18, pady=(12, 8), sticky="ew")
 
-        ctk.CTkLabel(self, text="2. Вставь финальный URL после входа").grid(row=5, column=0, columnspan=3, padx=18, pady=(8, 4), sticky="w")
-        self.redirect_url_entry = ctk.CTkEntry(self, placeholder_text="Например: http://localhost/?code=...&state=...")
-        self.redirect_url_entry.grid(row=6, column=0, columnspan=3, padx=18, pady=6, sticky="ew")
+        ctk.CTkLabel(
+            self,
+            text="Резервный ручной режим: вставь redirect URL сюда, если автоперехват не сработал"
+        ).grid(row=5, column=0, columnspan=3, padx=18, pady=(8, 4), sticky="w")
+
+        manual_row = ctk.CTkFrame(self, fg_color="transparent")
+        manual_row.grid(row=6, column=0, columnspan=3, padx=18, pady=6, sticky="ew")
+        manual_row.grid_columnconfigure(0, weight=1)
+
+        self.redirect_url_entry = ctk.CTkEntry(manual_row, placeholder_text="http://localhost:8765/callback?code=...&state=...")
+        self.redirect_url_entry.grid(row=0, column=0, padx=(0, 8), sticky="ew")
+        self.redirect_url_entry.bind("<Control-v>", lambda _e: self.paste_redirect_url())
+        self.redirect_url_entry.bind("<Control-V>", lambda _e: self.paste_redirect_url())
+        self.redirect_url_entry.bind("<Button-3>", self.show_paste_menu)
+
+        self.paste_button = ctk.CTkButton(manual_row, text="Вставить", width=110, command=self.paste_redirect_url)
+        self.paste_button.grid(row=0, column=1, padx=(0, 8))
+
+        self.complete_button = ctk.CTkButton(manual_row, text="Завершить вручную", width=170, command=self.complete_login)
+        self.complete_button.grid(row=0, column=2)
 
         buttons = ctk.CTkFrame(self, fg_color="transparent")
         buttons.grid(row=7, column=0, columnspan=3, padx=18, pady=8, sticky="ew")
         buttons.grid_columnconfigure((0, 1), weight=1)
 
-        ctk.CTkButton(buttons, text="3. Завершить вход", command=self.complete_login).grid(row=0, column=0, padx=(0, 8), sticky="ew")
-        ctk.CTkButton(buttons, text="Закрыть", fg_color="#444", command=self.destroy).grid(row=0, column=1, padx=(8, 0), sticky="ew")
+        ctk.CTkButton(buttons, text="Закрыть", fg_color="#444", command=self.destroy).grid(row=0, column=0, columnspan=2, sticky="ew")
 
-        self.status_box = ctk.CTkTextbox(self, height=150)
-        self.status_box.grid(row=8, column=0, columnspan=3, padx=18, pady=(8, 18), sticky="nsew")
-        self.status_box.insert("end", "Готово. Укажи Client ID и нажми «Открыть вход Microsoft».\\n")
+        self.status_box = ctk.CTkTextbox(self, height=190)
+        self.status_box.grid(row=9, column=0, columnspan=3, padx=18, pady=(8, 18), sticky="nsew")
+        self.status_box.insert(
+            "end",
+            "Готово. Нажми «Открыть вход Microsoft». Локальный callback будет запущен автоматически.\n"
+        )
         self.status_box.configure(state="disabled")
+
+        self.protocol("WM_DELETE_WINDOW", self.close)
+
+    def reset_redirect_uri(self):
+        self.redirect_entry.delete(0, "end")
+        self.redirect_entry.insert(0, "http://localhost:8765/callback")
 
     def log(self, text: str):
         self.status_box.configure(state="normal")
-        self.status_box.insert("end", text.rstrip() + "\\n")
+        self.status_box.insert("end", text.rstrip() + "\n")
         self.status_box.see("end")
         self.status_box.configure(state="disabled")
 
     def auth_config(self):
         client_id = self.client_id_entry.get().strip()
-        redirect_uri = self.redirect_entry.get().strip() or "http://localhost"
+        redirect_uri = self.redirect_entry.get().strip() or "http://localhost:8765/callback"
         client_secret = self.app.config.get("microsoft_client_secret", "") or None
 
         if not client_id:
-            raise LauncherError(
-                "Не указан Microsoft Azure App Client ID. "
-                "Для готового публичного лаунчера нужен свой Client ID с разрешением Minecraft API."
-            )
+            raise LauncherError("Не указан Microsoft Azure App Client ID.")
 
         self.app.settings["microsoft_client_id"] = client_id
         self.app.settings["microsoft_redirect_uri"] = redirect_uri
@@ -388,31 +489,139 @@ class MicrosoftLoginDialog(ctk.CTkToplevel):
 
         return client_id, redirect_uri, client_secret
 
+    def paste_redirect_url(self):
+        try:
+            text = self.clipboard_get()
+            self.redirect_url_entry.configure(state="normal")
+            self.redirect_url_entry.delete(0, "end")
+            self.redirect_url_entry.insert(0, text.strip())
+            return "break"
+        except Exception as exc:
+            messagebox.showerror("StoneLight Launcher", f"Не удалось вставить из буфера: {exc}")
+            return "break"
+
+    def show_paste_menu(self, event):
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Вставить", command=self.paste_redirect_url)
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+        return "break"
+
+    def start_callback_server(self, redirect_uri: str):
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        from urllib.parse import urlparse
+
+        parsed = urlparse(redirect_uri)
+        host = parsed.hostname or self.CALLBACK_HOST
+        port = parsed.port or self.CALLBACK_PORT
+        path = parsed.path or self.CALLBACK_PATH
+
+        if host not in ("localhost", "127.0.0.1"):
+            raise LauncherError("Автоперехват поддерживает только localhost redirect URI.")
+
+        self.stop_callback_server()
+
+        dialog = self
+
+        class CallbackHandler(BaseHTTPRequestHandler):
+            def log_message(self, *_args):
+                return
+
+            def do_GET(self):
+                request_path = self.path.split("?", 1)[0]
+                if request_path != path:
+                    self.send_response(404)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.end_headers()
+                    self.wfile.write("StoneLight Launcher callback path mismatch.".encode("utf-8"))
+                    return
+
+                full_url = f"http://localhost:8765/callback:{port}{self.path}"
+                html = """
+<!doctype html>
+<html lang="ru">
+<head><meta charset="utf-8"><title>StoneLight Launcher</title></head>
+<body style="font-family: sans-serif; padding: 32px;">
+<h2>Вход завершён</h2>
+<p>Можно вернуться в StoneLight Launcher. Это окно браузера можно закрыть.</p>
+</body>
+</html>
+"""
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(html.encode("utf-8"))
+                dialog.after(0, lambda: dialog.on_callback_received(full_url))
+
+        try:
+            server = ThreadingHTTPServer(("127.0.0.1", port), CallbackHandler)
+        except OSError as exc:
+            raise LauncherError(
+                f"Не удалось запустить локальный callback-сервер на порту {port}. "
+                f"Возможно, порт занят или заблокирован. Детали: {exc}"
+            )
+
+        self.callback_server = server
+        self.callback_thread = threading.Thread(target=server.serve_forever, daemon=True)
+        self.callback_thread.start()
+
+        return f"http://localhost:8765/callback:{port}{path}"
+
+    def stop_callback_server(self):
+        if self.callback_server:
+            try:
+                self.callback_server.shutdown()
+            except Exception:
+                pass
+            try:
+                self.callback_server.server_close()
+            except Exception:
+                pass
+            self.callback_server = None
+            self.callback_thread = None
+
     def open_login(self):
         try:
             import minecraft_launcher_lib.microsoft_account as microsoft_account
 
             client_id, redirect_uri, _secret = self.auth_config()
+            callback_uri = self.start_callback_server(redirect_uri)
+
             login_url, state, code_verifier = microsoft_account.get_secure_login_data(client_id, redirect_uri)
             self.login_state = state
             self.code_verifier = code_verifier
 
             webbrowser.open(login_url)
+            self.log(f"Локальный callback запущен: {callback_uri}")
             self.log("Открыт браузер Microsoft login.")
-            self.log("После входа скопируй URL, на который тебя перенаправило, и вставь его в поле ниже.")
+            self.log("После входа лаунчер должен завершить авторизацию автоматически.")
         except Exception as exc:
+            self.stop_callback_server()
             messagebox.showerror("StoneLight Launcher", str(exc))
             self.log(f"Ошибка: {exc}")
 
-    def complete_login(self):
+    def on_callback_received(self, redirected_url: str):
+        if self.received_redirect_url:
+            return
+
+        self.received_redirect_url = redirected_url
+        self.redirect_url_entry.configure(state="normal")
+        self.redirect_url_entry.delete(0, "end")
+        self.redirect_url_entry.insert(0, redirected_url)
+        self.log("Получен callback от Microsoft. Завершаю вход...")
+        self.complete_login(auto=True)
+
+    def complete_login(self, auto: bool = False):
         try:
             import minecraft_launcher_lib.microsoft_account as microsoft_account
 
             client_id, redirect_uri, client_secret = self.auth_config()
-            redirected_url = self.redirect_url_entry.get().strip()
+            redirected_url = self.received_redirect_url or self.redirect_url_entry.get().strip()
 
             if not redirected_url:
-                raise LauncherError("Вставь финальный redirect URL после входа Microsoft.")
+                raise LauncherError("Нет redirect URL. Повтори вход или вставь URL вручную.")
 
             if not self.code_verifier:
                 raise LauncherError("Сначала нажми «Открыть вход Microsoft», чтобы создать secure login session.")
@@ -424,24 +633,31 @@ class MicrosoftLoginDialog(ctk.CTkToplevel):
             except TypeError:
                 response = microsoft_account.complete_login(client_id, redirect_uri, auth_code, self.code_verifier)
 
+            self.stop_callback_server()
+
             self.app.accounts_data, info = add_or_update_microsoft_account(response)
             self.app.refresh_accounts_ui()
             self.app.append_log(info + f" {response.get('name', '')}")
             self.log(info)
             self.log(f"Добавлен аккаунт: {response.get('name', '')}")
-            messagebox.showinfo("StoneLight Launcher", f"{info}\\n{response.get('name', '')}")
+            messagebox.showinfo("StoneLight Launcher", f"{info}\n{response.get('name', '')}")
             self.destroy()
         except Exception as exc:
+            if not auto:
+                self.stop_callback_server()
             messagebox.showerror("StoneLight Launcher", str(exc))
             self.log(f"Ошибка завершения входа: {exc}")
 
+    def close(self):
+        self.stop_callback_server()
+        self.destroy()
 
 
 class GlobalLaunchSettingsDialog(ctk.CTkToplevel):
     def __init__(self, app):
         super().__init__(app)
         self.app = app
-        self.title("Глобальные настройки запуска")
+        self.title(tr("Глобальные настройки запуска"))
         self.geometry("540x330")
         self.resizable(False, False)
         self.transient(app)
@@ -533,7 +749,7 @@ class CreateInstanceDialog(ctk.CTkToplevel):
     def __init__(self, app):
         super().__init__(app)
         self.app = app
-        self.title("Создать сборку")
+        self.title(tr("Создать сборку"))
         self.geometry("590x470")
         self.resizable(False, False)
         self.transient(app)
@@ -744,10 +960,15 @@ class InstanceWindow(ctk.CTkToplevel):
         self.tabs = ctk.CTkTabview(self, corner_radius=18)
         self.tabs.grid(row=1, column=0, padx=18, pady=(8, 18), sticky="nsew")
 
-        self.tab_launch = self.tabs.add("Запуск")
-        self.tab_files = self.tabs.add("Папки")
-        self.tab_settings = self.tabs.add("Настройки")
-        self.tab_console = self.tabs.add("Консоль")
+        self.tab_launch_name = tr("Запуск")
+        self.tab_files_name = tr("Папки")
+        self.tab_settings_name = tr("Настройки")
+        self.tab_console_name = tr("Консоль")
+
+        self.tab_launch = self.tabs.add(self.tab_launch_name)
+        self.tab_files = self.tabs.add(self.tab_files_name)
+        self.tab_settings = self.tabs.add(self.tab_settings_name)
+        self.tab_console = self.tabs.add(self.tab_console_name)
 
         self.build_launch_tab()
         self.build_files_tab()
@@ -1198,7 +1419,7 @@ class InstanceWindow(ctk.CTkToplevel):
 
     def browse_java(self):
         # Java меняется на вкладке «Настройки».
-        self.tabs.set("Настройки")
+        self.tabs.set(getattr(self, "tab_settings_name", tr("Настройки")))
         self.browse_instance_java()
 
     def browse_instance_java(self):
@@ -1327,7 +1548,7 @@ class InstanceWindow(ctk.CTkToplevel):
 
         self.set_busy(True)
         self.progress.set(0)
-        self.tabs.set("Консоль")
+        self.tabs.set(getattr(self, "tab_console_name", tr("Консоль")))
 
         def wrapper():
             try:
@@ -1579,7 +1800,7 @@ class InstanceWindow(ctk.CTkToplevel):
             messagebox.showerror("StoneLight Launcher", "Для этого preset нельзя определить версию Java.")
             return
 
-        self.tabs.set("Консоль")
+        self.tabs.set(getattr(self, "tab_console_name", tr("Консоль")))
         self.set_busy(True)
         self.progress.set(0)
 
@@ -1734,6 +1955,7 @@ class StoneLightLauncherApp(ctk.CTk):
         self._syncing_launch_settings = False
         self.settings = load_user_settings()
         self.config = LauncherCore().base_config
+        i18n.set_language(self.settings.get("language", self.config.get("language", "en")))
 
         self.instances_data = load_instances(self.config)
         self.accounts_data = ensure_initial_account()
@@ -1750,6 +1972,7 @@ class StoneLightLauncherApp(ctk.CTk):
         header = ctk.CTkFrame(self, corner_radius=18)
         header.grid(row=0, column=0, padx=18, pady=(18, 10), sticky="ew")
         header.grid_columnconfigure(0, weight=1)
+        header.grid_columnconfigure(1, weight=0)
 
         title = ctk.CTkLabel(
             header,
@@ -1760,6 +1983,30 @@ class StoneLightLauncherApp(ctk.CTk):
 
         self.subtitle = ctk.CTkLabel(header, text="", text_color="#bdbdbd")
         self.subtitle.grid(row=1, column=0, padx=18, pady=(0, 16), sticky="w")
+
+        header_tools = ctk.CTkFrame(header, fg_color="transparent")
+        header_tools.grid(row=0, column=1, rowspan=2, padx=18, pady=14, sticky="e")
+        header_tools.grid_columnconfigure(1, weight=1)
+
+        self.language_label = ctk.CTkLabel(header_tools, text="Language")
+        self.language_label.grid(row=0, column=0, padx=(0, 8), pady=(0, 8), sticky="e")
+
+        self.language_combo = ctk.CTkComboBox(
+            header_tools,
+            values=list(i18n.LANGUAGE_NAMES.values()),
+            width=155,
+            command=self.on_language_changed
+        )
+        self.language_combo.grid(row=0, column=1, pady=(0, 8), sticky="ew")
+        self.language_combo.set(i18n.language_label(i18n.get_language()))
+
+        self.github_button = ctk.CTkButton(
+            header_tools,
+            text="Open GitHub",
+            width=155,
+            command=self.open_github
+        )
+        self.github_button.grid(row=1, column=0, columnspan=2, sticky="ew")
 
         instance_frame = ctk.CTkFrame(self, corner_radius=18)
         instance_frame.grid(row=1, column=0, padx=18, pady=8, sticky="ew")
@@ -1970,8 +2217,33 @@ class StoneLightLauncherApp(ctk.CTk):
 
         self.log_box = ctk.CTkTextbox(status_frame, height=140)
         self.log_box.grid(row=2, column=0, padx=16, pady=(0, 16), sticky="nsew")
-        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.24\n")
+        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.26\n")
         self.log_box.configure(state="disabled")
+
+    def open_github(self):
+        webbrowser.open(self.config.get("github_url", GITHUB_URL))
+
+    def on_language_changed(self, label: str):
+        language = i18n.language_code_from_label(label)
+        self.settings["language"] = language
+        save_user_settings(self.settings)
+        i18n.set_language(language)
+
+        for win in list(self.instance_windows.values()):
+            try:
+                if win and win.winfo_exists():
+                    win.destroy()
+            except Exception:
+                pass
+        self.instance_windows = {}
+
+        for child in list(self.winfo_children()):
+            child.destroy()
+
+        self.build_ui()
+        self.refresh_instances_ui()
+        self.refresh_accounts_ui()
+        self.append_log("Language changed.")
 
     def get_global_launch_settings(self) -> dict:
         return normalize_global_launch_settings(self.settings, self.config)
@@ -1980,9 +2252,10 @@ class StoneLightLauncherApp(ctk.CTk):
         if not hasattr(self, "global_summary_label"):
             return
         current = self.get_global_launch_settings()
-        mode = "полноэкранный" if current["fullscreen"] else "оконный"
+        mode = tr("полноэкранный") if current["fullscreen"] else tr("оконный")
+        template = tr("Глобально для всех сборок: RAM {min}–{max} МБ, режим: {mode}.")
         self.global_summary_label.configure(
-            text=f"Глобально для всех сборок: RAM {current['ram_min_mb']}–{current['ram_max_mb']} МБ, режим: {mode}."
+            text=template.format(min=current["ram_min_mb"], max=current["ram_max_mb"], mode=mode)
         )
 
     def on_global_launch_settings(self):
@@ -2094,11 +2367,11 @@ class StoneLightLauncherApp(ctk.CTk):
         self.subtitle.configure(text=text)
 
         if instance.get("official"):
-            info = "StoneLight: модпак + сервер в списке + защита от удаления"
+            info = tr("StoneLight: модпак + сервер в списке + защита от удаления")
         elif instance.get("loader") == "vanilla":
-            info = "Пустая vanilla-сборка"
+            info = tr("Пустая vanilla-сборка")
         else:
-            info = f"Пустая сборка с loader: {instance.get('loader')}"
+            info = tr("Пустая сборка с loader: {loader}").format(loader=instance.get("loader"))
         self.instance_info.configure(text=info)
 
     def refresh_instances_ui(self):
@@ -2245,7 +2518,7 @@ class StoneLightLauncherApp(ctk.CTk):
 
     def get_microsoft_auth_config(self):
         client_id = self.settings.get("microsoft_client_id", self.config.get("microsoft_client_id", "")).strip()
-        redirect_uri = self.settings.get("microsoft_redirect_uri", self.config.get("microsoft_redirect_uri", "http://localhost")).strip() or "http://localhost"
+        redirect_uri = self.settings.get("microsoft_redirect_uri", self.config.get("microsoft_redirect_uri", "http://localhost:8765/callback")).strip() or "http://localhost:8765/callback"
         client_secret = self.config.get("microsoft_client_secret", "") or None
         if not client_id:
             raise LauncherError("Не указан Microsoft Azure App Client ID. Нажми «Войти Microsoft» и укажи Client ID.")

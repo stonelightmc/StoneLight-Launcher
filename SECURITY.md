@@ -23,5 +23,5 @@ Current public Client ID:
 Redirect URI:
 
 ```text
-http://localhost
+http://localhost:8765/callback
 ```
