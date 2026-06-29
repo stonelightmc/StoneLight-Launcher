@@ -53,10 +53,152 @@ from launcher_core import (
 )
 
 
-APP_TITLE = "StoneLight Launcher v0.5.27"
+APP_TITLE = "StoneLight Launcher v0.5.29"
 JAVA_PRESET_VALUES = ["auto", "global", "java8", "java16", "java17", "java21", "java25", "manual"]
 
 GITHUB_URL = "https://github.com/stonelightmc/StoneLight-Launcher"
+
+THEME_NAMES = {
+    "dark": "Dark",
+    "light": "Light",
+}
+
+# Inspired by the StoneLight website CSS variables:
+# light: #fff7ea / #f4e6d2 / #2d2118 / #6b5747 / #ffb347 / #f47c38
+# dark:  #0b1118 / #111a25 / #edf3ff / #9fb0c8 / #ffb347 / #ff8c42
+THEME_PALETTE = {
+    "light": {
+        "appearance": "light",
+        "window": "#fff7ea",
+        "panel": "#fffaf1",
+        "panel_strong": "#ffffff",
+        "input": "#fffaf1",
+        "text": "#2d2118",
+        "muted": "#6b5747",
+        "line": "#d8c0a8",
+        "accent": "#ffb347",
+        "accent_hover": "#f47c38",
+        "accent_text": "#3c1f08",
+        "secondary": "#f4e6d2",
+        "secondary_hover": "#ead5bb",
+        "danger": "#e9625f",
+        "danger_hover": "#d94a46",
+    },
+    "dark": {
+        "appearance": "dark",
+        "window": "#0b1118",
+        "panel": "#151c27",
+        "panel_strong": "#1c2533",
+        "input": "#111a25",
+        "text": "#edf3ff",
+        "muted": "#9fb0c8",
+        "line": "#2e3b4c",
+        "accent": "#ffb347",
+        "accent_hover": "#ff8c42",
+        "accent_text": "#3c1f08",
+        "secondary": "#263244",
+        "secondary_hover": "#314052",
+        "danger": "#ff6b6b",
+        "danger_hover": "#e05252",
+    },
+}
+
+
+def normalize_theme(theme: str | None) -> str:
+    theme = (theme or "dark").strip().lower()
+    if theme in ("dark", "night", "темная", "тёмная"):
+        return "dark"
+    if theme in ("light", "day", "светлая"):
+        return "light"
+    return "dark"
+
+
+def theme_pair(name: str):
+    return (THEME_PALETTE["light"][name], THEME_PALETTE["dark"][name])
+
+
+def theme_label(theme: str | None = None) -> str:
+    return tr(THEME_NAMES.get(normalize_theme(theme), "Dark"))
+
+
+def theme_code_from_label(label: str | None) -> str:
+    label = (label or "").strip()
+    for code, raw_label in THEME_NAMES.items():
+        if label in (raw_label, tr(raw_label)):
+            return code
+    return normalize_theme(label)
+
+
+def apply_ctk_theme(theme: str | None):
+    theme = normalize_theme(theme)
+    ctk.set_appearance_mode(THEME_PALETTE[theme]["appearance"])
+
+
+def apply_theme_to_window(window):
+    try:
+        window.configure(fg_color=theme_pair("window"))
+    except Exception:
+        pass
+
+
+def is_transparent(value) -> bool:
+    return isinstance(value, str) and value.lower() == "transparent"
+
+
+def style_kwargs(cls_name: str, kwargs: dict) -> dict:
+    kwargs = dict(kwargs)
+
+    # Preserve intentionally transparent layout helper frames.
+    if kwargs.get("fg_color") is not None and is_transparent(kwargs.get("fg_color")):
+        return kwargs
+
+    if cls_name in ("CTkFrame", "CTkToplevel"):
+        kwargs.setdefault("fg_color", theme_pair("panel"))
+        kwargs.setdefault("border_color", theme_pair("line"))
+        kwargs.setdefault("border_width", 1)
+    elif cls_name == "CTkTabview":
+        kwargs.setdefault("fg_color", theme_pair("panel"))
+        kwargs.setdefault("border_color", theme_pair("line"))
+        kwargs.setdefault("segmented_button_fg_color", theme_pair("secondary"))
+        kwargs.setdefault("segmented_button_selected_color", theme_pair("accent"))
+        kwargs.setdefault("segmented_button_selected_hover_color", theme_pair("accent_hover"))
+        kwargs.setdefault("segmented_button_unselected_color", theme_pair("secondary"))
+        kwargs.setdefault("segmented_button_unselected_hover_color", theme_pair("secondary_hover"))
+        kwargs.setdefault("text_color", theme_pair("text"))
+    elif cls_name in ("CTkEntry", "CTkComboBox", "CTkTextbox"):
+        kwargs.setdefault("fg_color", theme_pair("input"))
+        kwargs.setdefault("border_color", theme_pair("line"))
+        kwargs.setdefault("text_color", theme_pair("text"))
+        if cls_name == "CTkComboBox":
+            kwargs.setdefault("button_color", theme_pair("secondary"))
+            kwargs.setdefault("button_hover_color", theme_pair("secondary_hover"))
+            kwargs.setdefault("dropdown_fg_color", theme_pair("panel_strong"))
+            kwargs.setdefault("dropdown_hover_color", theme_pair("secondary"))
+            kwargs.setdefault("dropdown_text_color", theme_pair("text"))
+    elif cls_name == "CTkButton":
+        if kwargs.get("fg_color") == "#444":
+            kwargs["fg_color"] = theme_pair("secondary")
+            kwargs.setdefault("hover_color", theme_pair("secondary_hover"))
+            kwargs.setdefault("text_color", theme_pair("text"))
+        elif kwargs.get("fg_color") == "#7a1f1f":
+            kwargs["fg_color"] = theme_pair("danger")
+            kwargs["hover_color"] = theme_pair("danger_hover")
+            kwargs.setdefault("text_color", "#ffffff")
+        else:
+            kwargs.setdefault("fg_color", theme_pair("accent"))
+            kwargs.setdefault("hover_color", theme_pair("accent_hover"))
+            kwargs.setdefault("text_color", theme_pair("accent_text"))
+
+    if kwargs.get("text_color") in ("#bdbdbd", "#a9a9a9"):
+        kwargs["text_color"] = theme_pair("muted")
+    elif kwargs.get("text_color") == "#ffffff":
+        kwargs["text_color"] = theme_pair("text")
+
+    if kwargs.get("border_color") in ("#444", "#555"):
+        kwargs["border_color"] = theme_pair("line")
+
+    return kwargs
+
 
 
 def tr(text: str | None) -> str | None:
@@ -70,12 +212,14 @@ def patch_i18n_widgets():
 
         original_init = cls.__init__
         original_configure = cls.configure
+        cls_name = cls.__name__
 
         def patched_init(self, *args, **kwargs):
             if "text" in kwargs:
                 kwargs["text"] = tr(kwargs["text"])
             if "placeholder_text" in kwargs:
                 kwargs["placeholder_text"] = tr(kwargs["placeholder_text"])
+            kwargs = style_kwargs(cls_name, kwargs)
             original_init(self, *args, **kwargs)
 
         def patched_configure(self, *args, **kwargs):
@@ -83,23 +227,75 @@ def patch_i18n_widgets():
                 kwargs["text"] = tr(kwargs["text"])
             if "placeholder_text" in kwargs:
                 kwargs["placeholder_text"] = tr(kwargs["placeholder_text"])
+            kwargs = style_kwargs(cls_name, kwargs)
             return original_configure(self, *args, **kwargs)
 
         cls.__init__ = patched_init
         cls.configure = patched_configure
         cls._stonelight_i18n_patched = True
 
-    for widget_cls in (ctk.CTkLabel, ctk.CTkButton, ctk.CTkCheckBox, ctk.CTkEntry):
+    for widget_cls in (
+        ctk.CTkLabel,
+        ctk.CTkButton,
+        ctk.CTkCheckBox,
+        ctk.CTkEntry,
+        ctk.CTkFrame,
+        ctk.CTkTabview,
+    ):
         patch_text_widget(widget_cls)
 
+    if not getattr(ctk.CTkComboBox, "_stonelight_i18n_patched", False):
+        original_combo_init = ctk.CTkComboBox.__init__
+        original_combo_configure = ctk.CTkComboBox.configure
+        original_combo_set = ctk.CTkComboBox.set
+
+        def translate_combo_values(values):
+            if isinstance(values, (list, tuple)):
+                return [tr(v) if isinstance(v, str) else v for v in values]
+            return values
+
+        def patched_combo_init(self, *args, **kwargs):
+            if "values" in kwargs:
+                kwargs["values"] = translate_combo_values(kwargs["values"])
+            kwargs = style_kwargs("CTkComboBox", kwargs)
+            original_combo_init(self, *args, **kwargs)
+
+        def patched_combo_configure(self, *args, **kwargs):
+            if "values" in kwargs:
+                kwargs["values"] = translate_combo_values(kwargs["values"])
+            kwargs = style_kwargs("CTkComboBox", kwargs)
+            return original_combo_configure(self, *args, **kwargs)
+
+        def patched_combo_set(self, value):
+            if isinstance(value, str):
+                value = tr(value)
+            return original_combo_set(self, value)
+
+        ctk.CTkComboBox.__init__ = patched_combo_init
+        ctk.CTkComboBox.configure = patched_combo_configure
+        ctk.CTkComboBox.set = patched_combo_set
+        ctk.CTkComboBox._stonelight_i18n_patched = True
+
     if not getattr(ctk.CTkTextbox, "_stonelight_i18n_patched", False):
+        original_textbox_init = ctk.CTkTextbox.__init__
+        original_textbox_configure = ctk.CTkTextbox.configure
         original_textbox_insert = ctk.CTkTextbox.insert
+
+        def patched_textbox_init(self, *args, **kwargs):
+            kwargs = style_kwargs("CTkTextbox", kwargs)
+            original_textbox_init(self, *args, **kwargs)
+
+        def patched_textbox_configure(self, *args, **kwargs):
+            kwargs = style_kwargs("CTkTextbox", kwargs)
+            return original_textbox_configure(self, *args, **kwargs)
 
         def patched_textbox_insert(self, index, text, *args, **kwargs):
             if isinstance(text, str):
                 text = tr(text)
             return original_textbox_insert(self, index, text, *args, **kwargs)
 
+        ctk.CTkTextbox.__init__ = patched_textbox_init
+        ctk.CTkTextbox.configure = patched_textbox_configure
         ctk.CTkTextbox.insert = patched_textbox_insert
         ctk.CTkTextbox._stonelight_i18n_patched = True
 
@@ -380,6 +576,7 @@ class MicrosoftLoginDialog(ctk.CTkToplevel):
 
     def __init__(self, app):
         super().__init__(app)
+        apply_theme_to_window(self)
         self.app = app
         self.title(tr("Вход Microsoft / Minecraft"))
         self.geometry("820x600")
@@ -670,6 +867,7 @@ class MicrosoftLoginDialog(ctk.CTkToplevel):
 class GlobalLaunchSettingsDialog(ctk.CTkToplevel):
     def __init__(self, app):
         super().__init__(app)
+        apply_theme_to_window(self)
         self.app = app
         self.title(tr("Глобальные настройки запуска"))
         self.geometry("540x330")
@@ -762,6 +960,7 @@ class GlobalLaunchSettingsDialog(ctk.CTkToplevel):
 class CreateInstanceDialog(ctk.CTkToplevel):
     def __init__(self, app):
         super().__init__(app)
+        apply_theme_to_window(self)
         self.app = app
         self.title(tr("Создать сборку"))
         self.geometry("590x470")
@@ -929,6 +1128,7 @@ class CreateInstanceDialog(ctk.CTkToplevel):
 class InstanceWindow(ctk.CTkToplevel):
     def __init__(self, app, instance_id: str):
         super().__init__(app)
+        apply_theme_to_window(self)
         self.app = app
         self.instance_id = instance_id
         self.queue = queue.Queue()
@@ -1295,7 +1495,7 @@ class InstanceWindow(ctk.CTkToplevel):
         self.app.accounts_data = load_accounts()
         accounts = self.app.accounts_data.get("accounts", [])
         labels = [account_label(acc) for acc in accounts]
-        self.account_combo.configure(values=labels or ["Нет аккаунтов"])
+        self.account_combo.configure(values=labels or [tr("Нет аккаунтов")])
         selected = get_selected_account(self.app.accounts_data)
         if selected:
             self.account_combo.set(account_label(selected))
@@ -1960,7 +2160,6 @@ class StoneLightLauncherApp(ctk.CTk):
         self.geometry("1040x880")
         self.minsize(960, 800)
 
-        ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
         self.ui_queue = queue.Queue()
@@ -1970,6 +2169,9 @@ class StoneLightLauncherApp(ctk.CTk):
         self.settings = load_user_settings()
         self.config = LauncherCore().base_config
         i18n.set_language(self.settings.get("language", self.config.get("language", "en")))
+        self.current_theme = normalize_theme(self.settings.get("theme", self.config.get("theme", "dark")))
+        apply_ctk_theme(self.current_theme)
+        apply_theme_to_window(self)
 
         self.instances_data = load_instances(self.config)
         self.accounts_data = ensure_initial_account()
@@ -1980,6 +2182,7 @@ class StoneLightLauncherApp(ctk.CTk):
         self.poll_queue()
 
     def build_ui(self):
+        apply_theme_to_window(self)
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(5, weight=1)
 
@@ -2014,13 +2217,25 @@ class StoneLightLauncherApp(ctk.CTk):
         self.language_combo.grid(row=0, column=1, pady=(0, 8), sticky="ew")
         self.language_combo.set(i18n.language_label(i18n.get_language()))
 
+        self.theme_label = ctk.CTkLabel(header_tools, text="Theme")
+        self.theme_label.grid(row=1, column=0, padx=(0, 8), pady=(0, 8), sticky="e")
+
+        self.theme_combo = ctk.CTkComboBox(
+            header_tools,
+            values=[theme_label("dark"), theme_label("light")],
+            width=155,
+            command=self.on_theme_changed
+        )
+        self.theme_combo.grid(row=1, column=1, pady=(0, 8), sticky="ew")
+        self.theme_combo.set(theme_label(self.current_theme))
+
         self.github_button = ctk.CTkButton(
             header_tools,
             text="Open GitHub",
             width=155,
             command=self.open_github
         )
-        self.github_button.grid(row=1, column=0, columnspan=2, sticky="ew")
+        self.github_button.grid(row=2, column=0, columnspan=2, sticky="ew")
 
         instance_frame = ctk.CTkFrame(self, corner_radius=18)
         instance_frame.grid(row=1, column=0, padx=18, pady=8, sticky="ew")
@@ -2231,7 +2446,7 @@ class StoneLightLauncherApp(ctk.CTk):
 
         self.log_box = ctk.CTkTextbox(status_frame, height=140)
         self.log_box.grid(row=2, column=0, padx=16, pady=(0, 16), sticky="nsew")
-        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.27\n")
+        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.29\n")
         self.log_box.configure(state="disabled")
 
     def open_github(self):
@@ -2258,6 +2473,30 @@ class StoneLightLauncherApp(ctk.CTk):
         self.refresh_instances_ui()
         self.refresh_accounts_ui()
         self.append_log("Language changed.")
+
+    def on_theme_changed(self, label: str):
+        theme = theme_code_from_label(label)
+        self.current_theme = theme
+        self.settings["theme"] = theme
+        save_user_settings(self.settings)
+        apply_ctk_theme(theme)
+        apply_theme_to_window(self)
+
+        for win in list(self.instance_windows.values()):
+            try:
+                if win and win.winfo_exists():
+                    win.destroy()
+            except Exception:
+                pass
+        self.instance_windows = {}
+
+        for child in list(self.winfo_children()):
+            child.destroy()
+
+        self.build_ui()
+        self.refresh_instances_ui()
+        self.refresh_accounts_ui()
+        self.append_log("Theme changed.")
 
     def get_global_launch_settings(self) -> dict:
         return normalize_global_launch_settings(self.settings, self.config)
@@ -2485,8 +2724,8 @@ class StoneLightLauncherApp(ctk.CTk):
         licensed = has_licensed_account(self.accounts_data)
 
         if not labels:
-            self.account_combo.configure(values=["Нет аккаунтов"])
-            self.account_combo.set("Нет аккаунтов")
+            self.account_combo.configure(values=[tr("Нет аккаунтов")])
+            self.account_combo.set(tr("Нет аккаунтов"))
             self.new_account_entry.delete(0, "end")
             self.new_account_entry.configure(state="disabled")
             self.add_account_button.configure(state="disabled")

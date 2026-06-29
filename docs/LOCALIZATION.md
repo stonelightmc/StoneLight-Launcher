@@ -1,6 +1,6 @@
 # Localization
 
-StoneLight Launcher v0.5.27 includes a first localization layer.
+StoneLight Launcher v0.5.29 includes a first localization layer.
 
 Supported languages:
 
@@ -25,7 +25,7 @@ i18n.py
 This first pass covers the main launcher UI, account controls, instance controls, global settings, common buttons, and Microsoft login window. Some dynamic diagnostic messages and low-level logs may still appear in Russian/English and can be migrated gradually.
 
 
-## v0.5.27 deeper pass
+## v0.5.29 deeper pass
 
 The localization layer now also translates:
 
@@ -37,3 +37,20 @@ The localization layer now also translates:
 ```
 
 Some low-level technical logs from installers/loaders may still remain untranslated because they are intended for diagnostics.
+
+
+## v0.5.29
+
+Fixed localization of `CTkComboBox` values and selected text. This fixes the account selector placeholder:
+
+```text
+Нет аккаунтов
+```
+
+which is now translated as:
+
+```text
+No accounts
+Немає акаунтів
+Аккаунт жоқ
+```
