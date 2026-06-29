@@ -53,8 +53,23 @@ from launcher_core import (
 )
 
 
-APP_TITLE = "StoneLight Launcher v0.5.32"
+APP_TITLE = "StoneLight Launcher v0.5.33"
 JAVA_PRESET_VALUES = ["auto", "global", "java8", "java16", "java17", "java21", "java25", "manual"]
+
+UI_FONT = "Segoe UI Variable"
+UI_FONT_FALLBACK = "Segoe UI"
+
+
+def ui_font(size: int = 14, weight: str | None = None):
+    kwargs = {"family": UI_FONT, "size": size}
+    if weight:
+        kwargs["weight"] = weight
+    try:
+        return ctk.CTkFont(**kwargs)
+    except Exception:
+        kwargs["family"] = UI_FONT_FALLBACK
+        return ctk.CTkFont(**kwargs)
+
 
 GITHUB_URL = "https://github.com/stonelightmc/StoneLight-Launcher"
 
@@ -237,9 +252,11 @@ def style_kwargs(cls_name: str, kwargs: dict) -> dict:
         kwargs.setdefault("fg_color", theme_pair("panel"))
         kwargs.setdefault("border_color", theme_pair("line"))
         kwargs.setdefault("border_width", 1)
+        kwargs.setdefault("corner_radius", 22)
     elif cls_name == "CTkTabview":
         kwargs.setdefault("fg_color", theme_pair("panel"))
         kwargs.setdefault("border_color", theme_pair("line"))
+        kwargs.setdefault("corner_radius", 20)
         kwargs.setdefault("segmented_button_fg_color", theme_pair("secondary"))
         kwargs.setdefault("segmented_button_selected_color", theme_pair("accent"))
         kwargs.setdefault("segmented_button_selected_hover_color", theme_pair("accent_hover"))
@@ -250,13 +267,23 @@ def style_kwargs(cls_name: str, kwargs: dict) -> dict:
         kwargs.setdefault("fg_color", theme_pair("input"))
         kwargs.setdefault("border_color", theme_pair("line"))
         kwargs.setdefault("text_color", theme_pair("text"))
+        kwargs.setdefault("corner_radius", 13)
+        if cls_name in ("CTkEntry", "CTkComboBox"):
+            kwargs.setdefault("height", 36)
+            kwargs.setdefault("font", ui_font(14))
         if cls_name == "CTkComboBox":
             kwargs.setdefault("button_color", theme_pair("secondary"))
             kwargs.setdefault("button_hover_color", theme_pair("secondary_hover"))
             kwargs.setdefault("dropdown_fg_color", theme_pair("panel_strong"))
             kwargs.setdefault("dropdown_hover_color", theme_pair("secondary"))
             kwargs.setdefault("dropdown_text_color", theme_pair("text"))
+            kwargs.setdefault("dropdown_font", ui_font(14))
+        if cls_name == "CTkTextbox":
+            kwargs.setdefault("font", ui_font(13))
     elif cls_name == "CTkButton":
+        kwargs.setdefault("corner_radius", 14)
+        kwargs.setdefault("height", 38)
+        kwargs.setdefault("font", ui_font(14, "bold"))
         if kwargs.get("fg_color") == "#444":
             kwargs["fg_color"] = theme_pair("secondary")
             kwargs.setdefault("hover_color", theme_pair("secondary_hover"))
@@ -269,6 +296,8 @@ def style_kwargs(cls_name: str, kwargs: dict) -> dict:
             kwargs.setdefault("fg_color", theme_pair("accent"))
             kwargs.setdefault("hover_color", theme_pair("accent_hover"))
             kwargs.setdefault("text_color", theme_pair("accent_text"))
+    elif cls_name == "CTkLabel":
+        kwargs.setdefault("font", ui_font(14))
 
     if kwargs.get("text_color") in ("#bdbdbd", "#a9a9a9"):
         kwargs["text_color"] = theme_pair("muted")
@@ -425,7 +454,7 @@ class SelectableListDialog(ctk.CTkToplevel):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(3, weight=1)
 
-        ctk.CTkLabel(self, text=title, font=ctk.CTkFont(size=22, weight="bold")).grid(
+        ctk.CTkLabel(self, text=title, font=ui_font(22, "bold")).grid(
             row=0, column=0, padx=16, pady=(16, 10), sticky="w"
         )
 
@@ -522,7 +551,7 @@ class VersionPickerDialog(ctk.CTkToplevel):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(3, weight=1)
 
-        ctk.CTkLabel(self, text="Выбор версии Minecraft", font=ctk.CTkFont(size=22, weight="bold")).grid(
+        ctk.CTkLabel(self, text="Выбор версии Minecraft", font=ui_font(22, "bold")).grid(
             row=0, column=0, padx=16, pady=(16, 10), sticky="w"
         )
 
@@ -679,7 +708,7 @@ class MicrosoftLoginDialog(ctk.CTkToplevel):
         ctk.CTkLabel(
             self,
             text="Вход в лицензионный Microsoft/Minecraft аккаунт",
-            font=ctk.CTkFont(size=22, weight="bold")
+            font=ui_font(22, "bold")
         ).grid(row=0, column=0, columnspan=3, padx=18, pady=(18, 8), sticky="w")
 
         note = (
@@ -965,7 +994,7 @@ class GlobalLaunchSettingsDialog(ctk.CTkToplevel):
         ctk.CTkLabel(
             self,
             text="Глобальные настройки запуска",
-            font=ctk.CTkFont(size=22, weight="bold")
+            font=ui_font(22, "bold")
         ).grid(row=0, column=0, columnspan=2, padx=18, pady=(18, 12), sticky="w")
 
         note = (
@@ -1053,7 +1082,7 @@ class CreateInstanceDialog(ctk.CTkToplevel):
 
         self.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(self, text="Новая сборка", font=ctk.CTkFont(size=22, weight="bold")).grid(
+        ctk.CTkLabel(self, text="Новая сборка", font=ui_font(22, "bold")).grid(
             row=0, column=0, columnspan=3, padx=18, pady=(18, 12), sticky="w"
         )
 
@@ -2238,8 +2267,8 @@ class StoneLightLauncherApp(ctk.CTk):
         super().__init__()
 
         self.title(APP_TITLE)
-        self.geometry("1040x880")
-        self.minsize(960, 800)
+        self.geometry("1120x900")
+        self.minsize(1000, 760)
 
         ctk.set_default_color_theme("blue")
 
@@ -2265,7 +2294,7 @@ class StoneLightLauncherApp(ctk.CTk):
     def build_ui(self):
         apply_theme_to_window(self)
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(5, weight=1)
+        self.grid_rowconfigure(4, weight=1)
 
         header = ctk.CTkFrame(self, corner_radius=18)
         header.grid(row=0, column=0, padx=18, pady=(18, 10), sticky="ew")
@@ -2275,12 +2304,16 @@ class StoneLightLauncherApp(ctk.CTk):
         title = ctk.CTkLabel(
             header,
             text="StoneLight Launcher",
-            font=ctk.CTkFont(size=30, weight="bold")
+            font=ui_font(34, "bold")
         )
         title.grid(row=0, column=0, padx=18, pady=(16, 0), sticky="w")
 
         self.subtitle = ctk.CTkLabel(header, text="", text_color="#bdbdbd")
-        self.subtitle.grid(row=1, column=0, padx=18, pady=(0, 16), sticky="w")
+        self.subtitle.grid(row=1, column=0, padx=18, pady=(0, 8), sticky="w")
+
+        self.header_accent = ctk.CTkFrame(header, height=4, corner_radius=999, fg_color=theme_pair("accent"), border_width=0)
+        self.header_accent.grid(row=2, column=0, columnspan=2, padx=18, pady=(0, 14), sticky="ew")
+        self.header_accent.grid_propagate(False)
 
         header_tools = ctk.CTkFrame(header, fg_color="transparent")
         header_tools.grid(row=0, column=1, rowspan=2, padx=18, pady=14, sticky="e")
@@ -2318,15 +2351,20 @@ class StoneLightLauncherApp(ctk.CTk):
         )
         self.github_button.grid(row=2, column=0, columnspan=2, sticky="ew")
 
-        instance_frame = ctk.CTkFrame(self, corner_radius=18)
-        instance_frame.grid(row=1, column=0, padx=18, pady=8, sticky="ew")
+        dashboard = ctk.CTkFrame(self, fg_color="transparent", border_width=0)
+        dashboard.grid(row=1, column=0, padx=18, pady=8, sticky="ew")
+        dashboard.grid_columnconfigure((0, 1), weight=1, uniform="dashboard")
+        dashboard.grid_rowconfigure(0, weight=1)
+
+        instance_frame = ctk.CTkFrame(dashboard, corner_radius=22)
+        instance_frame.grid(row=0, column=0, padx=(0, 8), pady=0, sticky="nsew")
         instance_frame.grid_columnconfigure(1, weight=1)
         instance_frame.grid_columnconfigure(3, weight=1)
 
         ctk.CTkLabel(
             instance_frame,
             text="Сборка",
-            font=ctk.CTkFont(size=18, weight="bold")
+            font=ui_font(18, "bold")
         ).grid(row=0, column=0, columnspan=4, padx=16, pady=(16, 8), sticky="w")
 
         ctk.CTkLabel(instance_frame, text="Выбранная").grid(row=1, column=0, padx=16, pady=8, sticky="w")
@@ -2375,15 +2413,15 @@ class StoneLightLauncherApp(ctk.CTk):
         )
         self.instance_info.grid(row=3, column=0, columnspan=4, padx=16, pady=(0, 16), sticky="ew")
 
-        account_frame = ctk.CTkFrame(self, corner_radius=18)
-        account_frame.grid(row=2, column=0, padx=18, pady=8, sticky="ew")
+        account_frame = ctk.CTkFrame(dashboard, corner_radius=22)
+        account_frame.grid(row=0, column=1, padx=(8, 0), pady=0, sticky="nsew")
         account_frame.grid_columnconfigure(1, weight=1)
         account_frame.grid_columnconfigure(3, weight=1)
 
         ctk.CTkLabel(
             account_frame,
             text="Аккаунт",
-            font=ctk.CTkFont(size=18, weight="bold")
+            font=ui_font(18, "bold")
         ).grid(row=0, column=0, columnspan=4, padx=16, pady=(16, 8), sticky="w")
 
         ctk.CTkLabel(account_frame, text="Выбранный").grid(row=1, column=0, padx=16, pady=8, sticky="w")
@@ -2438,13 +2476,13 @@ class StoneLightLauncherApp(ctk.CTk):
         self.account_policy_label.grid(row=3, column=3, padx=(8, 16), pady=(8, 16), sticky="w")
 
         form = ctk.CTkFrame(self, corner_radius=18)
-        form.grid(row=3, column=0, padx=18, pady=8, sticky="ew")
+        form.grid(row=2, column=0, padx=18, pady=8, sticky="ew")
         form.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(
             form,
             text="Java выбранной сборки",
-            font=ctk.CTkFont(size=18, weight="bold")
+            font=ui_font(18, "bold")
         ).grid(row=0, column=0, columnspan=3, padx=16, pady=(16, 8), sticky="w")
 
         ctk.CTkLabel(form, text="Java preset").grid(row=1, column=0, padx=16, pady=8, sticky="w")
@@ -2476,7 +2514,7 @@ class StoneLightLauncherApp(ctk.CTk):
         self.global_settings_button.grid(row=3, column=2, padx=16, pady=(8, 16), sticky="e")
 
         actions = ctk.CTkFrame(self, corner_radius=18)
-        actions.grid(row=4, column=0, padx=18, pady=6, sticky="ew")
+        actions.grid(row=3, column=0, padx=18, pady=6, sticky="ew")
         actions.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
         self.play_button = ctk.CTkButton(
@@ -2513,21 +2551,21 @@ class StoneLightLauncherApp(ctk.CTk):
         )
         self.open_log_button.grid(row=0, column=3, padx=10, pady=10, sticky="ew")
 
-        status_frame = ctk.CTkFrame(self, corner_radius=18)
-        status_frame.grid(row=5, column=0, padx=18, pady=(8, 18), sticky="nsew")
+        status_frame = ctk.CTkFrame(self, corner_radius=22)
+        status_frame.grid(row=4, column=0, padx=18, pady=(8, 18), sticky="nsew")
         status_frame.grid_columnconfigure(0, weight=1)
         status_frame.grid_rowconfigure(2, weight=1)
 
         self.status_label = ctk.CTkLabel(status_frame, text="Готов к запуску.", anchor="w")
-        self.status_label.grid(row=0, column=0, padx=16, pady=(14, 4), sticky="ew")
+        self.status_label.grid(row=0, column=0, padx=16, pady=(10, 2), sticky="ew")
 
         self.progress = ctk.CTkProgressBar(status_frame)
-        self.progress.grid(row=1, column=0, padx=16, pady=(4, 10), sticky="ew")
+        self.progress.grid(row=1, column=0, padx=16, pady=(4, 8), sticky="ew")
         self.progress.set(0)
 
-        self.log_box = ctk.CTkTextbox(status_frame, height=140)
-        self.log_box.grid(row=2, column=0, padx=16, pady=(0, 16), sticky="nsew")
-        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.32\n")
+        self.log_box = ctk.CTkTextbox(status_frame, height=92)
+        self.log_box.grid(row=2, column=0, padx=16, pady=(0, 12), sticky="nsew")
+        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.33\n")
         self.log_box.configure(state="disabled")
 
     def open_github(self):
