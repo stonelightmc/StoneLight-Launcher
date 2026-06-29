@@ -140,7 +140,7 @@ TRANSLATIONS = {
         "Обновить / установить": "Update / install",
         "Открыть лог": "Open log",
         "Готов к запуску.": "Ready to launch.",
-        "Добро пожаловать в StoneLight Launcher v0.5.30\n": "Welcome to StoneLight Launcher v0.5.30\n",
+        "Добро пожаловать в StoneLight Launcher v0.5.31\n": "Welcome to StoneLight Launcher v0.5.31\n",
         "полноэкранный": "fullscreen",
         "оконный": "windowed",
         "Полноэкранный": "Fullscreen",
@@ -257,7 +257,7 @@ TRANSLATIONS = {
         "Обновить / установить": "Оновити / встановити",
         "Открыть лог": "Відкрити лог",
         "Готов к запуску.": "Готовий до запуску.",
-        "Добро пожаловать в StoneLight Launcher v0.5.30\n": "Ласкаво просимо до StoneLight Launcher v0.5.30\n",
+        "Добро пожаловать в StoneLight Launcher v0.5.31\n": "Ласкаво просимо до StoneLight Launcher v0.5.31\n",
         "полноэкранный": "повноекранний",
         "оконный": "віконний",
         "Полноэкранный": "Повноекранний",
@@ -364,7 +364,7 @@ TRANSLATIONS = {
         "Обновить / установить": "Жаңарту / орнату",
         "Открыть лог": "Логты ашу",
         "Готов к запуску.": "Іске қосуға дайын.",
-        "Добро пожаловать в StoneLight Launcher v0.5.30\n": "StoneLight Launcher v0.5.30-ға қош келдіңіз\n",
+        "Добро пожаловать в StoneLight Launcher v0.5.31\n": "StoneLight Launcher v0.5.31-ға қош келдіңіз\n",
         "полноэкранный": "толық экран",
         "оконный": "терезелік",
         "Полноэкранный": "Толық экран",
@@ -393,7 +393,7 @@ TRANSLATIONS = {
     }
 }
 
-# Extra UI translations added in v0.5.30.
+# Extra UI translations added in v0.5.31.
 # These cover helper comments, small grey hints, dynamic status text, and common diagnostic fragments.
 SUPPLEMENTAL_TRANSLATIONS = {'en': {'\n\nЛаунчер заранее создаст launcher_profiles.json, чтобы старый Forge принял папку.\nПосле установки в открывшемся окне нажми «Проверить Forge» или «Играть».': '\n'
                                                                                                                                                                           '\n'
@@ -896,7 +896,7 @@ for _language, _mapping in SUPPLEMENTAL_TRANSLATIONS.items():
     TRANSLATIONS.setdefault(_language, {}).update(_mapping)
 
 
-# v0.5.30: account ComboBox placeholder capitalization fallback.
+# v0.5.31: account ComboBox placeholder capitalization fallback.
 for _lang, _value in {
     "en": "No accounts",
     "uk": "Немає акаунтів",
@@ -905,7 +905,7 @@ for _lang, _value in {
     TRANSLATIONS.setdefault(_lang, {})["Нет Аккаунтов"] = _value
 
 
-# v0.5.30: theme selector.
+# v0.5.31: theme selector.
 for _lang, _mapping in {
     "en": {
         "Theme": "Theme",
@@ -929,7 +929,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.5.30: protect brand names and translate instance type suffixes.
+# v0.5.31: protect brand names and translate instance type suffixes.
 for _lang, _mapping in {
     "en": {
         "StoneLight": "StoneLight",
@@ -954,6 +954,27 @@ for _lang, _mapping in {
         "пользовательская": "пайдаланушы",
         "официальная сборка": "ресми жинақ",
         "пользовательская сборка": "пайдаланушы жинағы",
+    },
+}.items():
+    TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
+
+
+# v0.5.31: extra theme names.
+for _lang, _mapping in {
+    "en": {
+        "Laconic": "Laconic",
+        "Neon": "Neon",
+        "Retro Future": "Retro Future",
+    },
+    "uk": {
+        "Laconic": "Лаконічна",
+        "Neon": "Неон",
+        "Retro Future": "Ретро-футуризм",
+    },
+    "kk": {
+        "Laconic": "Лаконикалық",
+        "Neon": "Неон",
+        "Retro Future": "Ретро-футуризм",
     },
 }.items():
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)

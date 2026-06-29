@@ -53,7 +53,7 @@ from launcher_core import (
 )
 
 
-APP_TITLE = "StoneLight Launcher v0.5.30"
+APP_TITLE = "StoneLight Launcher v0.5.31"
 JAVA_PRESET_VALUES = ["auto", "global", "java8", "java16", "java17", "java21", "java25", "manual"]
 
 GITHUB_URL = "https://github.com/stonelightmc/StoneLight-Launcher"
@@ -61,11 +61,18 @@ GITHUB_URL = "https://github.com/stonelightmc/StoneLight-Launcher"
 THEME_NAMES = {
     "dark": "Dark",
     "light": "Light",
+    "laconic": "Laconic",
+    "neon": "Neon",
+    "retro_future": "Retro Future",
 }
 
-# Inspired by the StoneLight website CSS variables:
+# Base palette inspired by StoneLight website CSS variables:
 # light: #fff7ea / #f4e6d2 / #2d2118 / #6b5747 / #ffb347 / #f47c38
 # dark:  #0b1118 / #111a25 / #edf3ff / #9fb0c8 / #ffb347 / #ff8c42
+# Extra themes:
+# laconic      - calm graphite UI with warm amber accent
+# neon         - dark cyber/arcade palette
+# retro_future - warm synthwave/sunset palette
 THEME_PALETTE = {
     "light": {
         "appearance": "light",
@@ -101,20 +108,93 @@ THEME_PALETTE = {
         "danger": "#ff6b6b",
         "danger_hover": "#e05252",
     },
+    "laconic": {
+        "appearance": "dark",
+        "window": "#0f141b",
+        "panel": "#171d26",
+        "panel_strong": "#202834",
+        "input": "#111821",
+        "text": "#eef3f8",
+        "muted": "#9aa8b8",
+        "line": "#2c3644",
+        "accent": "#f2b45a",
+        "accent_hover": "#e39a35",
+        "accent_text": "#241500",
+        "secondary": "#263141",
+        "secondary_hover": "#313d50",
+        "danger": "#e05f5f",
+        "danger_hover": "#c94d4d",
+    },
+    "neon": {
+        "appearance": "dark",
+        "window": "#070912",
+        "panel": "#101426",
+        "panel_strong": "#171c33",
+        "input": "#0b1020",
+        "text": "#f2f7ff",
+        "muted": "#8da0c2",
+        "line": "#273152",
+        "accent": "#00e5ff",
+        "accent_hover": "#8a5cff",
+        "accent_text": "#020812",
+        "secondary": "#1b2340",
+        "secondary_hover": "#26315a",
+        "danger": "#ff3b8d",
+        "danger_hover": "#d92e76",
+    },
+    "retro_future": {
+        "appearance": "dark",
+        "window": "#1a1026",
+        "panel": "#261936",
+        "panel_strong": "#332046",
+        "input": "#21152f",
+        "text": "#fff1dc",
+        "muted": "#c9a9b8",
+        "line": "#4a315f",
+        "accent": "#ff9f45",
+        "accent_hover": "#ff6f3c",
+        "accent_text": "#261000",
+        "secondary": "#3a2850",
+        "secondary_hover": "#4b3466",
+        "danger": "#ff5c7a",
+        "danger_hover": "#df4864",
+    },
 }
 
 
 def normalize_theme(theme: str | None) -> str:
-    theme = (theme or "dark").strip().lower()
-    if theme in ("dark", "night", "темная", "тёмная"):
-        return "dark"
-    if theme in ("light", "day", "светлая"):
-        return "light"
-    return "dark"
+    theme = (theme or "dark").strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "dark": "dark",
+        "night": "dark",
+        "темная": "dark",
+        "тёмная": "dark",
+        "light": "light",
+        "day": "light",
+        "светлая": "light",
+        "laconic": "laconic",
+        "minimal": "laconic",
+        "лаконичная": "laconic",
+        "лаконічна": "laconic",
+        "лаконикалық": "laconic",
+        "neon": "neon",
+        "неон": "neon",
+        "retro": "retro_future",
+        "retro_future": "retro_future",
+        "retro_futurism": "retro_future",
+        "ретро_футуризм": "retro_future",
+    }
+    return aliases.get(theme, theme if theme in THEME_PALETTE else "dark")
 
 
 def theme_pair(name: str):
-    return (THEME_PALETTE["light"][name], THEME_PALETTE["dark"][name])
+    # CustomTkinter tuple colors are chosen by appearance mode only.
+    # For extra dark-mode themes, use the active custom theme for both tuple sides.
+    current = normalize_theme(globals().get("_ACTIVE_THEME", "dark"))
+    if current in ("dark", "light"):
+        return (THEME_PALETTE["light"][name], THEME_PALETTE["dark"][name])
+    value = THEME_PALETTE[current][name]
+    return (value, value)
 
 
 def theme_label(theme: str | None = None) -> str:
@@ -131,6 +211,7 @@ def theme_code_from_label(label: str | None) -> str:
 
 def apply_ctk_theme(theme: str | None):
     theme = normalize_theme(theme)
+    globals()["_ACTIVE_THEME"] = theme
     ctk.set_appearance_mode(THEME_PALETTE[theme]["appearance"])
 
 
@@ -2222,7 +2303,7 @@ class StoneLightLauncherApp(ctk.CTk):
 
         self.theme_combo = ctk.CTkComboBox(
             header_tools,
-            values=[theme_label("dark"), theme_label("light")],
+            values=[theme_label(code) for code in ("dark", "light", "laconic", "neon", "retro_future")],
             width=155,
             command=self.on_theme_changed
         )
@@ -2446,7 +2527,7 @@ class StoneLightLauncherApp(ctk.CTk):
 
         self.log_box = ctk.CTkTextbox(status_frame, height=140)
         self.log_box.grid(row=2, column=0, padx=16, pady=(0, 16), sticky="nsew")
-        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.30\n")
+        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.31\n")
         self.log_box.configure(state="disabled")
 
     def open_github(self):

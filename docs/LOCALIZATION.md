@@ -1,6 +1,6 @@
 # Localization
 
-StoneLight Launcher v0.5.30 includes a first localization layer.
+StoneLight Launcher v0.5.31 includes a first localization layer.
 
 Supported languages:
 
@@ -25,7 +25,7 @@ i18n.py
 This first pass covers the main launcher UI, account controls, instance controls, global settings, common buttons, and Microsoft login window. Some dynamic diagnostic messages and low-level logs may still appear in Russian/English and can be migrated gradually.
 
 
-## v0.5.30 deeper pass
+## v0.5.31 deeper pass
 
 The localization layer now also translates:
 
@@ -39,7 +39,7 @@ The localization layer now also translates:
 Some low-level technical logs from installers/loaders may still remain untranslated because they are intended for diagnostics.
 
 
-## v0.5.30
+## v0.5.31
 
 Fixed localization of `CTkComboBox` values and selected text. This fixes the account selector placeholder:
 
@@ -56,7 +56,7 @@ No accounts
 ```
 
 
-## v0.5.30
+## v0.5.31
 
 Fixed two localization edge cases:
 
@@ -71,4 +71,15 @@ Instance type suffixes are now localized:
 ```text
 официальная      → official / офіційна / ресми
 пользовательская → custom / користувацька / пайдаланушы
+```
+
+
+## v0.5.31
+
+Added localized theme names:
+
+```text
+Laconic / Лаконічна / Лаконикалық
+Neon / Неон / Неон
+Retro Future / Ретро-футуризм / Ретро-футуризм
 ```

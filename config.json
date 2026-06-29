@@ -1,6 +1,6 @@
 {
   "launcher_name": "StoneLight Launcher",
-  "launcher_version": "0.5.30",
+  "launcher_version": "0.5.31",
   "minecraft_version": "26.1.2",
   "loader": "fabric",
   "fabric_loader_version": "0.19.3",
@@ -46,6 +46,9 @@
   "theme": "dark",
   "available_themes": [
     "dark",
-    "light"
+    "light",
+    "laconic",
+    "neon",
+    "retro_future"
   ]
 }
