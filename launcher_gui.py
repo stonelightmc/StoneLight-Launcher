@@ -53,7 +53,7 @@ from launcher_core import (
 )
 
 
-APP_TITLE = "StoneLight Launcher v0.5.36"
+APP_TITLE = "StoneLight Launcher v0.5.37"
 JAVA_PRESET_VALUES = ["auto", "global", "java8", "java16", "java17", "java21", "java25", "manual"]
 
 UI_FONT = "Segoe UI Variable"
@@ -244,11 +244,11 @@ def apply_theme_to_window(window):
 def apply_segmented_tab_style(segmented):
     try:
         segmented.configure(
-            fg_color=theme_pair("accent"),
+            fg_color=theme_pair("accent_hover"),
             selected_color=theme_pair("accent"),
-            selected_hover_color=theme_pair("accent_hover"),
-            unselected_color=theme_pair("accent"),
-            unselected_hover_color=theme_pair("accent_hover"),
+            selected_hover_color=theme_pair("accent"),
+            unselected_color=theme_pair("accent_hover"),
+            unselected_hover_color=theme_pair("accent"),
             text_color=theme_pair("accent_text"),
             font=ui_font(14, "bold"),
         )
@@ -271,6 +271,17 @@ def safe_tab_set(tabview, name):
     return result
 
 
+def style_danger_button(button):
+    try:
+        button.configure(
+            fg_color=theme_pair("danger"),
+            hover_color=theme_pair("danger_hover"),
+            text_color=theme_pair("danger_text"),
+        )
+    except Exception:
+        pass
+
+
 def is_transparent(value) -> bool:
     return isinstance(value, str) and value.lower() == "transparent"
 
@@ -291,13 +302,15 @@ def style_kwargs(cls_name: str, kwargs: dict) -> dict:
         kwargs.setdefault("fg_color", theme_pair("panel"))
         kwargs.setdefault("border_color", theme_pair("line"))
         kwargs.setdefault("corner_radius", 20)
-        # CTkTabview/CTkSegmentedButton may darken unselected tabs after switching.
-        # Use accent for both selected and unselected states to keep the tabs stable.
-        kwargs.setdefault("segmented_button_fg_color", theme_pair("accent"))
+        # Stable tab scheme:
+        # selected   = accent
+        # unselected = accent_hover
+        # Both stay readable with accent_text, while selected tab remains visible.
+        kwargs.setdefault("segmented_button_fg_color", theme_pair("accent_hover"))
         kwargs.setdefault("segmented_button_selected_color", theme_pair("accent"))
-        kwargs.setdefault("segmented_button_selected_hover_color", theme_pair("accent_hover"))
-        kwargs.setdefault("segmented_button_unselected_color", theme_pair("accent"))
-        kwargs.setdefault("segmented_button_unselected_hover_color", theme_pair("accent_hover"))
+        kwargs.setdefault("segmented_button_selected_hover_color", theme_pair("accent"))
+        kwargs.setdefault("segmented_button_unselected_color", theme_pair("accent_hover"))
+        kwargs.setdefault("segmented_button_unselected_hover_color", theme_pair("accent"))
         kwargs.setdefault("text_color", theme_pair("accent_text"))
     elif cls_name in ("CTkEntry", "CTkComboBox", "CTkTextbox"):
         kwargs.setdefault("fg_color", theme_pair("input"))
@@ -327,7 +340,7 @@ def style_kwargs(cls_name: str, kwargs: dict) -> dict:
         elif kwargs.get("fg_color") == "#7a1f1f":
             kwargs["fg_color"] = theme_pair("danger")
             kwargs["hover_color"] = theme_pair("danger_hover")
-            kwargs.setdefault("text_color", theme_pair("danger_text"))
+            kwargs["text_color"] = theme_pair("danger_text")
         else:
             kwargs.setdefault("fg_color", theme_pair("accent"))
             kwargs.setdefault("hover_color", theme_pair("accent_hover"))
@@ -1313,10 +1326,18 @@ class InstanceWindow(ctk.CTkToplevel):
         self.after(500, lambda: self.attributes("-topmost", False))
 
         self.build_ui()
+        self.apply_danger_button_styles()
+        apply_tabview_button_style(self.tabs)
+        self.after(50, lambda: apply_tabview_button_style(self.tabs))
         self.refresh_all()
         self.subscribe_console_history()
         self.protocol("WM_DELETE_WINDOW", self.on_close)
         self.poll_queue()
+
+    def apply_danger_button_styles(self):
+        button = getattr(self, "stop_button", None)
+        if button is not None:
+            style_danger_button(button)
 
     def reload_instance(self):
         self.app.instances_data = load_instances(self.app.config)
@@ -1405,6 +1426,7 @@ class InstanceWindow(ctk.CTkToplevel):
 
         self.stop_button = ctk.CTkButton(actions, text="Остановить", height=40, fg_color="#7a1f1f", hover_color="#9b2929", command=self.on_stop_game)
         self.stop_button.grid(row=0, column=2, padx=6, pady=(0, 6), sticky="ew")
+        style_danger_button(self.stop_button)
 
         self.open_folder_button = ctk.CTkButton(actions, text="Папка сборки", height=40, command=self.open_game_folder)
         self.open_folder_button.grid(row=0, column=3, padx=(6, 0), pady=(0, 6), sticky="ew")
@@ -2472,6 +2494,7 @@ class StoneLightLauncherApp(ctk.CTk):
             command=self.on_delete_instance
         )
         self.delete_instance_button.grid(row=3, column=0, columnspan=2, padx=(16, 8), pady=(0, 12), sticky="ew")
+        style_danger_button(self.delete_instance_button)
 
         self.open_instance_folder_button = ctk.CTkButton(
             instance_frame,
@@ -2537,6 +2560,7 @@ class StoneLightLauncherApp(ctk.CTk):
             command=self.on_delete_account
         )
         self.delete_account_button.grid(row=3, column=0, columnspan=4, padx=16, pady=(0, 10), sticky="ew")
+        style_danger_button(self.delete_account_button)
 
         ctk.CTkLabel(account_frame, text="Offline-ник").grid(row=4, column=0, padx=16, pady=(8, 8), sticky="w")
         self.new_account_entry = ctk.CTkEntry(account_frame, placeholder_text="Доступно после входа в лицензионный аккаунт")
@@ -2627,6 +2651,7 @@ class StoneLightLauncherApp(ctk.CTk):
             command=self.on_stop_game
         )
         self.stop_button.grid(row=0, column=2, padx=10, pady=10, sticky="ew")
+        style_danger_button(self.stop_button)
 
         self.open_log_button = ctk.CTkButton(
             actions,
@@ -2650,8 +2675,15 @@ class StoneLightLauncherApp(ctk.CTk):
 
         self.log_box = ctk.CTkTextbox(status_frame, height=92)
         self.log_box.grid(row=2, column=0, padx=16, pady=(0, 12), sticky="nsew")
-        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.36\n")
+        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.37\n")
         self.log_box.configure(state="disabled")
+        self.apply_danger_button_styles()
+
+    def apply_danger_button_styles(self):
+        for button_name in ("delete_instance_button", "delete_account_button", "stop_button"):
+            button = getattr(self, button_name, None)
+            if button is not None:
+                style_danger_button(button)
 
     def open_github(self):
         webbrowser.open(self.config.get("github_url", GITHUB_URL))
