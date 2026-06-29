@@ -1,6 +1,6 @@
 # UI Design
 
-StoneLight Launcher v0.5.35 starts a modernized UI pass.
+StoneLight Launcher v0.5.36 starts a modernized UI pass.
 
 ## Changes
 
@@ -19,7 +19,7 @@ StoneLight Launcher v0.5.35 starts a modernized UI pass.
 CustomTkinter does not provide native real gradients or advanced animations for all widgets. These can be added later through canvas-based custom widgets without changing launcher functionality.
 
 
-## v0.5.35
+## v0.5.36
 
 Layout fixes:
 
@@ -29,7 +29,7 @@ Layout fixes:
 - Tab buttons in instance windows no longer use accent color as selected background. This avoids unreadable text because `CTkTabview` uses one text color for all tab buttons.
 
 
-## v0.5.35
+## v0.5.36
 
 Fix pass for instance windows:
 
@@ -39,3 +39,15 @@ Fix pass for instance windows:
   - `Жинақ: name`
 - Instance account selector now explicitly displays the localized `No accounts` placeholder when no accounts exist.
 - Tab buttons are forced to stable neutral theme colors, so switching tabs no longer makes them unexpectedly darker.
+
+
+## v0.5.36
+
+Tab color and destructive button pass:
+
+- `CTkTabview` and its internal `CTkSegmentedButton` are patched so tab buttons keep the current theme accent color after clicking/switching.
+- Selected and unselected tab states use the same accent color; hover uses `accent_hover`.
+- Destructive buttons now use theme-aware `danger`, `danger_hover`, and `danger_text` colors:
+  - delete instance
+  - delete account
+  - stop game

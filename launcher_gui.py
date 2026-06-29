@@ -53,7 +53,7 @@ from launcher_core import (
 )
 
 
-APP_TITLE = "StoneLight Launcher v0.5.35"
+APP_TITLE = "StoneLight Launcher v0.5.36"
 JAVA_PRESET_VALUES = ["auto", "global", "java8", "java16", "java17", "java21", "java25", "manual"]
 
 UI_FONT = "Segoe UI Variable"
@@ -103,8 +103,9 @@ THEME_PALETTE = {
         "accent_text": "#3c1f08",
         "secondary": "#f4e6d2",
         "secondary_hover": "#ead5bb",
-        "danger": "#e9625f",
-        "danger_hover": "#d94a46",
+        "danger": "#d65f45",
+        "danger_hover": "#b94b34",
+        "danger_text": "#ffffff",
     },
     "dark": {
         "appearance": "dark",
@@ -120,8 +121,9 @@ THEME_PALETTE = {
         "accent_text": "#3c1f08",
         "secondary": "#263244",
         "secondary_hover": "#314052",
-        "danger": "#ff6b6b",
-        "danger_hover": "#e05252",
+        "danger": "#ff6b4a",
+        "danger_hover": "#e95032",
+        "danger_text": "#ffffff",
     },
     "laconic": {
         "appearance": "light",
@@ -137,8 +139,9 @@ THEME_PALETTE = {
         "accent_text": "#11251f",
         "secondary": "#e8e1d7",
         "secondary_hover": "#dcd4c8",
-        "danger": "#d97878",
-        "danger_hover": "#c86161",
+        "danger": "#c96f5d",
+        "danger_hover": "#ad5949",
+        "danger_text": "#ffffff",
     },
     "neon": {
         "appearance": "dark",
@@ -154,8 +157,9 @@ THEME_PALETTE = {
         "accent_text": "#020812",
         "secondary": "#1b2340",
         "secondary_hover": "#26315a",
-        "danger": "#ff3b8d",
-        "danger_hover": "#d92e76",
+        "danger": "#ff2d95",
+        "danger_hover": "#ff174f",
+        "danger_text": "#ffffff",
     },
     "retro_future": {
         "appearance": "dark",
@@ -171,8 +175,9 @@ THEME_PALETTE = {
         "accent_text": "#17001a",
         "secondary": "#3a2850",
         "secondary_hover": "#4b3466",
-        "danger": "#ff6b8a",
-        "danger_hover": "#e14f70",
+        "danger": "#ff3d6e",
+        "danger_hover": "#ff7a00",
+        "danger_text": "#ffffff",
     },
 }
 
@@ -236,21 +241,34 @@ def apply_theme_to_window(window):
     except Exception:
         pass
 
+def apply_segmented_tab_style(segmented):
+    try:
+        segmented.configure(
+            fg_color=theme_pair("accent"),
+            selected_color=theme_pair("accent"),
+            selected_hover_color=theme_pair("accent_hover"),
+            unselected_color=theme_pair("accent"),
+            unselected_hover_color=theme_pair("accent_hover"),
+            text_color=theme_pair("accent_text"),
+            font=ui_font(14, "bold"),
+        )
+    except Exception:
+        pass
+
+
 def apply_tabview_button_style(tabview):
     try:
         segmented = getattr(tabview, "_segmented_button", None)
         if segmented is not None:
-            segmented.configure(
-                fg_color=theme_pair("secondary"),
-                selected_color=theme_pair("secondary"),
-                selected_hover_color=theme_pair("secondary_hover"),
-                unselected_color=theme_pair("secondary"),
-                unselected_hover_color=theme_pair("secondary_hover"),
-                text_color=theme_pair("text"),
-                font=ui_font(14, "bold"),
-            )
+            apply_segmented_tab_style(segmented)
     except Exception:
         pass
+
+
+def safe_tab_set(tabview, name):
+    result = tabview.set(name)
+    apply_tabview_button_style(tabview)
+    return result
 
 
 def is_transparent(value) -> bool:
@@ -273,14 +291,14 @@ def style_kwargs(cls_name: str, kwargs: dict) -> dict:
         kwargs.setdefault("fg_color", theme_pair("panel"))
         kwargs.setdefault("border_color", theme_pair("line"))
         kwargs.setdefault("corner_radius", 20)
-        # Keep tab buttons visually stable. CTkTabview has one text color for all tab buttons,
-        # and selected/unselected colors can look broken on some custom themes.
-        kwargs.setdefault("segmented_button_fg_color", theme_pair("secondary"))
-        kwargs.setdefault("segmented_button_selected_color", theme_pair("secondary"))
-        kwargs.setdefault("segmented_button_selected_hover_color", theme_pair("secondary_hover"))
-        kwargs.setdefault("segmented_button_unselected_color", theme_pair("secondary"))
-        kwargs.setdefault("segmented_button_unselected_hover_color", theme_pair("secondary_hover"))
-        kwargs.setdefault("text_color", theme_pair("text"))
+        # CTkTabview/CTkSegmentedButton may darken unselected tabs after switching.
+        # Use accent for both selected and unselected states to keep the tabs stable.
+        kwargs.setdefault("segmented_button_fg_color", theme_pair("accent"))
+        kwargs.setdefault("segmented_button_selected_color", theme_pair("accent"))
+        kwargs.setdefault("segmented_button_selected_hover_color", theme_pair("accent_hover"))
+        kwargs.setdefault("segmented_button_unselected_color", theme_pair("accent"))
+        kwargs.setdefault("segmented_button_unselected_hover_color", theme_pair("accent_hover"))
+        kwargs.setdefault("text_color", theme_pair("accent_text"))
     elif cls_name in ("CTkEntry", "CTkComboBox", "CTkTextbox"):
         kwargs.setdefault("fg_color", theme_pair("input"))
         kwargs.setdefault("border_color", theme_pair("line"))
@@ -309,7 +327,7 @@ def style_kwargs(cls_name: str, kwargs: dict) -> dict:
         elif kwargs.get("fg_color") == "#7a1f1f":
             kwargs["fg_color"] = theme_pair("danger")
             kwargs["hover_color"] = theme_pair("danger_hover")
-            kwargs.setdefault("text_color", "#ffffff")
+            kwargs.setdefault("text_color", theme_pair("danger_text"))
         else:
             kwargs.setdefault("fg_color", theme_pair("accent"))
             kwargs.setdefault("hover_color", theme_pair("accent_hover"))
@@ -426,6 +444,28 @@ def patch_i18n_widgets():
         ctk.CTkTextbox.configure = patched_textbox_configure
         ctk.CTkTextbox.insert = patched_textbox_insert
         ctk.CTkTextbox._stonelight_i18n_patched = True
+
+    if not getattr(ctk.CTkTabview, "_stonelight_set_patched", False):
+        original_tabview_set = ctk.CTkTabview.set
+
+        def patched_tabview_set(self, name):
+            result = original_tabview_set(self, name)
+            apply_tabview_button_style(self)
+            return result
+
+        ctk.CTkTabview.set = patched_tabview_set
+        ctk.CTkTabview._stonelight_set_patched = True
+
+    if hasattr(ctk, "CTkSegmentedButton") and not getattr(ctk.CTkSegmentedButton, "_stonelight_set_patched", False):
+        original_segmented_set = ctk.CTkSegmentedButton.set
+
+        def patched_segmented_set(self, value, *args, **kwargs):
+            result = original_segmented_set(self, value, *args, **kwargs)
+            apply_segmented_tab_style(self)
+            return result
+
+        ctk.CTkSegmentedButton.set = patched_segmented_set
+        ctk.CTkSegmentedButton._stonelight_set_patched = True
 
     if not getattr(messagebox, "_stonelight_i18n_patched", False):
         original_showerror = messagebox.showerror
@@ -1313,6 +1353,8 @@ class InstanceWindow(ctk.CTkToplevel):
         self.tab_settings = self.tabs.add(self.tab_settings_name)
         self.tab_console = self.tabs.add(self.tab_console_name)
         apply_tabview_button_style(self.tabs)
+        self.after(50, lambda: apply_tabview_button_style(self.tabs))
+        self.after(200, lambda: apply_tabview_button_style(self.tabs))
 
         self.build_launch_tab()
         self.build_files_tab()
@@ -1770,7 +1812,7 @@ class InstanceWindow(ctk.CTkToplevel):
 
     def browse_java(self):
         # Java меняется на вкладке «Настройки».
-        self.tabs.set(getattr(self, "tab_settings_name", tr("Настройки")))
+        safe_tab_set(self.tabs, getattr(self, "tab_settings_name", tr("Настройки")))
         self.browse_instance_java()
 
     def browse_instance_java(self):
@@ -1899,7 +1941,7 @@ class InstanceWindow(ctk.CTkToplevel):
 
         self.set_busy(True)
         self.progress.set(0)
-        self.tabs.set(getattr(self, "tab_console_name", tr("Консоль")))
+        safe_tab_set(self.tabs, getattr(self, "tab_console_name", tr("Консоль")))
 
         def wrapper():
             try:
@@ -2151,7 +2193,7 @@ class InstanceWindow(ctk.CTkToplevel):
             messagebox.showerror("StoneLight Launcher", "Для этого preset нельзя определить версию Java.")
             return
 
-        self.tabs.set(getattr(self, "tab_console_name", tr("Консоль")))
+        safe_tab_set(self.tabs, getattr(self, "tab_console_name", tr("Консоль")))
         self.set_busy(True)
         self.progress.set(0)
 
@@ -2608,7 +2650,7 @@ class StoneLightLauncherApp(ctk.CTk):
 
         self.log_box = ctk.CTkTextbox(status_frame, height=92)
         self.log_box.grid(row=2, column=0, padx=16, pady=(0, 12), sticky="nsew")
-        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.35\n")
+        self.log_box.insert("end", "Добро пожаловать в StoneLight Launcher v0.5.36\n")
         self.log_box.configure(state="disabled")
 
     def open_github(self):

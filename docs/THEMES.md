@@ -1,6 +1,6 @@
 # Themes
 
-StoneLight Launcher v0.5.35 includes the first visual theme system.
+StoneLight Launcher v0.5.36 includes the first visual theme system.
 
 ## Themes
 
@@ -44,7 +44,7 @@ accent:     #ffb347 / #ff8c42
 The launcher uses `customtkinter` appearance mode plus tuple colors for light/dark theme-aware widgets.
 
 
-## v0.5.35 additional themes
+## v0.5.36 additional themes
 
 ### Laconic
 
@@ -91,7 +91,7 @@ danger:        #ff5c7a
 ```
 
 
-## v0.5.35 palette revision
+## v0.5.36 palette revision
 
 ### Laconic revised
 
@@ -125,3 +125,18 @@ accent:        #ff4fd8
 accent_hover:  #00d4ff
 danger:        #ff6b8a
 ```
+
+
+## v0.5.36 destructive button colors
+
+Each theme now has its own destructive/warning color pair:
+
+```text
+Light:        #d65f45 / #b94b34
+Dark:         #ff6b4a / #e95032
+Laconic:      #c96f5d / #ad5949
+Neon:         #ff2d95 / #ff174f
+Retro Future: #ff3d6e / #ff7a00
+```
+
+Used for actions such as deleting instances/accounts and force-stopping the game.
