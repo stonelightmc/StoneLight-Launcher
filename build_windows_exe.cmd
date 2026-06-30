@@ -72,5 +72,6 @@ echo Executable:
 echo   dist\StoneLight Launcher\StoneLight Launcher.exe
 echo.
 echo You can zip the whole "dist\StoneLight Launcher" folder and publish it in GitHub Releases.
+echo Recommended asset name: StoneLightLauncher_v0_5_52_Windows.zip
 echo.
 pause

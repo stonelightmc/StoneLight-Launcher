@@ -1,6 +1,6 @@
 # Localization
 
-StoneLight Launcher v0.5.51 includes a first localization layer.
+StoneLight Launcher v0.5.52 includes a first localization layer.
 
 Supported languages:
 
@@ -25,7 +25,7 @@ i18n.py
 This first pass covers the main launcher UI, account controls, instance controls, global settings, common buttons, and Microsoft login window. Some dynamic diagnostic messages and low-level logs may still appear in Russian/English and can be migrated gradually.
 
 
-## v0.5.51 deeper pass
+## v0.5.52 deeper pass
 
 The localization layer now also translates:
 
@@ -39,7 +39,7 @@ The localization layer now also translates:
 Some low-level technical logs from installers/loaders may still remain untranslated because they are intended for diagnostics.
 
 
-## v0.5.51
+## v0.5.52
 
 Fixed localization of `CTkComboBox` values and selected text. This fixes the account selector placeholder:
 
@@ -56,7 +56,7 @@ No accounts
 ```
 
 
-## v0.5.51
+## v0.5.52
 
 Fixed two localization edge cases:
 
@@ -74,7 +74,7 @@ Instance type suffixes are now localized:
 ```
 
 
-## v0.5.51
+## v0.5.52
 
 Added localized theme names:
 
@@ -85,7 +85,7 @@ Retro Future / Ретро-футуризм / Ретро-футуризм
 ```
 
 
-## v0.5.51 update service localization
+## v0.5.52 update service localization
 
 Update-system service messages were added to localization dictionaries:
 
@@ -98,7 +98,7 @@ Update-system service messages were added to localization dictionaries:
 - cancellation and fallback launch prompts
 
 
-## v0.5.51
+## v0.5.52
 
 Added localization keys for:
 
@@ -108,7 +108,7 @@ Added localization keys for:
 - full launcher-update prompt with current/latest versions
 
 
-## v0.5.51
+## v0.5.52
 
 Dynamic update errors are now translated with pattern matching.
 
@@ -123,12 +123,12 @@ This message is now translated even though the repository name is inserted dynam
 Also, missing launcher GitHub Releases are treated as a non-fatal launcher-update warning so the official StoneLight build update check can continue.
 
 
-## v0.5.51
+## v0.5.52
 
 Added localization keys for startup messages and install/update flow messages.
 
 
-## v0.5.51
+## v0.5.52
 
 Centralized service/status/log localization:
 
@@ -138,7 +138,7 @@ Centralized service/status/log localization:
 - Dynamic service patterns are handled by `tr_service()`.
 
 
-## v0.5.51
+## v0.5.52
 
 Hotfix for centralized service localization:
 

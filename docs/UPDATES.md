@@ -1,6 +1,6 @@
 # Updates
 
-StoneLight Launcher v0.5.51 adds the first update system.
+StoneLight Launcher v0.5.52 adds the first update system.
 
 ## Launcher updates
 
@@ -60,7 +60,7 @@ data/
 ```
 
 
-## v0.5.51 official pre-launch update
+## v0.5.52 official pre-launch update
 
 When the selected instance is the official `StoneLight` instance, the launcher now checks the official modpack release before launching the game.
 
@@ -88,7 +88,7 @@ server settings
 ```
 
 
-## v0.5.51
+## v0.5.52
 
 Manual update check behavior:
 
@@ -98,7 +98,7 @@ Manual update check behavior:
 - The Install button performs only local install/reinstall using current metadata.
 
 
-## v0.5.51
+## v0.5.52
 
 Update check timeout:
 
@@ -107,3 +107,44 @@ update_check_timeout_seconds = 12
 ```
 
 If GitHub/update checks do not complete in time, the launcher clears the busy state and writes a localized timeout message.
+
+
+## v0.5.52 Windows EXE self-update
+
+Self-update is now aware of two launcher package types:
+
+```text
+Source/dev package:
+StoneLightLauncher_v0_5_xx_GitHub.zip
+
+Windows user package:
+StoneLightLauncher_v0_5_xx_Windows.zip
+```
+
+When running from source, the launcher still searches for the `GitHub.zip` asset.
+
+When running as a Windows executable, the launcher searches for the `Windows.zip` asset, using:
+
+```json
+"launcher_update_windows_asset_keyword": "Windows.zip"
+```
+
+The apply script now supports Windows one-folder PyInstaller layout:
+
+```text
+StoneLight Launcher/
+  StoneLight Launcher.exe
+  _internal/
+  config.json
+  docs/
+  assets/
+```
+
+It updates `_internal` as well, while preserving user data:
+
+```text
+data/
+accounts.json
+user_settings.json
+instances.json
+```

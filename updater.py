@@ -3,6 +3,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 from app_paths import app_root
 
@@ -14,6 +15,21 @@ CONFIG_PATH = ROOT / "config.json"
 
 class UpdateError(RuntimeError):
     pass
+
+
+def is_frozen_launcher() -> bool:
+    return bool(getattr(sys, "frozen", False)) or (ROOT / "StoneLight Launcher.exe").exists()
+
+
+def launcher_update_keyword(config: dict) -> str:
+    if is_frozen_launcher():
+        return config.get("launcher_update_windows_asset_keyword") or "Windows.zip"
+    return config.get("launcher_update_asset_keyword") or "GitHub.zip"
+
+
+def launcher_exe_name(config: dict | None = None) -> str:
+    config = config or load_config()
+    return config.get("launcher_update_exe_name") or config.get("windows_exe_name") or "StoneLight Launcher.exe"
 
 
 def parse_version(value: str) -> tuple[int, ...]:
@@ -94,7 +110,7 @@ def check_launcher_update(config: dict | None = None) -> dict:
     config = config or load_config()
     current = str(config.get("launcher_version", "0.0.0"))
     repo = config.get("launcher_update_repo", "stonelightmc/StoneLight-Launcher")
-    keyword = config.get("launcher_update_asset_keyword", "GitHub.zip")
+    keyword = launcher_update_keyword(config)
 
     try:
         release = github_latest_release(repo)
@@ -120,6 +136,7 @@ def check_launcher_update(config: dict | None = None) -> dict:
 
     return {
         "kind": "launcher",
+        "package_type": "windows" if is_frozen_launcher() else "source",
         "repo": repo,
         "current_version": current,
         "latest_version": latest,
@@ -231,8 +248,10 @@ def create_launcher_update_script(update_zip: Path) -> Path:
 
     script = ROOT / "apply_launcher_update.cmd"
     root = ROOT.resolve()
+    exe_name = launcher_exe_name()
 
-    content = f'''@echo off
+    content = f"""@echo off
+setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 title StoneLight Launcher Update
 
@@ -249,6 +268,7 @@ timeout /t 3 /nobreak >nul
 
 set "ROOT={root}"
 set "ZIP={update_zip}"
+set "EXE_NAME={exe_name}"
 set "TMP=%TEMP%\\StoneLightLauncher_update_%RANDOM%%RANDOM%"
 
 if exist "%TMP%" rmdir /s /q "%TMP%"
@@ -262,17 +282,51 @@ if errorlevel 1 (
 )
 
 set "SRC="
-for /d %%D in ("%TMP%\\StoneLightLauncher*") do (
-  set "SRC=%%D"
+
+rem Preferred Windows package layout:
+rem   StoneLight Launcher\StoneLight Launcher.exe
+if exist "%TMP%\\StoneLight Launcher\\%EXE_NAME%" (
+  set "SRC=%TMP%\\StoneLight Launcher"
   goto found_src
 )
+
+rem Direct Windows package layout:
+rem   StoneLight Launcher.exe
+if exist "%TMP%\\%EXE_NAME%" (
+  set "SRC=%TMP%"
+  goto found_src
+)
+
+rem Recursive fallback: find StoneLight Launcher.exe anywhere in the archive.
+for /r "%TMP%" %%F in ("%EXE_NAME%") do (
+  set "SRC=%%~dpF"
+  goto trim_src
+)
+
+:trim_src
+if defined SRC (
+  if "!SRC:~-1!"=="\\" set "SRC=!SRC:~0,-1!"
+  goto found_src
+)
+
+rem Source package layout:
+rem   StoneLightLauncher_v0_5_xx\...
+for /d %%D in ("%TMP%\\StoneLightLauncher*") do (
+  set "SRC=%%~fD"
+  goto found_src
+)
+
+rem Last fallback: copy from archive root.
+set "SRC=%TMP%"
+
 :found_src
-
-if not defined SRC set "SRC=%TMP%"
-
+echo.
+echo Update source:
+echo !SRC!
 echo.
 echo Copying files...
-robocopy "%SRC%" "%ROOT%" /MIR /XD ".git" "data" "__pycache__" ".venv" "venv" "env" "_internal" /XF "accounts.json" "user_settings.json" "instances.json" "*.log" "*.zip" "apply_launcher_update.cmd"
+
+robocopy "!SRC!" "%ROOT%" /MIR /XD ".git" "data" "__pycache__" ".venv" "venv" "env" /XF "accounts.json" "user_settings.json" "instances.json" "*.log" "*.zip" "apply_launcher_update.cmd"
 set "RC=%ERRORLEVEL%"
 
 if %RC% GEQ 8 (
@@ -285,16 +339,20 @@ if %RC% GEQ 8 (
 echo.
 echo Update applied successfully.
 
-if exist "%ROOT%\\StoneLightLauncher.cmd" (
+if exist "%ROOT%\\%EXE_NAME%" (
+  start "" "%ROOT%\\%EXE_NAME%"
+) else if exist "%ROOT%\\StoneLightLauncher.cmd" (
   start "" "%ROOT%\\StoneLightLauncher.cmd"
 ) else if exist "%ROOT%\\StoneLightLauncher.bat" (
   start "" "%ROOT%\\StoneLightLauncher.bat"
+) else if exist "%ROOT%\\StoneLightLauncher.pyw" (
+  start "" pyw "%ROOT%\\StoneLightLauncher.pyw"
 ) else (
   start "" python "%ROOT%\\launcher_gui.py"
 )
 
 exit /b 0
-'''
+"""
     script.write_text(content, encoding="utf-8")
     return script
 
