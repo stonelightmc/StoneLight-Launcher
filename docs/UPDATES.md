@@ -1,6 +1,6 @@
 # Updates
 
-StoneLight Launcher v0.5.52 adds the first update system.
+StoneLight Launcher v0.5.53 adds the first update system.
 
 ## Launcher updates
 
@@ -60,7 +60,7 @@ data/
 ```
 
 
-## v0.5.52 official pre-launch update
+## v0.5.53 official pre-launch update
 
 When the selected instance is the official `StoneLight` instance, the launcher now checks the official modpack release before launching the game.
 
@@ -88,7 +88,7 @@ server settings
 ```
 
 
-## v0.5.52
+## v0.5.53
 
 Manual update check behavior:
 
@@ -98,7 +98,7 @@ Manual update check behavior:
 - The Install button performs only local install/reinstall using current metadata.
 
 
-## v0.5.52
+## v0.5.53
 
 Update check timeout:
 
@@ -109,7 +109,7 @@ update_check_timeout_seconds = 12
 If GitHub/update checks do not complete in time, the launcher clears the busy state and writes a localized timeout message.
 
 
-## v0.5.52 Windows EXE self-update
+## v0.5.53 Windows EXE self-update
 
 Self-update is now aware of two launcher package types:
 
@@ -147,4 +147,39 @@ data/
 accounts.json
 user_settings.json
 instances.json
+```
+
+
+## v0.5.53 nested Windows update fix
+
+Fixed an update-script fallback that could copy the whole unpacked ZIP root into the launcher folder.
+
+Bad result before:
+
+```text
+E:\Mine\Launcher\Release\StoneLight Launcher\
+```
+
+Correct result now:
+
+```text
+E:\Mine\Launcher\Release\StoneLight Launcher.exe
+E:\Mine\Launcher\Release\_internal\
+E:\Mine\Launcher\Release\config.json
+```
+
+The update script now:
+
+1. Uses `StoneLight Launcher\StoneLight Launcher.exe` as preferred source.
+2. Supports direct ZIP root with `StoneLight Launcher.exe`.
+3. Recursively finds the folder that directly contains `StoneLight Launcher.exe`.
+4. Supports source packages with `StoneLightLauncher_v0_5_xx\launcher_gui.py`.
+5. Stops with an error if it cannot determine the source folder.
+
+It no longer falls back to copying the entire temporary extraction root.
+
+A helper script was added:
+
+```text
+repair_nested_update.cmd
 ```

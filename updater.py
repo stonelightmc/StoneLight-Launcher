@@ -283,41 +283,48 @@ if errorlevel 1 (
 
 set "SRC="
 
-rem Preferred Windows package layout:
-rem   StoneLight Launcher\StoneLight Launcher.exe
+rem 1) Preferred Windows package layout:
+rem    StoneLight Launcher\\StoneLight Launcher.exe
 if exist "%TMP%\\StoneLight Launcher\\%EXE_NAME%" (
   set "SRC=%TMP%\\StoneLight Launcher"
   goto found_src
 )
 
-rem Direct Windows package layout:
-rem   StoneLight Launcher.exe
+rem 2) Direct Windows package layout:
+rem    StoneLight Launcher.exe
 if exist "%TMP%\\%EXE_NAME%" (
   set "SRC=%TMP%"
   goto found_src
 )
 
-rem Recursive fallback: find StoneLight Launcher.exe anywhere in the archive.
-for /r "%TMP%" %%F in ("%EXE_NAME%") do (
-  set "SRC=%%~dpF"
-  goto trim_src
+rem 3) Recursive Windows package fallback:
+rem    find the folder that directly contains StoneLight Launcher.exe.
+for /f "usebackq delims=" %%D in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$exe = Get-ChildItem -LiteralPath '%TMP%' -Filter '%EXE_NAME%' -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1; if ($exe) {{ $exe.Directory.FullName }}"`) do (
+  set "SRC=%%D"
 )
+if defined SRC goto found_src
 
-:trim_src
-if defined SRC (
-  if "!SRC:~-1!"=="\\" set "SRC=!SRC:~0,-1!"
-  goto found_src
-)
-
-rem Source package layout:
-rem   StoneLightLauncher_v0_5_xx\...
+rem 4) Source package layout:
+rem    StoneLightLauncher_v0_5_xx\\launcher_gui.py
 for /d %%D in ("%TMP%\\StoneLightLauncher*") do (
-  set "SRC=%%~fD"
-  goto found_src
+  if exist "%%~fD\\launcher_gui.py" (
+    set "SRC=%%~fD"
+    goto found_src
+  )
 )
 
-rem Last fallback: copy from archive root.
-set "SRC=%TMP%"
+echo.
+echo ERROR: Could not determine update source folder.
+echo The update archive must contain either:
+echo   StoneLight Launcher\\%EXE_NAME%
+echo or:
+echo   %EXE_NAME%
+echo or:
+echo   StoneLightLauncher_v0_5_xx\\launcher_gui.py
+echo.
+echo No files were copied.
+pause
+exit /b 1
 
 :found_src
 echo.

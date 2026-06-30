@@ -980,7 +980,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.5.52: update manager UI.
+# v0.5.53: update manager UI.
 for _lang, _mapping in {
     "en": {
         "Проверить обновления": "Check updates",
@@ -1022,7 +1022,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.5.52: official StoneLight pre-launch update flow.
+# v0.5.53: official StoneLight pre-launch update flow.
 for _lang, _mapping in {
     "en": {
         "Проверяю обновление StoneLight перед запуском...": "Checking StoneLight update before launch...",
@@ -1061,7 +1061,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.5.52: update service messages.
+# v0.5.53: update service messages.
 for _lang, _mapping in {
     "en": {
         "Автопроверка обновлений не удалась: {error}": "Auto-check for updates failed: {error}",
@@ -1142,7 +1142,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.5.52: shorter update buttons and clearer update-service messages.
+# v0.5.53: shorter update buttons and clearer update-service messages.
 for _lang, _mapping in {
     "en": {
         "Обновления": "Updates",
@@ -1169,7 +1169,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.5.52: dynamic update-error localization and missing launcher release handling.
+# v0.5.53: dynamic update-error localization and missing launcher release handling.
 for _lang, _mapping in {
     "en": {
         "В репозитории {repo} не найден latest release.": "No latest release was found in repository {repo}.",
@@ -1193,7 +1193,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.5.52: update flow cleanup and startup message localization.
+# v0.5.53: update flow cleanup and startup message localization.
 for _lang, _mapping in {
     "en": {
         "Готов к запуску.": "Ready to launch.",
@@ -1235,7 +1235,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.5.52: centralized service/status/log localization.
+# v0.5.53: centralized service/status/log localization.
 for _lang, _mapping in {
     "en": {
         "Запущенный процесс этой сборки не найден.": "No running process was found for this instance.",
