@@ -1,6 +1,6 @@
 # Windows EXE build
 
-v0.5.53 adds Windows executable packaging support.
+v0.5.54 adds Windows executable packaging support.
 
 ## Build
 
@@ -50,10 +50,10 @@ StoneLightLauncher_v0_5_50_GitHub.zip
 ```
 
 
-## v0.5.53 config/runtime-file fix
+## v0.5.54 config/runtime-file fix
 
 PyInstaller one-folder builds may place bundled data under `_internal`.
-The launcher expects writable files next to the `.exe`, so v0.5.53 adds two protections:
+The launcher expects writable files next to the `.exe`, so v0.5.54 adds two protections:
 
 1. `build_windows_exe.cmd` copies these files next to the exe after build:
 
@@ -70,12 +70,12 @@ assets/
 2. At runtime, `app_paths.ensure_runtime_files()` copies missing bundled resources from `_internal` to the exe folder on first launch.
 
 
-## v0.5.53 self-update note
+## v0.5.54 self-update note
 
 For executable releases, publish the built folder as:
 
 ```text
-StoneLightLauncher_v0_5_53_Windows.zip
+StoneLightLauncher_v0_5_54_Windows.zip
 ```
 
 The ZIP should contain the whole folder:
@@ -92,12 +92,12 @@ StoneLight Launcher/
 The executable launcher will prefer the `Windows.zip` release asset for self-updates.
 
 
-## v0.5.53 update ZIP layout recommendation
+## v0.5.54 update ZIP layout recommendation
 
 Recommended release ZIP layout:
 
 ```text
-StoneLightLauncher_v0_5_53_Windows.zip
+StoneLightLauncher_v0_5_54_Windows.zip
 └─ StoneLight Launcher/
    ├─ StoneLight Launcher.exe
    ├─ _internal/
@@ -109,7 +109,7 @@ StoneLightLauncher_v0_5_53_Windows.zip
 Also supported:
 
 ```text
-StoneLightLauncher_v0_5_53_Windows.zip
+StoneLightLauncher_v0_5_54_Windows.zip
 ├─ StoneLight Launcher.exe
 ├─ _internal/
 ├─ config.json
@@ -118,3 +118,19 @@ StoneLightLauncher_v0_5_53_Windows.zip
 ```
 
 Do not include a `dist/` wrapper level.
+
+
+## v0.5.54 icon note
+
+The executable icon was replaced with the new StoneLight glowing block icon.
+PyInstaller will use:
+
+```text
+assets/stonelight_launcher.ico
+```
+
+when building:
+
+```bat
+build_windows_exe.cmd
+```
