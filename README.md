@@ -2,8 +2,6 @@
 
 Unofficial AI-coded Minecraft launcher for the StoneLight community.
 
-Still in development. This build is not fully functional. Minecraft API permission is pending.
-
 ## Features
 
 - Microsoft licensed account login.
@@ -22,7 +20,7 @@ Still in development. This build is not fully functional. Minecraft API permissi
 
 ## License
 
-StoneLight Launcher is distributed for personal, non-commercial use with the StoneLight Minecraft community.
+StoneLight Launcher is distributed for personal, non-commercial use.
 
 This project is not affiliated with Microsoft, Mojang Studios, or Minecraft.
 
