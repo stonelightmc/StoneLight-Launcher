@@ -20,6 +20,10 @@ Still in development. This build is not fully functional. Minecraft API permissi
   - Ukrainian
   - Kazakh
 
-## Disclaimer
+## License
 
-StoneLight Launcher is not affiliated with Microsoft, Mojang Studios, or Minecraft.
+StoneLight Launcher is distributed for personal, non-commercial use with the StoneLight Minecraft community.
+
+This project is not affiliated with Microsoft, Mojang Studios, or Minecraft.
+
+See [LICENSE](LICENSE) for details.
