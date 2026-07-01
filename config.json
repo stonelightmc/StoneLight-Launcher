@@ -1,6 +1,6 @@
 {
   "launcher_name": "StoneLight Launcher",
-  "launcher_version": "0.5.55",
+  "launcher_version": "0.5.56",
   "minecraft_version": "26.1.2",
   "loader": "fabric",
   "fabric_loader_version": "0.19.3",
@@ -51,7 +51,7 @@
     "neon",
     "retro_future"
   ],
-  "ui_style": "compact_main_layout_icon_java_fix",
+  "ui_style": "main_actions_java_side_by_side",
   "launcher_update_repo": "stonelightmc/StoneLight-Launcher",
   "launcher_update_asset_keyword": "GitHub.zip",
   "autocheck_updates": true,

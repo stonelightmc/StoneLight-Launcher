@@ -64,7 +64,7 @@ from updater import (
 )
 
 
-APP_TITLE = "StoneLight Launcher v0.5.55"
+APP_TITLE = "StoneLight Launcher v0.5.56"
 JAVA_PRESET_VALUES = ["auto", "global", "java8", "java16", "java17", "java21", "java25", "manual"]
 
 UI_FONT = "Segoe UI Variable"
@@ -3036,7 +3036,8 @@ class StoneLightLauncherApp(ctk.CTk):
         self.check_updates_button.grid(row=2, column=1, padx=10, pady=(4, 8), sticky="ew")
 
         # Compact status/log card. It must be visible without maximizing the main window.
-        status_frame = ctk.CTkFrame(self, corner_radius=22)
+        self.status_frame = ctk.CTkFrame(self, corner_radius=22)
+        status_frame = self.status_frame
         status_frame.grid(row=4, column=0, padx=18, pady=(4, 8), sticky="ew")
         status_frame.grid_columnconfigure(0, weight=1)
         status_frame.grid_rowconfigure(2, weight=0)
@@ -3050,9 +3051,12 @@ class StoneLightLauncherApp(ctk.CTk):
 
         self.log_box = ctk.CTkTextbox(status_frame, height=96)
         self.log_box.grid(row=2, column=0, padx=14, pady=(0, 8), sticky="ew")
-        self.log_box.insert("end", tr_service("Добро пожаловать в StoneLight Launcher v0.5.55") + "\n")
+        self.log_box.insert("end", tr_service("Добро пожаловать в StoneLight Launcher v0.5.56") + "\n")
         self.log_box.configure(state="disabled")
         self.apply_danger_button_styles()
+
+        self.relayout_actions_and_java_card()
+
 
     def apply_danger_button_styles(self):
         for button_name in ("delete_instance_button", "delete_account_button", "stop_button"):
@@ -3533,6 +3537,100 @@ class StoneLightLauncherApp(ctk.CTk):
 
     def push_progress(self, current: int, total: int):
         self.ui_queue.put(("progress", current, total))
+
+    def relayout_actions_and_java_card(self):
+        """Place main action buttons and selected-instance Java card side by side.
+
+        Left card:
+            [ Play ]
+            [ Install ] [ Stop ]
+            [ Log ]     [ Updates ]
+
+        Right card:
+            Java of selected instance.
+        """
+        try:
+            # Locate action buttons.
+            buttons = [
+                getattr(self, "play_button", None),
+                getattr(self, "update_button", None),
+                getattr(self, "stop_button", None),
+                getattr(self, "log_button", None),
+                getattr(self, "check_updates_button", None),
+            ]
+            if not all(buttons):
+                return
+
+            actions = self.play_button.master
+
+            # Try to locate the Java card by known child text/attributes.
+            java_card = None
+            for child in self.winfo_children():
+                if child is actions:
+                    continue
+                try:
+                    texts = []
+                    for sub in child.winfo_children():
+                        try:
+                            texts.append(str(sub.cget("text")))
+                        except Exception:
+                            pass
+                    joined = " ".join(texts)
+                    if ("Java" in joined and ("сбор" in joined or "збір" in joined or "instance" in joined or "вибра" in joined)):
+                        java_card = child
+                        break
+                except Exception:
+                    pass
+
+            # Fallback: known attribute names from previous layouts.
+            for attr in ("main_java_frame", "java_frame", "main_java_card", "java_card"):
+                candidate = getattr(self, attr, None)
+                if candidate is not None:
+                    java_card = candidate
+                    break
+
+            if java_card is None:
+                return
+
+            # Create row wrapper once.
+            if not hasattr(self, "actions_java_row"):
+                self.actions_java_row = ctk.CTkFrame(self, fg_color="transparent", border_width=0)
+                self.actions_java_row.grid_columnconfigure(0, weight=1, uniform="actions_java")
+                self.actions_java_row.grid_columnconfigure(1, weight=1, uniform="actions_java")
+
+            # Move the two cards into one row.
+            try:
+                actions.grid_forget()
+            except Exception:
+                pass
+            try:
+                java_card.grid_forget()
+            except Exception:
+                pass
+
+            self.actions_java_row.grid(row=3, column=0, padx=18, pady=(4, 4), sticky="ew")
+            actions.grid(row=0, column=0, padx=(0, 9), pady=0, sticky="nsew")
+            java_card.grid(row=0, column=1, padx=(9, 0), pady=0, sticky="nsew")
+
+            actions.grid_columnconfigure((0, 1), weight=1, uniform="main_actions")
+            self.play_button.grid(row=0, column=0, columnspan=2, padx=10, pady=(8, 4), sticky="ew")
+            self.update_button.grid(row=1, column=0, padx=10, pady=4, sticky="ew")
+            self.stop_button.grid(row=1, column=1, padx=10, pady=4, sticky="ew")
+            self.log_button.grid(row=2, column=0, padx=10, pady=(4, 8), sticky="ew")
+            self.check_updates_button.grid(row=2, column=1, padx=10, pady=(4, 8), sticky="ew")
+
+            # Status block should sit directly below this row.
+            if hasattr(self, "status_frame"):
+                try:
+                    self.status_frame.grid(row=4, column=0, padx=18, pady=(4, 8), sticky="ew")
+                except Exception:
+                    pass
+
+        except Exception as exc:
+            try:
+                print("relayout_actions_and_java_card failed:", exc)
+            except Exception:
+                pass
 
     def poll_queue(self):
         try:
