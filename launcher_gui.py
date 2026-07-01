@@ -64,11 +64,17 @@ from updater import (
 )
 
 
-APP_TITLE = "StoneLight Launcher v0.5.56"
+APP_TITLE = "StoneLight Launcher v0.5.62"
 JAVA_PRESET_VALUES = ["auto", "global", "java8", "java16", "java17", "java21", "java25", "manual"]
 
 UI_FONT = "Segoe UI Variable"
 UI_FONT_FALLBACK = "Segoe UI"
+
+UI_BUTTON_HEIGHT = 32
+UI_BUTTON_CORNER_RADIUS = 12
+UI_TAB_BUTTON_HEIGHT = 32
+UI_FOLDER_BUTTON_HEIGHT = 32
+
 
 
 def ui_font(size: int = 14, weight: str | None = None):
@@ -170,6 +176,20 @@ def set_label_text(label, text):
         label.configure(text=tr_service(text))
     except Exception:
         pass
+
+
+def compact_buttons_in(root):
+    try:
+        children = root.winfo_children()
+    except Exception:
+        return
+    for child in children:
+        try:
+            if child.__class__.__name__ == "CTkButton":
+                child.configure(height=UI_BUTTON_HEIGHT, corner_radius=UI_BUTTON_CORNER_RADIUS)
+        except Exception:
+            pass
+        compact_buttons_in(child)
 
 
 def is_manual_java_preset_value(value) -> bool:
@@ -355,6 +375,7 @@ def apply_segmented_tab_style(segmented):
             text_color=theme_pair("accent_text"),
             font=ui_font(14, "bold"),
         )
+        segmented.configure(height=UI_TAB_BUTTON_HEIGHT)
     except Exception:
         pass
 
@@ -364,6 +385,7 @@ def apply_tabview_button_style(tabview):
         segmented = getattr(tabview, "_segmented_button", None)
         if segmented is not None:
             apply_segmented_tab_style(segmented)
+        segmented.configure(height=UI_TAB_BUTTON_HEIGHT)
     except Exception:
         pass
 
@@ -374,15 +396,31 @@ def safe_tab_set(tabview, name):
     return result
 
 
+def style_warning_button(button):
+    try:
+        button.configure(
+            fg_color=theme_pair("danger"),
+            hover_color=theme_pair("danger_hover"),
+            text_color=theme_pair("danger_text"),
+            height=UI_BUTTON_HEIGHT,
+            corner_radius=UI_BUTTON_CORNER_RADIUS,
+        )
+    except Exception:
+        pass
+
+
 def style_danger_button(button):
     try:
         button.configure(
             fg_color=theme_pair("danger"),
             hover_color=theme_pair("danger_hover"),
             text_color=theme_pair("danger_text"),
+            height=UI_BUTTON_HEIGHT,
+            corner_radius=UI_BUTTON_CORNER_RADIUS,
         )
     except Exception:
         pass
+
 
 
 def style_custom_tab_button(button, active: bool):
@@ -402,6 +440,7 @@ def style_custom_tab_button(button, active: bool):
                 border_width=1,
                 border_color=theme_pair("line"),
             )
+        button.configure(height=UI_TAB_BUTTON_HEIGHT, corner_radius=UI_BUTTON_CORNER_RADIUS)
     except Exception:
         pass
 
@@ -433,6 +472,7 @@ def style_folder_nav_button(button, active: bool):
                 border_width=1,
                 border_color=theme_pair("line"),
             )
+        button.configure(height=UI_FOLDER_BUTTON_HEIGHT, corner_radius=UI_BUTTON_CORNER_RADIUS)
     except Exception:
         pass
 
@@ -485,8 +525,8 @@ def style_kwargs(cls_name: str, kwargs: dict) -> dict:
         if cls_name == "CTkTextbox":
             kwargs.setdefault("font", ui_font(13))
     elif cls_name == "CTkButton":
-        kwargs.setdefault("corner_radius", 14)
-        kwargs.setdefault("height", 38)
+        kwargs.setdefault("corner_radius", UI_BUTTON_CORNER_RADIUS)
+        kwargs.setdefault("height", UI_BUTTON_HEIGHT)
         kwargs.setdefault("font", ui_font(14, "bold"))
         if kwargs.get("fg_color") == "#444":
             kwargs["fg_color"] = theme_pair("secondary")
@@ -541,14 +581,22 @@ def patch_i18n_widgets():
                 kwargs["text"] = tr(kwargs["text"])
             if "placeholder_text" in kwargs:
                 kwargs["placeholder_text"] = tr(kwargs["placeholder_text"])
-            # Do not inject default theme colors when only runtime state changes.
-            # Otherwise danger buttons lose their warning colors after disabled -> normal.
-            style_keys = {
-                "fg_color", "hover_color", "text_color", "border_color", "border_width",
-                "corner_radius", "font", "height", "width"
+
+            # Do not inject default theme colors when configure() only changes
+            # runtime state or geometry/layout properties. Otherwise compacting
+            # buttons with height/corner_radius overwrites danger/warning colors.
+            color_keys = {"fg_color", "hover_color", "text_color", "border_color"}
+            theme_affecting_keys = color_keys | {"border_width"}
+            geometry_only_keys = {
+                "height", "width", "corner_radius", "font",
+                "state", "command", "text", "image", "compound", "anchor"
             }
-            if cls_name == "CTkButton" and kwargs and not (set(kwargs) & style_keys):
-                return original_configure(self, *args, **kwargs)
+
+            if cls_name == "CTkButton" and kwargs:
+                keys = set(kwargs)
+                if not (keys & theme_affecting_keys):
+                    return original_configure(self, *args, **kwargs)
+
             kwargs = style_kwargs(cls_name, kwargs)
             return original_configure(self, *args, **kwargs)
 
@@ -697,7 +745,7 @@ class SelectableListDialog(ctk.CTkToplevel):
         self.filter_entry.bind("<KeyRelease>", lambda e: self.apply_filter())
 
         self.info_label = ctk.CTkLabel(self, text="", text_color="#bdbdbd")
-        self.info_label.grid(row=2, column=0, padx=16, pady=(0, 8), sticky="w")
+        self.info_label.grid(row=2, column=0, padx=16, pady=(0, 6), sticky="w")
 
         list_frame = ctk.CTkFrame(self)
         list_frame.grid(row=3, column=0, padx=16, pady=8, sticky="nsew")
@@ -801,7 +849,7 @@ class VersionPickerDialog(ctk.CTkToplevel):
         self.reload_button.grid(row=0, column=1, sticky="e")
 
         self.info_label = ctk.CTkLabel(self, text="Загрузка списка версий...", text_color="#bdbdbd")
-        self.info_label.grid(row=2, column=0, padx=16, pady=(0, 8), sticky="w")
+        self.info_label.grid(row=2, column=0, padx=16, pady=(0, 6), sticky="w")
 
         list_frame = ctk.CTkFrame(self)
         list_frame.grid(row=3, column=0, padx=16, pady=8, sticky="nsew")
@@ -838,6 +886,8 @@ class VersionPickerDialog(ctk.CTkToplevel):
         self.cancel_button.grid(row=0, column=1, padx=(8, 0), sticky="ew")
 
         self.load_versions()
+        compact_buttons_in(self)
+
 
     def load_versions(self):
         self.reload_button.configure(state="disabled")
@@ -983,7 +1033,7 @@ class MicrosoftLoginDialog(ctk.CTkToplevel):
         ctk.CTkLabel(
             self,
             text="Резервный ручной режим: вставь redirect URL сюда, если автоперехват не сработал"
-        ).grid(row=5, column=0, columnspan=3, padx=18, pady=(8, 4), sticky="w")
+        ).grid(row=5, column=0, columnspan=3, padx=18, pady=(6, 3), sticky="w")
 
         manual_row = ctk.CTkFrame(self, fg_color="transparent")
         manual_row.grid(row=6, column=0, columnspan=3, padx=18, pady=6, sticky="ew")
@@ -1016,6 +1066,8 @@ class MicrosoftLoginDialog(ctk.CTkToplevel):
         self.status_box.configure(state="disabled")
 
         self.protocol("WM_DELETE_WINDOW", self.close)
+        compact_buttons_in(self)
+
 
     def reset_redirect_uri(self):
         self.redirect_entry.delete(0, "end")
@@ -1263,6 +1315,8 @@ class GlobalLaunchSettingsDialog(ctk.CTkToplevel):
 
         ctk.CTkButton(buttons, text=icon_text("settings", "Сохранить"), command=self.save).grid(row=0, column=0, padx=(0, 8), sticky="ew")
         ctk.CTkButton(buttons, text="Отмена", fg_color="#444", command=self.destroy).grid(row=0, column=1, padx=(8, 0), sticky="ew")
+        compact_buttons_in(self)
+
 
     def save(self):
         try:
@@ -1382,6 +1436,8 @@ class CreateInstanceDialog(ctk.CTkToplevel):
         self.cancel_button.grid(row=0, column=1, padx=(8, 0), sticky="ew")
 
         self.on_loader_changed()
+        compact_buttons_in(self)
+
 
     def pick_version(self):
         VersionPickerDialog(
@@ -1463,6 +1519,7 @@ class CreateInstanceDialog(ctk.CTkToplevel):
                 version_type
             )
             self.app.refresh_instances_ui()
+            self.app.refresh_header()
             self.app.append_log(f"{info} {name}")
             self.destroy()
         except Exception as exc:
@@ -1489,6 +1546,7 @@ class InstanceWindow(ctk.CTkToplevel):
         self.after(500, lambda: self.attributes("-topmost", False))
 
         self.build_ui()
+        self.compact_all_buttons()
         self.apply_danger_button_styles()
         self.update_custom_tab_buttons()
         hide_tabview_internal_tabs(self.tabs)
@@ -1498,10 +1556,21 @@ class InstanceWindow(ctk.CTkToplevel):
         self.protocol("WM_DELETE_WINDOW", self.on_close)
         self.poll_queue()
 
+    def compact_all_buttons(self):
+        compact_buttons_in(self)
+
     def apply_danger_button_styles(self):
-        button = getattr(self, "stop_button", None)
-        if button is not None:
-            style_danger_button(button)
+        for name in (
+            "delete_instance_button",
+            "delete_account_button",
+            "stop_button",
+            "delete_button",
+            "remove_button",
+        ):
+            button = getattr(self, name, None)
+            if button is not None:
+                style_danger_button(button)
+
 
     def reload_instance(self):
         self.app.instances_data = load_instances(self.app.config)
@@ -1525,7 +1594,7 @@ class InstanceWindow(ctk.CTkToplevel):
         self.subtitle_label.grid(row=1, column=0, padx=18, pady=(0, 16), sticky="w")
 
         self.custom_tab_bar = ctk.CTkFrame(self, fg_color="transparent", border_width=0)
-        self.custom_tab_bar.grid(row=1, column=0, padx=18, pady=(0, 8), sticky="ew")
+        self.custom_tab_bar.grid(row=1, column=0, padx=18, pady=(0, 6), sticky="ew")
         self.custom_tab_bar.grid_columnconfigure((0, 1, 2, 3), weight=1, uniform="instance_tabs")
 
         self.tabs = ctk.CTkTabview(self, corner_radius=18)
@@ -1569,7 +1638,7 @@ class InstanceWindow(ctk.CTkToplevel):
         button = ctk.CTkButton(
             self.custom_tab_bar,
             text=icon_text(tab_icon_key, tab_name),
-            height=34,
+            height=UI_BUTTON_HEIGHT,
             font=ui_font(14, "bold"),
             command=lambda name=tab_name: self.select_custom_tab(name),
         )
@@ -1616,34 +1685,34 @@ class InstanceWindow(ctk.CTkToplevel):
             "Java, Minecraft и модлоадер меняются на вкладке «Настройки»."
         )
         ctk.CTkLabel(tab, text=info, text_color="#bdbdbd", wraplength=980, justify="left").grid(
-            row=3, column=0, columnspan=3, padx=14, pady=(0, 8), sticky="w"
+            row=3, column=0, columnspan=3, padx=14, pady=(0, 6), sticky="w"
         )
 
         actions = ctk.CTkFrame(tab, fg_color="transparent")
         actions.grid(row=4, column=0, columnspan=3, padx=14, pady=(8, 10), sticky="ew")
         actions.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
-        self.play_button = ctk.CTkButton(actions, text=icon_text("play", "Играть"), height=36, command=self.on_play)
+        self.play_button = ctk.CTkButton(actions, text=icon_text("play", "Играть"), height=UI_BUTTON_HEIGHT, command=self.on_play)
         self.play_button.grid(row=0, column=0, padx=(0, 6), pady=(0, 6), sticky="ew")
 
-        self.update_button = ctk.CTkButton(actions, text="Обновить", height=36, command=self.on_update)
+        self.update_button = ctk.CTkButton(actions, text="Обновить", height=UI_BUTTON_HEIGHT, command=self.on_update)
         self.update_button.grid(row=0, column=1, padx=6, pady=(0, 6), sticky="ew")
 
-        self.stop_button = ctk.CTkButton(actions, text=icon_text("stop", "Остановить"), height=36, fg_color="#7a1f1f", hover_color="#9b2929", command=self.on_stop_game)
+        self.stop_button = ctk.CTkButton(actions, text=icon_text("stop", "Остановить"), height=UI_BUTTON_HEIGHT, fg_color="#7a1f1f", hover_color="#9b2929", command=self.on_stop_game)
         self.stop_button.grid(row=0, column=2, padx=6, pady=(0, 6), sticky="ew")
         style_danger_button(self.stop_button)
 
-        self.open_folder_button = ctk.CTkButton(actions, text=icon_text("folder", "Папка сборки"), height=36, command=self.open_game_folder)
+        self.open_folder_button = ctk.CTkButton(actions, text=icon_text("folder", "Папка сборки"), height=UI_BUTTON_HEIGHT, command=self.open_game_folder)
         self.open_folder_button.grid(row=0, column=3, padx=(6, 0), pady=(0, 6), sticky="ew")
 
         # Forge-only row. It is hidden for non-Forge instances.
-        self.repair_button = ctk.CTkButton(actions, text=icon_text("repair", "Repair"), height=34, command=self.on_repair)
+        self.repair_button = ctk.CTkButton(actions, text=icon_text("repair", "Repair"), height=UI_BUTTON_HEIGHT, command=self.on_repair)
         self.repair_button.grid(row=1, column=0, padx=(0, 6), pady=(4, 0), sticky="ew")
 
-        self.manual_forge_button = ctk.CTkButton(actions, text="Forge Installer", height=34, command=self.on_manual_forge)
+        self.manual_forge_button = ctk.CTkButton(actions, text="Forge Installer", height=UI_BUTTON_HEIGHT, command=self.on_manual_forge)
         self.manual_forge_button.grid(row=1, column=1, padx=6, pady=(4, 0), sticky="ew")
 
-        self.check_forge_button = ctk.CTkButton(actions, text="Проверить Forge", height=34, command=self.on_check_forge)
+        self.check_forge_button = ctk.CTkButton(actions, text="Проверить Forge", height=UI_BUTTON_HEIGHT, command=self.on_check_forge)
         self.check_forge_button.grid(row=1, column=2, padx=6, pady=(4, 0), sticky="ew")
 
         self.status_label = ctk.CTkLabel(tab, text=tr("Готово."), anchor="w")
@@ -1659,7 +1728,7 @@ class InstanceWindow(ctk.CTkToplevel):
             text_color="#bdbdbd",
             wraplength=980,
             justify="left"
-        ).grid(row=7, column=0, columnspan=3, padx=14, pady=(0, 8), sticky="w")
+        ).grid(row=7, column=0, columnspan=3, padx=14, pady=(0, 6), sticky="w")
 
         self.refresh_launch_info()
         self.refresh_manual_forge_button()
@@ -1728,7 +1797,7 @@ class InstanceWindow(ctk.CTkToplevel):
             button = ctk.CTkButton(
                 buttons,
                 text=icon_text(icon_key, label),
-                height=34,
+                height=UI_BUTTON_HEIGHT,
                 font=ui_font(13, "bold"),
                 command=lambda f=folder: self.show_folder(f)
             )
@@ -1737,7 +1806,7 @@ class InstanceWindow(ctk.CTkToplevel):
             style_folder_nav_button(button, active=False)
 
         self.folder_label = ctk.CTkLabel(tab, text="Выбери папку выше.", anchor="w")
-        self.folder_label.grid(row=1, column=0, columnspan=2, padx=16, pady=(8, 4), sticky="ew")
+        self.folder_label.grid(row=1, column=0, columnspan=2, padx=16, pady=(6, 3), sticky="ew")
 
         self.files_box = ctk.CTkTextbox(tab)
         self.files_box.grid(row=2, column=0, columnspan=2, padx=16, pady=(4, 12), sticky="nsew")
@@ -1761,46 +1830,46 @@ class InstanceWindow(ctk.CTkToplevel):
         tab.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(tab, text="Настройки сборки", font=ctk.CTkFont(size=20, weight="bold")).grid(
-            row=0, column=0, columnspan=3, padx=16, pady=(18, 8), sticky="w"
+            row=0, column=0, columnspan=2, padx=16, pady=(14, 6), sticky="w"
         )
 
-        ctk.CTkLabel(tab, text="Название").grid(row=1, column=0, padx=16, pady=8, sticky="w")
+        ctk.CTkLabel(tab, text="Название").grid(row=1, column=0, padx=16, pady=5, sticky="w")
         self.name_entry = ctk.CTkEntry(tab)
-        self.name_entry.grid(row=1, column=1, columnspan=2, padx=16, pady=8, sticky="ew")
+        self.name_entry.grid(row=1, column=1, columnspan=2, padx=16, pady=5, sticky="ew")
 
-        ctk.CTkLabel(tab, text="Minecraft").grid(row=2, column=0, padx=16, pady=8, sticky="w")
+        ctk.CTkLabel(tab, text="Minecraft").grid(row=2, column=0, padx=16, pady=5, sticky="w")
         self.mc_entry = ctk.CTkEntry(tab)
-        self.mc_entry.grid(row=2, column=1, padx=(16, 8), pady=8, sticky="ew")
+        self.mc_entry.grid(row=2, column=1, padx=(16, 8), pady=5, sticky="ew")
 
         self.pick_mc_button = ctk.CTkButton(tab, text="Выбрать", width=110, command=self.pick_settings_version)
-        self.pick_mc_button.grid(row=2, column=2, padx=(8, 16), pady=8, sticky="ew")
+        self.pick_mc_button.grid(row=2, column=2, padx=(8, 16), pady=5, sticky="ew")
 
-        ctk.CTkLabel(tab, text="Loader").grid(row=3, column=0, padx=16, pady=8, sticky="w")
+        ctk.CTkLabel(tab, text="Loader").grid(row=3, column=0, padx=16, pady=5, sticky="w")
         self.loader_combo = ctk.CTkComboBox(tab, values=get_available_mod_loaders(), command=lambda _: self.on_settings_loader_changed())
-        self.loader_combo.grid(row=3, column=1, columnspan=2, padx=16, pady=8, sticky="ew")
+        self.loader_combo.grid(row=3, column=1, columnspan=2, padx=16, pady=5, sticky="ew")
 
-        ctk.CTkLabel(tab, text="Loader version").grid(row=4, column=0, padx=16, pady=8, sticky="w")
+        ctk.CTkLabel(tab, text="Loader version").grid(row=4, column=0, padx=16, pady=5, sticky="w")
         self.loader_version_combo = ctk.CTkComboBox(tab, values=[""])
-        self.loader_version_combo.grid(row=4, column=1, padx=(16, 8), pady=8, sticky="ew")
+        self.loader_version_combo.grid(row=4, column=1, padx=(16, 8), pady=5, sticky="ew")
 
         self.load_loader_versions_button = ctk.CTkButton(tab, text="Загрузить", width=110, command=self.load_settings_loader_versions)
-        self.load_loader_versions_button.grid(row=4, column=2, padx=(8, 16), pady=8, sticky="ew")
+        self.load_loader_versions_button.grid(row=4, column=2, padx=(8, 16), pady=5, sticky="ew")
 
-        ctk.CTkLabel(tab, text="Forge mode").grid(row=5, column=0, padx=16, pady=8, sticky="w")
+        ctk.CTkLabel(tab, text="Forge mode").grid(row=5, column=0, padx=16, pady=5, sticky="w")
         self.forge_mode_combo = ctk.CTkComboBox(tab, values=["auto", "manual"])
-        self.forge_mode_combo.grid(row=5, column=1, columnspan=2, padx=16, pady=8, sticky="ew")
+        self.forge_mode_combo.grid(row=5, column=1, columnspan=2, padx=16, pady=5, sticky="ew")
 
-        ctk.CTkLabel(tab, text="Java preset").grid(row=6, column=0, padx=16, pady=8, sticky="w")
+        ctk.CTkLabel(tab, text="Java preset").grid(row=6, column=0, padx=16, pady=5, sticky="w")
         self.java_preset_combo = ctk.CTkComboBox(
             tab,
             values=JAVA_PRESET_VALUES,
             command=lambda _: self.on_settings_java_changed()
         )
-        self.java_preset_combo.grid(row=6, column=1, columnspan=2, padx=16, pady=8, sticky="ew")
+        self.java_preset_combo.grid(row=6, column=1, columnspan=2, padx=16, pady=5, sticky="ew")
 
-        ctk.CTkLabel(tab, text="Java этой сборки").grid(row=7, column=0, padx=16, pady=8, sticky="w")
+        ctk.CTkLabel(tab, text="Java этой сборки").grid(row=7, column=0, padx=16, pady=5, sticky="w")
         java_instance_row = ctk.CTkFrame(tab, fg_color="transparent")
-        java_instance_row.grid(row=7, column=1, columnspan=2, padx=16, pady=8, sticky="ew")
+        java_instance_row.grid(row=7, column=1, columnspan=2, padx=16, pady=5, sticky="ew")
         java_instance_row.grid_columnconfigure(0, weight=1)
 
         self.instance_java_entry = ctk.CTkEntry(java_instance_row, placeholder_text="auto = скачать/использовать portable Java")
@@ -1811,7 +1880,7 @@ class InstanceWindow(ctk.CTkToplevel):
         self.instance_java_button.grid(row=0, column=1, sticky="e")
 
         java_buttons = ctk.CTkFrame(tab, fg_color="transparent")
-        java_buttons.grid(row=8, column=1, columnspan=2, padx=16, pady=(0, 8), sticky="ew")
+        java_buttons.grid(row=8, column=1, columnspan=2, padx=16, pady=(0, 4), sticky="ew")
         java_buttons.grid_columnconfigure((0, 1), weight=1)
         self.install_recommended_java_button = ctk.CTkButton(java_buttons, text="Установить рекомендуемую Java", command=self.on_install_recommended_java)
         self.install_recommended_java_button.grid(row=0, column=0, padx=(0, 8), sticky="ew")
@@ -1819,21 +1888,21 @@ class InstanceWindow(ctk.CTkToplevel):
         self.install_preset_java_button.grid(row=0, column=1, padx=(8, 0), sticky="ew")
 
         self.java_hint_label = ctk.CTkLabel(tab, text="", text_color="#bdbdbd", wraplength=740, justify="left")
-        self.java_hint_label.grid(row=9, column=1, columnspan=2, padx=16, pady=(0, 8), sticky="w")
+        self.java_hint_label.grid(row=9, column=1, columnspan=2, padx=16, pady=(0, 4), sticky="w")
 
-        ctk.CTkLabel(tab, text="Server IP").grid(row=10, column=0, padx=16, pady=8, sticky="w")
+        ctk.CTkLabel(tab, text="Server IP").grid(row=10, column=0, padx=16, pady=5, sticky="w")
         self.server_entry = ctk.CTkEntry(tab)
-        self.server_entry.grid(row=10, column=1, columnspan=2, padx=16, pady=8, sticky="ew")
+        self.server_entry.grid(row=10, column=1, columnspan=2, padx=16, pady=5, sticky="ew")
 
         self.ensure_server_var = ctk.BooleanVar(value=False)
         self.ensure_server_check = ctk.CTkCheckBox(tab, text="Добавлять сервер в servers.dat", variable=self.ensure_server_var)
-        self.ensure_server_check.grid(row=11, column=1, columnspan=2, padx=16, pady=8, sticky="w")
+        self.ensure_server_check.grid(row=11, column=1, columnspan=2, padx=16, pady=5, sticky="w")
 
         self.save_settings_button = ctk.CTkButton(tab, text="Сохранить настройки сборки", command=self.save_instance_settings)
-        self.save_settings_button.grid(row=12, column=1, columnspan=2, padx=16, pady=(18, 8), sticky="ew")
+        self.save_settings_button.grid(row=0, column=2, padx=(8, 16), pady=(14, 6), sticky="ew")
 
         self.settings_note = ctk.CTkLabel(tab, text="", text_color="#bdbdbd", wraplength=740, justify="left")
-        self.settings_note.grid(row=13, column=0, columnspan=3, padx=16, pady=8, sticky="w")
+        self.settings_note.grid(row=13, column=0, columnspan=3, padx=16, pady=5, sticky="w")
 
     def build_console_tab(self):
         tab = self.tab_console
@@ -1930,6 +1999,7 @@ class InstanceWindow(ctk.CTkToplevel):
 
     def on_settings_java_changed(self):
         self.on_java_preset_changed()
+        self.refresh_instance_java_manual_controls()
         self.sync_settings_java_to_instance()
 
     def sync_settings_java_to_instance(self):
@@ -2007,11 +2077,10 @@ class InstanceWindow(ctk.CTkToplevel):
         # Java-настройки разрешены даже для защищённой официальной сборки:
         # защищены версия, loader и модпак, но не выбор Java.
         self.java_preset_combo.configure(state="normal")
-        self.instance_java_entry.configure(state="normal")
-        self.instance_java_button.configure(state="normal")
         self.install_recommended_java_button.configure(state="normal")
         self.install_preset_java_button.configure(state="normal")
         self.save_settings_button.configure(state="normal")
+        self.refresh_instance_java_manual_controls()
 
         if locked:
             self.settings_note.configure(text="Официальная сборка StoneLight защищена от редактирования версии, loader и модпака.")
@@ -2020,6 +2089,7 @@ class InstanceWindow(ctk.CTkToplevel):
 
         self.on_settings_loader_changed(locked=locked)
         self.refresh_manual_forge_button()
+        self.refresh_instance_java_manual_controls()
         self._refreshing_settings = False
 
     def is_forge_instance(self) -> bool:
@@ -2052,6 +2122,11 @@ class InstanceWindow(ctk.CTkToplevel):
         self.browse_instance_java()
 
     def browse_instance_java(self):
+        preset = self.java_preset_combo.get().strip().lower() if hasattr(self, "java_preset_combo") else "auto"
+        if not is_manual_java_preset_value(preset):
+            self.refresh_instance_java_manual_controls()
+            return
+
         filetypes = [
             ("Java executable", "java.exe javaw.exe"),
             ("Executable", "*.exe"),
@@ -2518,13 +2593,19 @@ class InstanceWindow(ctk.CTkToplevel):
 
     def on_java_preset_changed(self):
         preset = self.java_preset_combo.get().strip().lower() if hasattr(self, "java_preset_combo") else "auto"
-        if preset in ("auto", "java8", "java16", "java17", "java21", "java25"):
-            self.instance_java_entry.configure(state="disabled")
-            self.instance_java_button.configure(state="disabled")
-        else:
-            locked = bool(self.instance.get("locked"))
-            self.instance_java_entry.configure(state="disabled" if locked else "normal")
-            self.instance_java_button.configure(state="disabled" if locked else "normal")
+        manual = is_manual_java_preset_value(preset)
+
+        if hasattr(self, "instance_java_entry"):
+            self.instance_java_entry.configure(state="normal" if manual else "disabled")
+            if not manual:
+                try:
+                    self.instance_java_entry.delete(0, "end")
+                except Exception:
+                    pass
+
+        if hasattr(self, "instance_java_button"):
+            self.instance_java_button.configure(state="normal" if manual else "disabled")
+
         self.refresh_instance_java_manual_controls()
 
 
@@ -2664,28 +2745,37 @@ class InstanceWindow(ctk.CTkToplevel):
                 preset = self.java_preset_combo.get()
             except Exception:
                 pass
+
         manual = is_manual_java_preset_value(preset)
-        for widget_name in ("instance_java_entry", "browse_java_button", "java_browse_button"):
+        state = "normal" if manual else "disabled"
+
+        for widget_name in ("instance_java_entry", "instance_java_button", "browse_java_button", "java_browse_button"):
             widget = getattr(self, widget_name, None)
             if widget is not None:
                 try:
-                    widget.configure(state="normal" if manual else "disabled")
+                    widget.configure(state=state)
                 except Exception:
                     pass
+
         if hasattr(self, "instance_java_entry"):
             try:
+                if not manual:
+                    self.instance_java_entry.delete(0, "end")
                 self.instance_java_entry.configure(
                     placeholder_text=tr("Путь к java.exe") if manual else tr("Для этого пресета путь java.exe не нужен")
                 )
             except Exception:
                 pass
 
+
     def save_instance_settings(self):
         self.sync_settings_java_to_instance()
+        java_preset, java_path = self.get_settings_java_values()
+
         if self.instance.get("locked"):
             updates = {
-                "java_preset": self.java_preset_combo.get().strip().lower() or "auto",
-                "java_executable": self.instance_java_entry.get().strip(),
+                "java_preset": java_preset,
+                "java_executable": java_path,
                 "server_ip": self.server_entry.get().strip(),
                 "ensure_server_in_list": bool(self.ensure_server_var.get()),
                 "server_list_name": self.instance.get("name", "StoneLight"),
@@ -2696,8 +2786,8 @@ class InstanceWindow(ctk.CTkToplevel):
                 "minecraft_version": self.mc_entry.get().strip(),
                 "loader": self.loader_combo.get().strip().lower() or "vanilla",
                 "loader_version": self.loader_version_combo.get().strip(),
-                "java_preset": self.java_preset_combo.get().strip().lower() or "auto",
-                "java_executable": self.instance_java_entry.get().strip(),
+                "java_preset": java_preset,
+                "java_executable": java_path,
                 "forge_install_mode": self.forge_mode_combo.get().strip().lower() or "auto",
                 "server_ip": self.server_entry.get().strip(),
                 "ensure_server_in_list": bool(self.ensure_server_var.get()),
@@ -2750,7 +2840,7 @@ class StoneLightLauncherApp(ctk.CTk):
         apply_theme_to_window(self)
         self.grid_columnconfigure(0, weight=1)
         # Status/log row must stay visible at startup; keep it compact instead of letting it fall below the window.
-        self.grid_rowconfigure(4, weight=0, minsize=172)
+        self.grid_rowconfigure(3, weight=0, minsize=172)
 
         header = ctk.CTkFrame(self, corner_radius=18)
         header.grid(row=0, column=0, padx=18, pady=(18, 10), sticky="ew")
@@ -2765,7 +2855,7 @@ class StoneLightLauncherApp(ctk.CTk):
         title.grid(row=0, column=0, padx=18, pady=(16, 0), sticky="w")
 
         self.subtitle = ctk.CTkLabel(header, text="", text_color="#bdbdbd")
-        self.subtitle.grid(row=1, column=0, padx=18, pady=(0, 8), sticky="w")
+        self.subtitle.grid(row=1, column=0, padx=18, pady=(0, 6), sticky="w")
 
         self.header_accent = ctk.CTkFrame(header, height=4, corner_radius=999, fg_color=theme_pair("accent"), border_width=0)
         self.header_accent.grid(row=2, column=0, columnspan=2, padx=18, pady=(0, 14), sticky="ew")
@@ -2776,7 +2866,7 @@ class StoneLightLauncherApp(ctk.CTk):
         header_tools.grid_columnconfigure(1, weight=1)
 
         self.language_label = ctk.CTkLabel(header_tools, text="Language")
-        self.language_label.grid(row=0, column=0, padx=(0, 8), pady=(0, 8), sticky="e")
+        self.language_label.grid(row=0, column=0, padx=(0, 8), pady=(0, 6), sticky="e")
 
         self.language_combo = ctk.CTkComboBox(
             header_tools,
@@ -2784,11 +2874,11 @@ class StoneLightLauncherApp(ctk.CTk):
             width=155,
             command=self.on_language_changed
         )
-        self.language_combo.grid(row=0, column=1, pady=(0, 8), sticky="ew")
+        self.language_combo.grid(row=0, column=1, pady=(0, 6), sticky="ew")
         self.language_combo.set(i18n.language_label(i18n.get_language()))
 
         self.theme_label = ctk.CTkLabel(header_tools, text="Theme")
-        self.theme_label.grid(row=1, column=0, padx=(0, 8), pady=(0, 8), sticky="e")
+        self.theme_label.grid(row=1, column=0, padx=(0, 8), pady=(0, 6), sticky="e")
 
         self.theme_combo = ctk.CTkComboBox(
             header_tools,
@@ -2796,7 +2886,7 @@ class StoneLightLauncherApp(ctk.CTk):
             width=155,
             command=self.on_theme_changed
         )
-        self.theme_combo.grid(row=1, column=1, pady=(0, 8), sticky="ew")
+        self.theme_combo.grid(row=1, column=1, pady=(0, 6), sticky="ew")
         self.theme_combo.set(theme_label(self.current_theme))
 
         self.github_button = ctk.CTkButton(
@@ -2834,41 +2924,41 @@ class StoneLightLauncherApp(ctk.CTk):
         self.open_instance_button = ctk.CTkButton(
             instance_frame,
             font=ui_font(13, "bold"),
-            height=36,
+            height=UI_BUTTON_HEIGHT,
             text=icon_text("open", "Открыть окно сборки"),
             command=self.on_open_instance_window
         )
-        self.open_instance_button.grid(row=2, column=0, columnspan=2, padx=(16, 8), pady=(6, 6), sticky="ew")
+        self.open_instance_button.grid(row=2, column=0, columnspan=2, padx=(16, 8), pady=(4, 4), sticky="ew")
 
         self.create_instance_button = ctk.CTkButton(
             instance_frame,
             font=ui_font(13, "bold"),
-            height=36,
+            height=UI_BUTTON_HEIGHT,
             text=icon_text("add", "Создать сборку"),
             command=self.on_create_instance
         )
-        self.create_instance_button.grid(row=2, column=2, columnspan=2, padx=(8, 16), pady=(6, 6), sticky="ew")
+        self.create_instance_button.grid(row=2, column=2, columnspan=2, padx=(8, 16), pady=(4, 4), sticky="ew")
 
         self.delete_instance_button = ctk.CTkButton(
             instance_frame,
             font=ui_font(13, "bold"),
-            height=36,
+            height=UI_BUTTON_HEIGHT,
             text=icon_text("delete", "Удалить сборку"),
             fg_color="#7a1f1f",
             hover_color="#9b2929",
             command=self.on_delete_instance
         )
-        self.delete_instance_button.grid(row=3, column=0, columnspan=2, padx=(16, 8), pady=(0, 8), sticky="ew")
+        self.delete_instance_button.grid(row=3, column=0, columnspan=2, padx=(16, 8), pady=(0, 6), sticky="ew")
         style_danger_button(self.delete_instance_button)
 
         self.open_instance_folder_button = ctk.CTkButton(
             instance_frame,
             font=ui_font(13, "bold"),
-            height=36,
+            height=UI_BUTTON_HEIGHT,
             text=icon_text("folder", "Папка"),
             command=self.on_open_instance_folder
         )
-        self.open_instance_folder_button.grid(row=3, column=2, columnspan=2, padx=(8, 16), pady=(0, 8), sticky="ew")
+        self.open_instance_folder_button.grid(row=3, column=2, columnspan=2, padx=(8, 16), pady=(0, 6), sticky="ew")
 
         self.instance_info = ctk.CTkLabel(
             instance_frame,
@@ -2876,7 +2966,8 @@ class StoneLightLauncherApp(ctk.CTk):
             text_color="#a9a9a9",
             anchor="w"
         )
-        self.instance_info.grid(row=4, column=0, columnspan=4, padx=16, pady=(0, 12), sticky="ew")
+        # v0.5.62: hidden to keep the main screen compact; detailed info is in the instance window.
+        self.instance_info.grid_remove()
 
         account_frame = ctk.CTkFrame(dashboard, corner_radius=22)
         account_frame.grid(row=0, column=1, padx=(8, 0), pady=0, sticky="nsew")
@@ -2900,45 +2991,45 @@ class StoneLightLauncherApp(ctk.CTk):
         self.microsoft_login_button = ctk.CTkButton(
             account_frame,
             font=ui_font(13, "bold"),
-            height=36,
+            height=UI_BUTTON_HEIGHT,
             text=icon_text("microsoft", "Войти Microsoft"),
             command=self.on_microsoft_login
         )
-        self.microsoft_login_button.grid(row=2, column=0, columnspan=2, padx=(16, 8), pady=(6, 6), sticky="ew")
+        self.microsoft_login_button.grid(row=2, column=0, columnspan=2, padx=(16, 8), pady=(4, 4), sticky="ew")
 
         self.refresh_license_button = ctk.CTkButton(
             account_frame,
             font=ui_font(13, "bold"),
-            height=36,
+            height=UI_BUTTON_HEIGHT,
             text=icon_text("refresh", "Обновить лицензию"),
             command=self.on_refresh_microsoft
         )
-        self.refresh_license_button.grid(row=2, column=2, columnspan=2, padx=(8, 16), pady=(6, 6), sticky="ew")
+        self.refresh_license_button.grid(row=2, column=2, columnspan=2, padx=(8, 16), pady=(4, 4), sticky="ew")
 
         self.delete_account_button = ctk.CTkButton(
             account_frame,
             font=ui_font(13, "bold"),
-            height=36,
+            height=UI_BUTTON_HEIGHT,
             text=icon_text("delete", "Удалить аккаунт"),
             fg_color="#7a1f1f",
             hover_color="#9b2929",
             command=self.on_delete_account
         )
-        self.delete_account_button.grid(row=3, column=0, columnspan=4, padx=16, pady=(0, 8), sticky="ew")
+        self.delete_account_button.grid(row=3, column=0, columnspan=4, padx=16, pady=(0, 6), sticky="ew")
         style_danger_button(self.delete_account_button)
 
-        ctk.CTkLabel(account_frame, text="Offline-ник").grid(row=4, column=0, padx=16, pady=(6, 6), sticky="w")
+        ctk.CTkLabel(account_frame, text="Offline-ник").grid(row=4, column=0, padx=16, pady=(4, 4), sticky="w")
         self.new_account_entry = ctk.CTkEntry(account_frame, placeholder_text="Доступно после входа в лицензионный аккаунт")
-        self.new_account_entry.grid(row=4, column=1, columnspan=2, padx=(16, 8), pady=(6, 6), sticky="ew")
+        self.new_account_entry.grid(row=4, column=1, columnspan=2, padx=(16, 8), pady=(4, 4), sticky="ew")
 
         self.add_account_button = ctk.CTkButton(
             account_frame,
             font=ui_font(13, "bold"),
-            height=36,
+            height=UI_BUTTON_HEIGHT,
             text=icon_text("add", "Добавить offline"),
             command=self.on_add_account
         )
-        self.add_account_button.grid(row=4, column=3, padx=(8, 16), pady=(6, 6), sticky="ew")
+        self.add_account_button.grid(row=4, column=3, padx=(8, 16), pady=(4, 4), sticky="ew")
 
         self.account_policy_label = ctk.CTkLabel(
             account_frame,
@@ -2947,10 +3038,20 @@ class StoneLightLauncherApp(ctk.CTk):
             wraplength=480,
             justify="left"
         )
-        self.account_policy_label.grid(row=5, column=0, columnspan=4, padx=16, pady=(0, 12), sticky="ew")
+        # v0.5.62: hidden to keep the main screen compact; the restriction is enforced when adding offline accounts.
+        self.account_policy_label.grid_remove()
 
-        form = ctk.CTkFrame(self, corner_radius=18)
-        form.grid(row=2, column=0, padx=18, pady=8, sticky="ew")
+        self.actions_java_row = ctk.CTkFrame(self, fg_color="transparent", border_width=0)
+        self.actions_java_row.grid(row=2, column=0, padx=18, pady=8, sticky="ew")
+        self.actions_java_row.grid_columnconfigure(0, weight=1, uniform="actions_java")
+        self.actions_java_row.grid_columnconfigure(1, weight=1, uniform="actions_java")
+
+        actions = ctk.CTkFrame(self.actions_java_row, corner_radius=18)
+        actions.grid(row=0, column=0, padx=(0, 9), pady=0, sticky="nsew")
+        actions.grid_columnconfigure((0, 1), weight=1, uniform="main_actions")
+
+        form = ctk.CTkFrame(self.actions_java_row, corner_radius=18)
+        form.grid(row=0, column=1, padx=(9, 0), pady=0, sticky="nsew")
         form.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(
@@ -2977,7 +3078,8 @@ class StoneLightLauncherApp(ctk.CTk):
         self.browse_java_button.grid(row=0, column=1, sticky="e")
 
         self.global_summary_label = ctk.CTkLabel(form, text="", text_color="#bdbdbd", anchor="w")
-        self.global_summary_label.grid(row=3, column=0, columnspan=2, padx=16, pady=(8, 16), sticky="ew")
+        # v0.5.62: hidden to keep the Java card compact.
+        self.global_summary_label.grid_remove()
 
         self.global_settings_button = ctk.CTkButton(
             form,
@@ -2985,60 +3087,58 @@ class StoneLightLauncherApp(ctk.CTk):
             width=210,
             command=self.on_global_launch_settings
         )
-        self.global_settings_button.grid(row=3, column=2, padx=16, pady=(8, 16), sticky="e")
+        self.global_settings_button.grid(row=3, column=0, columnspan=3, padx=16, pady=(8, 12), sticky="ew")
 
-        actions = ctk.CTkFrame(self, corner_radius=18)
-        actions.grid(row=3, column=0, padx=18, pady=(4, 4), sticky="ew")
-        actions.grid_columnconfigure((0, 1), weight=1, uniform="main_actions")
+
 
         self.play_button = ctk.CTkButton(
             actions,
             text=icon_text("play", "Играть"),
-            height=36,
+            height=UI_BUTTON_HEIGHT,
             command=self.on_play
         )
-        self.play_button.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+        self.play_button.grid(row=0, column=0, columnspan=2, padx=10, pady=(6, 3), sticky="ew")
 
         self.update_button = ctk.CTkButton(
             actions,
             text=icon_text("download", "Установить"),
-            height=36,
+            height=UI_BUTTON_HEIGHT,
             command=self.on_update
         )
-        self.update_button.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
+        self.update_button.grid(row=1, column=0, padx=10, pady=4, sticky="ew")
 
         self.stop_button = ctk.CTkButton(
             actions,
             text=icon_text("stop", "Остановить"),
-            height=36,
+            height=UI_BUTTON_HEIGHT,
             fg_color="#7a1f1f",
             hover_color="#9b2929",
             command=self.on_stop_game
         )
-        self.stop_button.grid(row=0, column=2, padx=10, pady=10, sticky="ew")
+        self.stop_button.grid(row=1, column=1, padx=10, pady=4, sticky="ew")
         style_danger_button(self.stop_button)
 
         self.open_log_button = ctk.CTkButton(
             actions,
             text=icon_text("logs", "Лог"),
-            height=36,
+            height=UI_BUTTON_HEIGHT,
             command=self.open_log
         )
-        self.open_log_button.grid(row=0, column=3, padx=10, pady=10, sticky="ew")
+        self.open_log_button.grid(row=2, column=0, padx=10, pady=(3, 6), sticky="ew")
 
         self.check_updates_button = ctk.CTkButton(
             actions,
             text=icon_text("check_updates", "Обновления"),
-            height=34,
+            height=UI_BUTTON_HEIGHT,
             font=ui_font(13, "bold"),
             command=lambda: self.on_check_updates(auto=False)
         )
-        self.check_updates_button.grid(row=2, column=1, padx=10, pady=(4, 8), sticky="ew")
+        self.check_updates_button.grid(row=2, column=1, padx=10, pady=(3, 6), sticky="ew")
 
         # Compact status/log card. It must be visible without maximizing the main window.
         self.status_frame = ctk.CTkFrame(self, corner_radius=22)
         status_frame = self.status_frame
-        status_frame.grid(row=4, column=0, padx=18, pady=(4, 8), sticky="ew")
+        status_frame.grid(row=3, column=0, padx=18, pady=(3, 6), sticky="ew")
         status_frame.grid_columnconfigure(0, weight=1)
         status_frame.grid_rowconfigure(2, weight=0)
 
@@ -3050,19 +3150,27 @@ class StoneLightLauncherApp(ctk.CTk):
         self.progress.set(0)
 
         self.log_box = ctk.CTkTextbox(status_frame, height=96)
-        self.log_box.grid(row=2, column=0, padx=14, pady=(0, 8), sticky="ew")
-        self.log_box.insert("end", tr_service("Добро пожаловать в StoneLight Launcher v0.5.56") + "\n")
+        self.log_box.grid(row=2, column=0, padx=14, pady=(0, 6), sticky="ew")
+        self.log_box.insert("end", tr_service("Добро пожаловать в StoneLight Launcher v0.5.62") + "\n")
         self.log_box.configure(state="disabled")
         self.apply_danger_button_styles()
 
-        self.relayout_actions_and_java_card()
+        self.compact_all_buttons()
+        self.apply_danger_button_styles()
 
 
     def apply_danger_button_styles(self):
-        for button_name in ("delete_instance_button", "delete_account_button", "stop_button"):
-            button = getattr(self, button_name, None)
+        for name in (
+            "delete_instance_button",
+            "delete_account_button",
+            "stop_button",
+            "delete_button",
+            "remove_button",
+        ):
+            button = getattr(self, name, None)
             if button is not None:
                 style_danger_button(button)
+
 
     def open_github(self):
         webbrowser.open(self.config.get("github_url", GITHUB_URL))
@@ -3216,6 +3324,24 @@ class StoneLightLauncherApp(ctk.CTk):
         finally:
             self._syncing_launch_settings = False
 
+    def find_instance_by_ui_label(self, label: str):
+        """Find instance by either raw or localized ComboBox label."""
+        label = str(label or "")
+        instance = find_instance_by_label(self.instances_data, label)
+        if instance:
+            return instance
+
+        for inst in self.instances_data.get("instances", []):
+            raw_label = instance_label(inst)
+            try:
+                localized_label = tr(raw_label)
+            except Exception:
+                localized_label = raw_label
+            if label == localized_label or label == raw_label:
+                return inst
+
+        return None
+
     def refresh_header(self):
         instance = self.get_selected_instance(silent=True)
         if not instance:
@@ -3257,14 +3383,17 @@ class StoneLightLauncherApp(ctk.CTk):
         selected_label = instance_label(selected)
 
         self.instance_combo.configure(values=labels)
-        self.instance_combo.set(selected_label)
+        try:
+            self.instance_combo.set(tr(selected_label))
+        except Exception:
+            self.instance_combo.set(selected_label)
         self.refresh_header()
         self.refresh_launch_settings_ui()
         self.refresh_global_launch_summary()
 
     def get_selected_instance(self, silent=False):
         label = self.instance_combo.get()
-        instance = find_instance_by_label(self.instances_data, label)
+        instance = self.find_instance_by_ui_label(label)
         if instance:
             return instance
 
@@ -3276,13 +3405,20 @@ class StoneLightLauncherApp(ctk.CTk):
             return None
         raise LauncherError("Нет выбранной сборки.")
 
-    def on_instance_selected(self, label: str):
-        instance = find_instance_by_label(self.instances_data, label)
+    def on_instance_selected(self, label: str = ""):
+        instance = self.find_instance_by_ui_label(label)
         if not instance:
+            try:
+                instance = self.find_instance_by_ui_label(self.instance_combo.get())
+            except Exception:
+                instance = None
+        if not instance:
+            self.refresh_header()
             return
 
         self.instances_data = select_instance(self.config, instance["id"])
         self.refresh_instances_ui()
+        self.refresh_header()
 
     def on_open_instance_window(self):
         try:
@@ -3538,99 +3674,9 @@ class StoneLightLauncherApp(ctk.CTk):
     def push_progress(self, current: int, total: int):
         self.ui_queue.put(("progress", current, total))
 
-    def relayout_actions_and_java_card(self):
-        """Place main action buttons and selected-instance Java card side by side.
 
-        Left card:
-            [ Play ]
-            [ Install ] [ Stop ]
-            [ Log ]     [ Updates ]
-
-        Right card:
-            Java of selected instance.
-        """
-        try:
-            # Locate action buttons.
-            buttons = [
-                getattr(self, "play_button", None),
-                getattr(self, "update_button", None),
-                getattr(self, "stop_button", None),
-                getattr(self, "log_button", None),
-                getattr(self, "check_updates_button", None),
-            ]
-            if not all(buttons):
-                return
-
-            actions = self.play_button.master
-
-            # Try to locate the Java card by known child text/attributes.
-            java_card = None
-            for child in self.winfo_children():
-                if child is actions:
-                    continue
-                try:
-                    texts = []
-                    for sub in child.winfo_children():
-                        try:
-                            texts.append(str(sub.cget("text")))
-                        except Exception:
-                            pass
-                    joined = " ".join(texts)
-                    if ("Java" in joined and ("сбор" in joined or "збір" in joined or "instance" in joined or "вибра" in joined)):
-                        java_card = child
-                        break
-                except Exception:
-                    pass
-
-            # Fallback: known attribute names from previous layouts.
-            for attr in ("main_java_frame", "java_frame", "main_java_card", "java_card"):
-                candidate = getattr(self, attr, None)
-                if candidate is not None:
-                    java_card = candidate
-                    break
-
-            if java_card is None:
-                return
-
-            # Create row wrapper once.
-            if not hasattr(self, "actions_java_row"):
-                self.actions_java_row = ctk.CTkFrame(self, fg_color="transparent", border_width=0)
-                self.actions_java_row.grid_columnconfigure(0, weight=1, uniform="actions_java")
-                self.actions_java_row.grid_columnconfigure(1, weight=1, uniform="actions_java")
-
-            # Move the two cards into one row.
-            try:
-                actions.grid_forget()
-            except Exception:
-                pass
-            try:
-                java_card.grid_forget()
-            except Exception:
-                pass
-
-            self.actions_java_row.grid(row=3, column=0, padx=18, pady=(4, 4), sticky="ew")
-            actions.grid(row=0, column=0, padx=(0, 9), pady=0, sticky="nsew")
-            java_card.grid(row=0, column=1, padx=(9, 0), pady=0, sticky="nsew")
-
-            actions.grid_columnconfigure((0, 1), weight=1, uniform="main_actions")
-            self.play_button.grid(row=0, column=0, columnspan=2, padx=10, pady=(8, 4), sticky="ew")
-            self.update_button.grid(row=1, column=0, padx=10, pady=4, sticky="ew")
-            self.stop_button.grid(row=1, column=1, padx=10, pady=4, sticky="ew")
-            self.log_button.grid(row=2, column=0, padx=10, pady=(4, 8), sticky="ew")
-            self.check_updates_button.grid(row=2, column=1, padx=10, pady=(4, 8), sticky="ew")
-
-            # Status block should sit directly below this row.
-            if hasattr(self, "status_frame"):
-                try:
-                    self.status_frame.grid(row=4, column=0, padx=18, pady=(4, 8), sticky="ew")
-                except Exception:
-                    pass
-
-        except Exception as exc:
-            try:
-                print("relayout_actions_and_java_card failed:", exc)
-            except Exception:
-                pass
+    def compact_all_buttons(self):
+        compact_buttons_in(self)
 
     def poll_queue(self):
         try:
