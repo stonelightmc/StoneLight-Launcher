@@ -1,6 +1,6 @@
 # UI Design
 
-StoneLight Launcher v0.5.54 starts a modernized UI pass.
+StoneLight Launcher v0.5.55 starts a modernized UI pass.
 
 ## Changes
 
@@ -19,7 +19,7 @@ StoneLight Launcher v0.5.54 starts a modernized UI pass.
 CustomTkinter does not provide native real gradients or advanced animations for all widgets. These can be added later through canvas-based custom widgets without changing launcher functionality.
 
 
-## v0.5.54
+## v0.5.55
 
 Layout fixes:
 
@@ -29,7 +29,7 @@ Layout fixes:
 - Tab buttons in instance windows no longer use accent color as selected background. This avoids unreadable text because `CTkTabview` uses one text color for all tab buttons.
 
 
-## v0.5.54
+## v0.5.55
 
 Fix pass for instance windows:
 
@@ -41,7 +41,7 @@ Fix pass for instance windows:
 - Tab buttons are forced to stable neutral theme colors, so switching tabs no longer makes them unexpectedly darker.
 
 
-## v0.5.54
+## v0.5.55
 
 Tab color and destructive button pass:
 
@@ -53,7 +53,7 @@ Tab color and destructive button pass:
   - stop game
 
 
-## v0.5.54
+## v0.5.55
 
 Fix pass after v0.5.36 testing:
 
@@ -67,7 +67,7 @@ Fix pass after v0.5.36 testing:
   - stop game
 
 
-## v0.5.54
+## v0.5.55
 
 Custom instance tab bar:
 
@@ -78,7 +78,7 @@ Custom instance tab bar:
 - This makes the active tab clearly visible and avoids CustomTkinter segmented-button color glitches.
 
 
-## v0.5.54
+## v0.5.55
 
 Files tab folder navigation redesign:
 
@@ -88,7 +88,7 @@ Files tab folder navigation redesign:
 - This makes the selected folder clearly visible in the instance window.
 
 
-## v0.5.54
+## v0.5.55
 
 Icon buttons pass:
 
@@ -103,7 +103,7 @@ Icon buttons pass:
 - Icons are embedded in button text to avoid external PNG/SVG assets and packaging issues.
 
 
-## v0.5.54
+## v0.5.55
 
 Main window status block visibility fix:
 
@@ -116,7 +116,7 @@ Main window status block visibility fix:
 - Main dashboard vertical padding was slightly reduced.
 
 
-## v0.5.54
+## v0.5.55
 
 Main action row and danger-button fixes:
 

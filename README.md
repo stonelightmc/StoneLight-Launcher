@@ -1,4 +1,4 @@
-# StoneLight Launcher v0.5.54
+# StoneLight Launcher v0.5.55
 
 Unofficial AI-coded Minecraft launcher for the StoneLight community.
 
@@ -19,7 +19,6 @@ Still in development. This build is not fully functional. Minecraft API permissi
   - English default
   - Ukrainian
   - Kazakh
-
 
 ## Disclaimer
 

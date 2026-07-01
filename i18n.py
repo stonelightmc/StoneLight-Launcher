@@ -980,7 +980,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.5.54: update manager UI.
+# v0.5.55: update manager UI.
 for _lang, _mapping in {
     "en": {
         "Проверить обновления": "Check updates",
@@ -1022,7 +1022,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.5.54: official StoneLight pre-launch update flow.
+# v0.5.55: official StoneLight pre-launch update flow.
 for _lang, _mapping in {
     "en": {
         "Проверяю обновление StoneLight перед запуском...": "Checking StoneLight update before launch...",
@@ -1061,7 +1061,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.5.54: update service messages.
+# v0.5.55: update service messages.
 for _lang, _mapping in {
     "en": {
         "Автопроверка обновлений не удалась: {error}": "Auto-check for updates failed: {error}",
@@ -1142,7 +1142,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.5.54: shorter update buttons and clearer update-service messages.
+# v0.5.55: shorter update buttons and clearer update-service messages.
 for _lang, _mapping in {
     "en": {
         "Обновления": "Updates",
@@ -1169,7 +1169,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.5.54: dynamic update-error localization and missing launcher release handling.
+# v0.5.55: dynamic update-error localization and missing launcher release handling.
 for _lang, _mapping in {
     "en": {
         "В репозитории {repo} не найден latest release.": "No latest release was found in repository {repo}.",
@@ -1193,7 +1193,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.5.54: update flow cleanup and startup message localization.
+# v0.5.55: update flow cleanup and startup message localization.
 for _lang, _mapping in {
     "en": {
         "Готов к запуску.": "Ready to launch.",
@@ -1235,7 +1235,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.5.54: centralized service/status/log localization.
+# v0.5.55: centralized service/status/log localization.
 for _lang, _mapping in {
     "en": {
         "Запущенный процесс этой сборки не найден.": "No running process was found for this instance.",
@@ -1275,6 +1275,24 @@ for _lang, _mapping in {
         "Запуск StoneLight отменён пользователем.": "StoneLight іске қосуын пайдаланушы тоқтатты.",
         "Готов к запуску.": "Іске қосуға дайын.",
         "Готово.": "Дайын.",
+    },
+}.items():
+    TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
+
+
+# v0.5.55: Java preset helper text.
+for _lang, _mapping in {
+    "en": {
+        "Для этого пресета путь java.exe не нужен": "This preset does not need a java.exe path",
+        "Путь к java.exe": "Path to java.exe",
+    },
+    "uk": {
+        "Для этого пресета путь java.exe не нужен": "Для цього пресета шлях до java.exe не потрібен",
+        "Путь к java.exe": "Шлях до java.exe",
+    },
+    "kk": {
+        "Для этого пресета путь java.exe не нужен": "Бұл пресет үшін java.exe жолы қажет емес",
+        "Путь к java.exe": "java.exe жолы",
     },
 }.items():
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
