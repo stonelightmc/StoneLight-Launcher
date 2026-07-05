@@ -64,7 +64,7 @@ from updater import (
 )
 
 
-APP_TITLE = "StoneLight Launcher v0.5.62"
+APP_TITLE = "StoneLight Launcher v0.5.64"
 JAVA_PRESET_VALUES = ["auto", "global", "java8", "java16", "java17", "java21", "java25", "manual"]
 
 UI_FONT = "Segoe UI Variable"
@@ -176,6 +176,17 @@ def set_label_text(label, text):
         label.configure(text=tr_service(text))
     except Exception:
         pass
+
+
+def add_query_params(url: str, **params) -> str:
+    from urllib.parse import urlencode as _urlencode, urlparse as _urlparse, parse_qsl as _parse_qsl, urlunparse as _urlunparse
+
+    parsed = _urlparse(url)
+    query = dict(_parse_qsl(parsed.query, keep_blank_values=True))
+    for key, value in params.items():
+        if value is not None:
+            query[key] = str(value)
+    return _urlunparse(parsed._replace(query=_urlencode(query)))
 
 
 def compact_buttons_in(root):
@@ -1115,7 +1126,7 @@ class MicrosoftLoginDialog(ctk.CTkToplevel):
 
     def start_callback_server(self, redirect_uri: str):
         from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-        from urllib.parse import urlparse
+        from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
         parsed = urlparse(redirect_uri)
         host = parsed.hostname or self.CALLBACK_HOST
@@ -1197,6 +1208,8 @@ class MicrosoftLoginDialog(ctk.CTkToplevel):
             callback_uri = self.start_callback_server(redirect_uri)
 
             login_url, state, code_verifier = microsoft_account.get_secure_login_data(client_id, redirect_uri)
+            if self.app.config.get("microsoft_prompt_select_account", True):
+                login_url = add_query_params(login_url, prompt="select_account")
             self.login_state = state
             self.code_verifier = code_verifier
 
@@ -2362,6 +2375,7 @@ class InstanceWindow(ctk.CTkToplevel):
 
         self.set_busy(True)
         self.progress.set(0)
+        self.push_status("Установка/запуск выполняется в фоне. Окно может получать много логов...")
         safe_tab_set(self.tabs, getattr(self, "tab_console_name", tr("Консоль")))
 
         def wrapper():
@@ -2464,9 +2478,12 @@ class InstanceWindow(ctk.CTkToplevel):
         self.queue.put(("progress", current, total))
 
     def poll_queue(self):
+        processed = 0
+        max_events = int(self.app.config.get("ui_queue_events_per_tick", 35) or 35)
         try:
-            while True:
+            while processed < max_events:
                 event = self.queue.get_nowait()
+                processed += 1
                 kind = event[0]
 
                 if kind == "console":
@@ -2500,7 +2517,8 @@ class InstanceWindow(ctk.CTkToplevel):
         except queue.Empty:
             pass
 
-        self.after(100, self.poll_queue)
+        delay = 10 if processed >= max_events else 100
+        self.after(delay, self.poll_queue)
 
     def append_console(self, message: str):
         display_message = message
@@ -2638,6 +2656,7 @@ class InstanceWindow(ctk.CTkToplevel):
         safe_tab_set(self.tabs, getattr(self, "tab_console_name", tr("Консоль")))
         self.set_busy(True)
         self.progress.set(0)
+        self.push_status("Установка/запуск выполняется в фоне. Окно может получать много логов...")
 
         def wrapper():
             try:
@@ -2966,7 +2985,7 @@ class StoneLightLauncherApp(ctk.CTk):
             text_color="#a9a9a9",
             anchor="w"
         )
-        # v0.5.62: hidden to keep the main screen compact; detailed info is in the instance window.
+        # v0.5.64: hidden to keep the main screen compact; detailed info is in the instance window.
         self.instance_info.grid_remove()
 
         account_frame = ctk.CTkFrame(dashboard, corner_radius=22)
@@ -3038,7 +3057,7 @@ class StoneLightLauncherApp(ctk.CTk):
             wraplength=480,
             justify="left"
         )
-        # v0.5.62: hidden to keep the main screen compact; the restriction is enforced when adding offline accounts.
+        # v0.5.64: hidden to keep the main screen compact; the restriction is enforced when adding offline accounts.
         self.account_policy_label.grid_remove()
 
         self.actions_java_row = ctk.CTkFrame(self, fg_color="transparent", border_width=0)
@@ -3078,7 +3097,7 @@ class StoneLightLauncherApp(ctk.CTk):
         self.browse_java_button.grid(row=0, column=1, sticky="e")
 
         self.global_summary_label = ctk.CTkLabel(form, text="", text_color="#bdbdbd", anchor="w")
-        # v0.5.62: hidden to keep the Java card compact.
+        # v0.5.64: hidden to keep the Java card compact.
         self.global_summary_label.grid_remove()
 
         self.global_settings_button = ctk.CTkButton(
@@ -3151,7 +3170,7 @@ class StoneLightLauncherApp(ctk.CTk):
 
         self.log_box = ctk.CTkTextbox(status_frame, height=96)
         self.log_box.grid(row=2, column=0, padx=14, pady=(0, 6), sticky="ew")
-        self.log_box.insert("end", tr_service("Добро пожаловать в StoneLight Launcher v0.5.62") + "\n")
+        self.log_box.insert("end", tr_service("Добро пожаловать в StoneLight Launcher v0.5.64") + "\n")
         self.log_box.configure(state="disabled")
         self.apply_danger_button_styles()
 
@@ -3679,9 +3698,12 @@ class StoneLightLauncherApp(ctk.CTk):
         compact_buttons_in(self)
 
     def poll_queue(self):
+        processed = 0
+        max_events = int(self.config.get("ui_queue_events_per_tick", 35) or 35)
         try:
-            while True:
+            while processed < max_events:
                 event = self.ui_queue.get_nowait()
+                processed += 1
                 kind = event[0]
 
                 if kind == "log":
@@ -3730,7 +3752,8 @@ class StoneLightLauncherApp(ctk.CTk):
         except queue.Empty:
             pass
 
-        self.after(100, self.poll_queue)
+        delay = 10 if processed >= max_events else 100
+        self.after(delay, self.poll_queue)
 
     def append_log(self, message: str):
         self.log_box.configure(state="normal")
