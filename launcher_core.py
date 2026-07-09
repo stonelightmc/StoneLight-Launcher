@@ -1321,6 +1321,7 @@ class LauncherCore:
         loader = (self.config.get("loader") or "vanilla").lower()
         minecraft_version = self.config["minecraft_version"]
         loader_version = self.config.get("fabric_loader_version", "") or ""
+        loader_version = normalize_loader_version_for_install(loader, minecraft_version, loader_version)
 
         if loader == "vanilla":
             return self.install_vanilla(minecraft_version)
@@ -2031,13 +2032,295 @@ def get_latest_versions() -> dict:
     return minecraft_launcher_lib.utils.get_latest_version()
 
 
-def get_available_mod_loaders() -> list[str]:
-    base = ["vanilla", "fabric", "forge", "quilt", "neoforge"]
+
+# Official loader metadata sources. The installer still uses minecraft-launcher-lib where possible,
+# but version lists are fetched directly because library metadata can lag behind official sites.
+FORGE_MAVEN_METADATA_URL = "https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml"
+FORGE_PROMOTIONS_URL = "https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json"
+FORGE_FILES_PAGE_URL = "https://files.minecraftforge.net/net/minecraftforge/forge/index_{minecraft_version}.html"
+FABRIC_LOADER_META_URL = "https://meta.fabricmc.net/v2/versions/loader/{minecraft_version}"
+QUILT_LOADER_META_URL = "https://meta.quiltmc.org/v3/versions/loader/{minecraft_version}"
+NEOFORGE_MAVEN_METADATA_URL = "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml"
+
+HTTP_HEADERS = {
+    "User-Agent": "StoneLightLauncher/0.5.75 (+https://github.com/stonelightmc/StoneLight-Launcher)",
+    "Accept": "application/json, text/xml, application/xml, text/plain, */*",
+}
+
+
+def _http_get_text(url: str, timeout: float = 20.0) -> str:
+    response = requests.get(url, headers=HTTP_HEADERS, timeout=timeout)
+    response.raise_for_status()
+    return response.text
+
+
+def _http_get_json(url: str, timeout: float = 20.0):
+    response = requests.get(url, headers=HTTP_HEADERS, timeout=timeout)
+    response.raise_for_status()
+    return response.json()
+
+
+def _parse_maven_versions(metadata_xml: str) -> list[str]:
+    versions = re.findall(r"<version>\s*([^<]+?)\s*</version>", metadata_xml or "")
     result = []
-    for item in base:
-        if item not in result:
-            result.append(item)
+    for value in versions:
+        value = str(value).strip()
+        if value and value not in result:
+            result.append(value)
     return result
+
+
+def _natural_version_key(value: str):
+    value = str(value or "")
+    parts = re.findall(r"\d+|[A-Za-z]+", value)
+    key = []
+    for part in parts:
+        if part.isdigit():
+            key.append((0, int(part)))
+        else:
+            # release builds should sort above beta/pre labels with the same numeric prefix
+            lower = part.lower()
+            weight = -1 if lower in ("beta", "alpha", "pre", "rc", "snapshot") else 0
+            key.append((1, weight, lower))
+    return key
+
+
+def _sort_versions_desc(values: list[str]) -> list[str]:
+    unique = []
+    for value in values:
+        value = str(value or "").strip()
+        if value and value not in unique:
+            unique.append(value)
+    return sorted(unique, key=_natural_version_key, reverse=True)
+
+
+def _forge_promotions() -> dict:
+    try:
+        data = _http_get_json(FORGE_PROMOTIONS_URL)
+        return dict(data.get("promos", {}) or {})
+    except Exception:
+        return {}
+
+
+def _forge_build_from_full(minecraft_version: str, forge_version: str) -> str:
+    forge_version = str(forge_version or "").strip()
+    prefix = f"{minecraft_version}-"
+    if forge_version.startswith(prefix):
+        return forge_version[len(prefix):]
+    return forge_version
+
+
+def _forge_full_version(minecraft_version: str, forge_build_or_full: str) -> str:
+    value = str(forge_build_or_full or "").strip()
+    if not value:
+        return ""
+    if minecraft_version and value.startswith(minecraft_version + "-"):
+        return value
+    if minecraft_version:
+        return f"{minecraft_version}-{value}"
+    return value
+
+
+def _forge_label(minecraft_version: str, full_version: str, promotions: dict | None = None) -> str:
+    promotions = promotions or {}
+    build = _forge_build_from_full(minecraft_version, full_version)
+    recommended = promotions.get(f"{minecraft_version}-recommended")
+    latest = promotions.get(f"{minecraft_version}-latest")
+
+    tags = []
+    if recommended and build == recommended:
+        tags.append("★ recommended")
+    if latest and build == latest:
+        tags.append("latest")
+
+    if tags:
+        return f"{full_version}  [{', '.join(tags)}]"
+    return full_version
+
+
+def normalize_loader_version_for_install(loader: str, minecraft_version: str, loader_version: str) -> str:
+    """Convert UI labels like '1.21.1-52.1.0  [★ recommended]' back to raw install values."""
+    loader = (loader or "").strip().lower()
+    minecraft_version = (minecraft_version or "").strip()
+    value = str(loader_version or "").strip()
+
+    if not value:
+        return ""
+
+    # Strip UI annotations.
+    value = re.sub(r"\s+\[[^\]]+\]\s*$", "", value).strip()
+    value = re.sub(r"\s+[★*].*$", "", value).strip()
+    value = value.replace("★", "").replace("*", "").strip()
+
+    if loader == "forge":
+        value = _forge_full_version(minecraft_version, value)
+
+    return value
+
+
+def _fabric_or_quilt_versions(loader: str, minecraft_version: str, stable_only: bool = False) -> list[str]:
+    if loader == "fabric":
+        url = FABRIC_LOADER_META_URL.format(minecraft_version=minecraft_version)
+    else:
+        url = QUILT_LOADER_META_URL.format(minecraft_version=minecraft_version)
+
+    data = _http_get_json(url)
+    result = []
+    for item in data if isinstance(data, list) else []:
+        loader_data = item.get("loader", item) if isinstance(item, dict) else {}
+        if stable_only and loader_data.get("stable") is False:
+            continue
+        version = loader_data.get("version") if isinstance(loader_data, dict) else None
+        if version:
+            result.append(str(version))
+    return _sort_versions_desc(result)
+
+
+def _neoforge_prefixes_for_minecraft(minecraft_version: str) -> list[str]:
+    mc = (minecraft_version or "").strip()
+    if not mc:
+        return []
+
+    parts = mc.split(".")
+    prefixes = []
+
+    # NeoForge artifact versions for normal Minecraft 1.x versions are usually:
+    # 1.20.6 -> 20.6.x, 1.21.1 -> 21.1.x, 1.21.10 -> 21.10.x
+    if len(parts) >= 2 and parts[0] == "1":
+        minor = parts[1]
+        patch = parts[2] if len(parts) >= 3 else "0"
+        prefixes.extend([
+            f"{minor}.{patch}.",
+            f"{minor}.{patch}-",
+            f"{minor}.{patch}",
+        ])
+    else:
+        # Newer/experimental Minecraft versions such as 26.1.2 are represented close to their MC version.
+        prefixes.extend([
+            f"{mc}.",
+            f"{mc}-",
+            mc,
+        ])
+        if len(parts) >= 2:
+            prefixes.append(f"{parts[0]}.{parts[1]}.")
+
+    unique = []
+    for prefix in prefixes:
+        if prefix and prefix not in unique:
+            unique.append(prefix)
+    return unique
+
+
+def _neoforge_versions_from_maven(minecraft_version: str) -> list[str]:
+    metadata_xml = _http_get_text(NEOFORGE_MAVEN_METADATA_URL)
+    versions = _parse_maven_versions(metadata_xml)
+    prefixes = _neoforge_prefixes_for_minecraft(minecraft_version)
+
+    if prefixes:
+        versions = [v for v in versions if any(v.startswith(prefix) for prefix in prefixes)]
+
+    return _sort_versions_desc(versions)
+
+
+
+def _forge_versions_from_files_page(minecraft_version: str) -> list[str]:
+    """Parse official Forge download page for exact Gradle coordinates.
+
+    This catches new branches such as 26.1.1 / 26.1.2 / 26.2 even when
+    minecraft-launcher-lib or maven-metadata filtering lags behind.
+    """
+    minecraft_version = (minecraft_version or "").strip()
+    if not minecraft_version:
+        return []
+
+    url = FORGE_FILES_PAGE_URL.format(minecraft_version=minecraft_version)
+    html = _http_get_text(url)
+
+    versions = []
+
+    # The Forge page contains lines like: Gradle: '26.1.2-64.0.11'
+    for match in re.finditer(r"Gradle:\s*['\"]([^'\"]+)['\"]", html):
+        full = match.group(1).strip()
+        if full.startswith(minecraft_version + "-"):
+            versions.append(full)
+
+    # Fallback parse for the visible "Download Latest 26.2 - 65.0.3" text.
+    latest_match = re.search(
+        r"Download\s+Latest\s+%s\s*-\s*([0-9][0-9A-Za-z.\-+]*)"
+        % re.escape(minecraft_version),
+        html,
+        flags=re.IGNORECASE,
+    )
+    if latest_match:
+        versions.append(_forge_full_version(minecraft_version, latest_match.group(1).strip()))
+
+    # Fallback parse for version rows near the "All Versions" table.
+    for build in re.findall(r">\s*([0-9]+(?:\.[0-9A-Za-z\-+]+)+)\s*</", html):
+        # Avoid accidentally taking Minecraft version itself from navigation/sidebar.
+        if build == minecraft_version or build.startswith("1.") or build.startswith("26."):
+            continue
+        versions.append(_forge_full_version(minecraft_version, build))
+
+    return _sort_versions_desc(versions)
+
+
+def _forge_versions_from_official(minecraft_version: str, automatic_only: bool = True) -> list[str]:
+    promotions = _forge_promotions()
+    collected = []
+
+    # Primary source: official Forge files page for this exact Minecraft version.
+    # This is more current for new branches like 26.1.1, 26.1.2 and 26.2.
+    try:
+        collected.extend(_forge_versions_from_files_page(minecraft_version))
+    except Exception:
+        pass
+
+    # Secondary source: Maven metadata.
+    try:
+        metadata_xml = _http_get_text(FORGE_MAVEN_METADATA_URL)
+        versions = _parse_maven_versions(metadata_xml)
+        if minecraft_version:
+            versions = [v for v in versions if v.startswith(minecraft_version + "-")]
+        collected.extend(versions)
+    except Exception:
+        pass
+
+    # Ensure official promoted versions are present even if page/Maven parsing changes.
+    for key in (f"{minecraft_version}-recommended", f"{minecraft_version}-latest"):
+        promoted = promotions.get(key)
+        if promoted:
+            collected.append(_forge_full_version(minecraft_version, promoted))
+
+    versions = _sort_versions_desc(collected)
+
+    # Old versions can still benefit from automatic-install filtering, but never allow
+    # minecraft-launcher-lib to hide a whole new branch if it does not know it yet.
+    if automatic_only and versions:
+        filtered = []
+        for full in versions:
+            try:
+                if minecraft_launcher_lib.forge.supports_automatic_install(full):
+                    filtered.append(full)
+            except Exception:
+                filtered.append(full)
+        if filtered:
+            versions = filtered
+
+    recommended = promotions.get(f"{minecraft_version}-recommended")
+    latest = promotions.get(f"{minecraft_version}-latest")
+    preferred = []
+    for build in (recommended, latest):
+        if build:
+            full = _forge_full_version(minecraft_version, build)
+            if full in versions and full not in preferred:
+                preferred.append(full)
+
+    ordered = preferred + [v for v in versions if v not in preferred]
+    return [_forge_label(minecraft_version, v, promotions) for v in ordered]
+
+def get_available_mod_loaders() -> list[str]:
+    """Return mod loaders supported by the launcher UI."""
+    return ["vanilla", "fabric", "forge", "quilt", "neoforge"]
 
 
 def get_loader_versions(loader: str, minecraft_version: str, stable_only: bool = False, automatic_only: bool = True) -> list[str]:
@@ -2047,14 +2330,38 @@ def get_loader_versions(loader: str, minecraft_version: str, stable_only: bool =
     if loader in ("", "vanilla"):
         return []
 
+    # Prefer official metadata endpoints because minecraft-launcher-lib can lag behind new loader releases.
+    try:
+        if loader == "forge":
+            return _forge_versions_from_official(minecraft_version, automatic_only=automatic_only)
+
+        if loader in ("fabric", "quilt"):
+            return _fabric_or_quilt_versions(loader, minecraft_version, stable_only=stable_only)
+
+        if loader == "neoforge":
+            return _neoforge_versions_from_maven(minecraft_version)
+    except Exception:
+        # Fall back to minecraft-launcher-lib below.
+        pass
+
     try:
         if loader == "forge":
             values = minecraft_launcher_lib.forge.list_forge_versions()
             if minecraft_version:
                 values = [v for v in values if str(v).startswith(minecraft_version + "-")]
             if automatic_only:
-                values = [v for v in values if minecraft_launcher_lib.forge.supports_automatic_install(v)]
-            return values
+                filtered = []
+                for v in values:
+                    try:
+                        if minecraft_launcher_lib.forge.supports_automatic_install(v):
+                            filtered.append(v)
+                    except Exception:
+                        filtered.append(v)
+                if filtered:
+                    values = filtered
+            promotions = _forge_promotions()
+            values = _sort_versions_desc(values)
+            return [_forge_label(minecraft_version, v, promotions) for v in values]
 
         if loader in ("fabric", "quilt", "neoforge"):
             mod_loader = minecraft_launcher_lib.mod_loader.get_mod_loader(loader)

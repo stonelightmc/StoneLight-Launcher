@@ -1,6 +1,6 @@
 {
   "launcher_name": "StoneLight Launcher",
-  "launcher_version": "0.5.64",
+  "launcher_version": "0.5.75",
   "minecraft_version": "26.1.2",
   "loader": "fabric",
   "fabric_loader_version": "0.19.3",
@@ -51,7 +51,7 @@
     "neon",
     "retro_future"
   ],
-  "ui_style": "microsoft_select_account_import_hotfix",
+  "ui_style": "smoother_soft_refresh",
   "launcher_update_repo": "stonelightmc/StoneLight-Launcher",
   "launcher_update_asset_keyword": "GitHub.zip",
   "autocheck_updates": true,
@@ -66,5 +66,18 @@
   "launcher_update_windows_asset_keyword": "Windows.zip",
   "launcher_update_exe_name": "StoneLight Launcher.exe",
   "microsoft_prompt_select_account": true,
-  "ui_queue_events_per_tick": 35
+  "ui_queue_events_per_tick": 35,
+  "loader_versions_source": "official_meta_with_library_fallback",
+  "forge_versions_source": "files_page_first_maven_fallback",
+  "splash_screen": true,
+  "dashboard_branding": true,
+  "watermark_opacity": 0.0,
+  "status_watermark": false,
+  "button_hover_grow": false,
+  "button_font": "Segoe UI Variable Display",
+  "stable_button_columns": true,
+  "instance_header_accent_after_logo": true,
+  "soft_ui_refresh": true,
+  "soft_ui_refresh_min_alpha": 0.72,
+  "soft_ui_refresh_step": 0.035
 }

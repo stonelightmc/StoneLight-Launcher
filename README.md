@@ -1,4 +1,4 @@
-# StoneLight Launcher v0.5.64
+# StoneLight Launcher v0.5.75
 
 Unofficial AI-coded Minecraft launcher for the StoneLight community.
 

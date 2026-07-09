@@ -1,6 +1,6 @@
 # UI Design
 
-StoneLight Launcher v0.5.64 starts a modernized UI pass.
+StoneLight Launcher v0.5.75 starts a modernized UI pass.
 
 ## Changes
 
@@ -19,7 +19,7 @@ StoneLight Launcher v0.5.64 starts a modernized UI pass.
 CustomTkinter does not provide native real gradients or advanced animations for all widgets. These can be added later through canvas-based custom widgets without changing launcher functionality.
 
 
-## v0.5.64
+## v0.5.75
 
 Layout fixes:
 
@@ -29,7 +29,7 @@ Layout fixes:
 - Tab buttons in instance windows no longer use accent color as selected background. This avoids unreadable text because `CTkTabview` uses one text color for all tab buttons.
 
 
-## v0.5.64
+## v0.5.75
 
 Fix pass for instance windows:
 
@@ -41,7 +41,7 @@ Fix pass for instance windows:
 - Tab buttons are forced to stable neutral theme colors, so switching tabs no longer makes them unexpectedly darker.
 
 
-## v0.5.64
+## v0.5.75
 
 Tab color and destructive button pass:
 
@@ -53,7 +53,7 @@ Tab color and destructive button pass:
   - stop game
 
 
-## v0.5.64
+## v0.5.75
 
 Fix pass after v0.5.36 testing:
 
@@ -67,7 +67,7 @@ Fix pass after v0.5.36 testing:
   - stop game
 
 
-## v0.5.64
+## v0.5.75
 
 Custom instance tab bar:
 
@@ -78,7 +78,7 @@ Custom instance tab bar:
 - This makes the active tab clearly visible and avoids CustomTkinter segmented-button color glitches.
 
 
-## v0.5.64
+## v0.5.75
 
 Files tab folder navigation redesign:
 
@@ -88,7 +88,7 @@ Files tab folder navigation redesign:
 - This makes the selected folder clearly visible in the instance window.
 
 
-## v0.5.64
+## v0.5.75
 
 Icon buttons pass:
 
@@ -103,7 +103,7 @@ Icon buttons pass:
 - Icons are embedded in button text to avoid external PNG/SVG assets and packaging issues.
 
 
-## v0.5.64
+## v0.5.75
 
 Main window status block visibility fix:
 
@@ -116,7 +116,7 @@ Main window status block visibility fix:
 - Main dashboard vertical padding was slightly reduced.
 
 
-## v0.5.64
+## v0.5.75
 
 Main action row and danger-button fixes:
 
@@ -125,3 +125,87 @@ Main action row and danger-button fixes:
 - `Install` no longer duplicates the remote GitHub update-check action for the official StoneLight instance.
 - `configure(state=...)` no longer injects default accent colors into buttons.
 - Danger buttons are restyled after busy-state transitions.
+
+## v0.5.75 StoneLight Dashboard UI
+
+Merged the v0.5.65 dashboard redesign into the current technical branch based on v0.5.68.
+
+```text
+- branded header with StoneLight cube logo
+- splash screen at startup
+- dashboard-style cards with borders and stronger hierarchy
+- primary Play button
+- live status chips for Ready / Minecraft / Loader / Java
+- visible decorative StoneLight watermark in the status area
+- fixed duplicated GitHub button label
+- keeps v0.5.68 loader metadata fixes
+```
+
+## v0.5.75 Instance Dashboard UI
+
+Visual polish pass:
+
+```text
+- removed the watermark from the main status card
+- made the main Play button taller and gave it more breathing room
+- restyled the instance window header with the StoneLight logo, border and accent line
+- restyled the instance TabView as a dashboard panel
+- restyled launch info cards in the instance window
+- made the instance-window Play button primary and larger
+- grouped instance launch actions into a dashboard action card
+```
+
+## v0.5.75 Button polish
+
+```text
+- fixed primary Play button being compacted back to normal height
+- switched button font helper to Segoe UI Variable Display with safe fallbacks
+- added subtle height-only hover effect for CTkButton widgets
+- increased vertical spacing around Build and Account card button rows
+- kept width unchanged on hover to avoid grid jitter
+```
+
+## v0.5.75 Button hover rollback
+
+```text
+- removed height-changing hover animation
+- kept Segoe UI Variable Display button font
+- kept larger primary Play button
+- kept increased spacing between button rows
+- hover now relies on normal CustomTkinter hover colors and optional hand cursor
+```
+
+Reason: changing widget height on hover forces Tk grid to recalculate row heights, which can shift button rows, card borders and lower UI blocks.
+
+## v0.5.75 Stable button grid
+
+```text
+- dashboard button columns use uniform grid columns, so width stays stable when language changes
+- Build card left/right button columns are equal
+- Account card columns are aligned the same way
+- button text is centered and the grid controls width
+- instance-window header accent line starts after the logo and no longer overlaps it
+- instance window minimum width increased to reduce field overflow risk
+```
+
+## v0.5.75 UI symmetry and soft refresh
+
+```text
+- Kazakh Play labels are detected as primary Play buttons, so their height stays correct
+- Account delete button moved under Refresh License and uses the same width
+- Instance launch action row now uses three equal-width buttons
+- Forge helper row also uses three equal-width buttons
+- Language/theme rebuild uses a tiny alpha fade to feel less abrupt
+```
+
+## v0.5.75 Smoother soft refresh
+
+```text
+- language/theme switching now fades out to about 72% alpha before rebuilding
+- widget tree rebuild happens while the window is dimmed
+- a short redraw pause is added before fade-in
+- fade-in is slower and smoother than v0.5.74
+- refresh is guarded so multiple theme/language changes cannot overlap
+```
+
+This is still limited by CustomTkinter/Tk: the UI is rebuilt, not recolored in-place.

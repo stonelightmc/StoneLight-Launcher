@@ -61,7 +61,7 @@ Invalid app registration
 403 Forbidden
 ```
 
-## v0.5.64 account chooser
+## v0.5.75 account chooser
 
 Microsoft login now adds:
 
@@ -71,6 +71,6 @@ prompt=select_account
 
 to the OAuth authorization URL. This asks Microsoft to show the account chooser instead of silently using the already active browser session, making it easier to add a second or third licensed account.
 
-## v0.5.64 hotfix
+## v0.5.75 hotfix
 
 Fixed a missing `urllib.parse` import used by the Microsoft account chooser URL patch.
