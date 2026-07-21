@@ -2393,7 +2393,7 @@ QUILT_LOADER_META_URL = "https://meta.quiltmc.org/v3/versions/loader/{minecraft_
 NEOFORGE_MAVEN_METADATA_URL = "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml"
 
 HTTP_HEADERS = {
-    "User-Agent": "StoneLightLauncher/0.6.66 (+https://github.com/stonelightmc/StoneLight-Launcher)",
+    "User-Agent": "StoneLightLauncher/0.6.67 (+https://github.com/stonelightmc/StoneLight-Launcher)",
     "Accept": "application/json, text/xml, application/xml, text/plain, */*",
 }
 

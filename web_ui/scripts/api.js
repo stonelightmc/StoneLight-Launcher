@@ -4,7 +4,10 @@ window.SLLApi = {
     new URLSearchParams(window.location.search).get("desktop") === "1"
     || window.location.hash.replace(/^#/, "") === "desktop=1"
   ),
+  browserBridgeMode: new URLSearchParams(window.location.search).get("transport") === "browser",
   _readyPromise: null,
+  _eventCursor: 0,
+  _eventPollStarted: false,
 
   bridgeAvailable() {
     return Boolean(
@@ -15,6 +18,12 @@ window.SLLApi = {
   },
 
   waitUntilReady(timeoutMs = 15000) {
+    if (this.browserBridgeMode) {
+      this.ready = true;
+      this.startBrowserEventPolling();
+      return Promise.resolve(true);
+    }
+
     if (!this.desktopMode) {
       return Promise.resolve(false);
     }
@@ -70,6 +79,10 @@ window.SLLApi = {
   },
 
   async call(method, ...args) {
+    if (this.browserBridgeMode) {
+      return await this.callBrowserBridge(method, ...args);
+    }
+
     if (this.desktopMode && !this.bridgeAvailable()) {
       await this.waitUntilReady();
     }
@@ -101,6 +114,55 @@ window.SLLApi = {
       return { ok: true, started: false, preview: true };
     }
     return { ok: true, preview: true };
+  },
+
+  async callBrowserBridge(method, ...args) {
+    const response = await fetch("/api/call", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ method, args })
+    });
+
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch (_error) {}
+
+    if (!response.ok || !payload?.ok) {
+      const message = payload?.error || `Browser bridge request failed: ${method}`;
+      throw new Error(message);
+    }
+
+    return payload.result;
+  },
+
+  startBrowserEventPolling() {
+    if (this._eventPollStarted || !this.browserBridgeMode) return;
+    this._eventPollStarted = true;
+
+    const poll = async () => {
+      try {
+        const response = await fetch(`/api/events?after=${this._eventCursor}`, {
+          method: "GET",
+          cache: "no-store"
+        });
+        const payload = await response.json();
+        if (payload?.ok && Array.isArray(payload.events)) {
+          for (const item of payload.events) {
+            this._eventCursor = Math.max(this._eventCursor, Number(item.id || 0));
+            window.StoneLightBridge?.receive(item.event, item.payload);
+          }
+        }
+      } catch (_error) {
+        // The browser fallback server may be shutting down.
+      } finally {
+        window.setTimeout(poll, 1000);
+      }
+    };
+
+    poll();
   }
 };
 

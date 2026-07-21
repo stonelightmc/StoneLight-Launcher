@@ -1,6 +1,6 @@
 # UI Design
 
-StoneLight Launcher v0.6.66 starts a modernized UI pass.
+StoneLight Launcher v0.6.67 starts a modernized UI pass.
 
 ## Changes
 
@@ -19,7 +19,7 @@ StoneLight Launcher v0.6.66 starts a modernized UI pass.
 CustomTkinter does not provide native real gradients or advanced animations for all widgets. These can be added later through canvas-based custom widgets without changing launcher functionality.
 
 
-## v0.6.66
+## v0.6.67
 
 Layout fixes:
 
@@ -29,7 +29,7 @@ Layout fixes:
 - Tab buttons in instance windows no longer use accent color as selected background. This avoids unreadable text because `CTkTabview` uses one text color for all tab buttons.
 
 
-## v0.6.66
+## v0.6.67
 
 Fix pass for instance windows:
 
@@ -41,7 +41,7 @@ Fix pass for instance windows:
 - Tab buttons are forced to stable neutral theme colors, so switching tabs no longer makes them unexpectedly darker.
 
 
-## v0.6.66
+## v0.6.67
 
 Tab color and destructive button pass:
 
@@ -53,7 +53,7 @@ Tab color and destructive button pass:
   - stop game
 
 
-## v0.6.66
+## v0.6.67
 
 Fix pass after v0.5.36 testing:
 
@@ -67,7 +67,7 @@ Fix pass after v0.5.36 testing:
   - stop game
 
 
-## v0.6.66
+## v0.6.67
 
 Custom instance tab bar:
 
@@ -78,7 +78,7 @@ Custom instance tab bar:
 - This makes the active tab clearly visible and avoids CustomTkinter segmented-button color glitches.
 
 
-## v0.6.66
+## v0.6.67
 
 Files tab folder navigation redesign:
 
@@ -88,7 +88,7 @@ Files tab folder navigation redesign:
 - This makes the selected folder clearly visible in the instance window.
 
 
-## v0.6.66
+## v0.6.67
 
 Icon buttons pass:
 
@@ -103,7 +103,7 @@ Icon buttons pass:
 - Icons are embedded in button text to avoid external PNG/SVG assets and packaging issues.
 
 
-## v0.6.66
+## v0.6.67
 
 Main window status block visibility fix:
 
@@ -116,7 +116,7 @@ Main window status block visibility fix:
 - Main dashboard vertical padding was slightly reduced.
 
 
-## v0.6.66
+## v0.6.67
 
 Main action row and danger-button fixes:
 
@@ -126,7 +126,7 @@ Main action row and danger-button fixes:
 - `configure(state=...)` no longer injects default accent colors into buttons.
 - Danger buttons are restyled after busy-state transitions.
 
-## v0.6.66 StoneLight Dashboard UI
+## v0.6.67 StoneLight Dashboard UI
 
 Merged the v0.5.65 dashboard redesign into the current technical branch based on v0.5.68.
 
@@ -141,7 +141,7 @@ Merged the v0.5.65 dashboard redesign into the current technical branch based on
 - keeps v0.5.68 loader metadata fixes
 ```
 
-## v0.6.66 Instance Dashboard UI
+## v0.6.67 Instance Dashboard UI
 
 Visual polish pass:
 
@@ -155,7 +155,7 @@ Visual polish pass:
 - grouped instance launch actions into a dashboard action card
 ```
 
-## v0.6.66 Button polish
+## v0.6.67 Button polish
 
 ```text
 - fixed primary Play button being compacted back to normal height
@@ -165,7 +165,7 @@ Visual polish pass:
 - kept width unchanged on hover to avoid grid jitter
 ```
 
-## v0.6.66 Button hover rollback
+## v0.6.67 Button hover rollback
 
 ```text
 - removed height-changing hover animation
@@ -177,7 +177,7 @@ Visual polish pass:
 
 Reason: changing widget height on hover forces Tk grid to recalculate row heights, which can shift button rows, card borders and lower UI blocks.
 
-## v0.6.66 Stable button grid
+## v0.6.67 Stable button grid
 
 ```text
 - dashboard button columns use uniform grid columns, so width stays stable when language changes
@@ -188,7 +188,7 @@ Reason: changing widget height on hover forces Tk grid to recalculate row height
 - instance window minimum width increased to reduce field overflow risk
 ```
 
-## v0.6.66 UI symmetry and soft refresh
+## v0.6.67 UI symmetry and soft refresh
 
 ```text
 - Kazakh Play labels are detected as primary Play buttons, so their height stays correct
@@ -198,7 +198,7 @@ Reason: changing widget height on hover forces Tk grid to recalculate row height
 - Language/theme rebuild uses a tiny alpha fade to feel less abrupt
 ```
 
-## v0.6.66 Smoother soft refresh
+## v0.6.67 Smoother soft refresh
 
 ```text
 - language/theme switching now fades out to about 72% alpha before rebuilding

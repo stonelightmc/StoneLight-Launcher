@@ -105,7 +105,7 @@ if exist "web_ui" (
 
 echo.
 echo Creating release archive...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path 'StoneLightLauncher_v0_6_66_Windows.zip') { Remove-Item 'StoneLightLauncher_v0_6_66_Windows.zip' -Force }; Compress-Archive -Path 'dist\StoneLight Launcher\*' -DestinationPath 'StoneLightLauncher_v0_6_66_Windows.zip'"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path 'StoneLightLauncher_v0_6_67_Windows.zip') { Remove-Item 'StoneLightLauncher_v0_6_67_Windows.zip' -Force }; Compress-Archive -Path 'dist\StoneLight Launcher\*' -DestinationPath 'StoneLightLauncher_v0_6_67_Windows.zip'"
 if errorlevel 1 (
   echo Archive creation failed, but exe build is complete.
   echo Folder:
@@ -121,6 +121,6 @@ echo Executable:
 echo   dist\StoneLight Launcher\StoneLight Launcher.exe
 echo.
 echo Release archive:
-echo   StoneLightLauncher_v0_6_66_Windows.zip
+echo   StoneLightLauncher_v0_6_67_Windows.zip
 echo.
 pause

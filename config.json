@@ -1,6 +1,6 @@
 {
   "launcher_name": "StoneLight Launcher",
-  "launcher_version": "0.6.66",
+  "launcher_version": "0.6.67",
   "minecraft_version": "26.1.2",
   "loader": "fabric",
   "fabric_loader_version": "0.19.3",
@@ -52,7 +52,7 @@
     "neon",
     "retro_future"
   ],
-  "ui_style": "soft_daily_update_check",
+  "ui_style": "webview_pythonnet_browser_fallback",
   "launcher_update_repo": "stonelightmc/StoneLight-Launcher",
   "launcher_update_asset_keyword": "GitHub.zip",
   "autocheck_updates": true,
@@ -172,7 +172,7 @@
   "web_theme_palette_preservation": true,
   "web_modrinth_integration_stage_1": true,
   "modrinth_api_base": "https://api.modrinth.com/v2",
-  "modrinth_user_agent": "StoneLightLauncher/0.6.66 (https://github.com/stonelightmc/StoneLight-Launcher)",
+  "modrinth_user_agent": "StoneLightLauncher/0.6.67 (https://github.com/stonelightmc/StoneLight-Launcher)",
   "web_modrinth_download_timeout_hotfix": true,
   "modrinth_download_timeout_seconds": 180,
   "modrinth_download_retries": 3,
@@ -215,5 +215,7 @@
   "windows_classic_build_script": true,
   "web_soft_daily_update_check": true,
   "update_autocheck_interval_hours": 24,
-  "web_update_center_empty_instance_fix": true
+  "web_update_center_empty_instance_fix": true,
+  "webview_pythonnet_fallback": true,
+  "browser_fallback_enabled": true
 }

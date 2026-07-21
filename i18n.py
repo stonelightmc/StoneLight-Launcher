@@ -980,7 +980,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.6.66: update manager UI.
+# v0.6.67: update manager UI.
 for _lang, _mapping in {
     "en": {
         "Проверить обновления": "Check updates",
@@ -1022,7 +1022,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.6.66: official StoneLight pre-launch update flow.
+# v0.6.67: official StoneLight pre-launch update flow.
 for _lang, _mapping in {
     "en": {
         "Проверяю обновление StoneLight перед запуском...": "Checking StoneLight update before launch...",
@@ -1061,7 +1061,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.6.66: update service messages.
+# v0.6.67: update service messages.
 for _lang, _mapping in {
     "en": {
         "Автопроверка обновлений не удалась: {error}": "Auto-check for updates failed: {error}",
@@ -1142,7 +1142,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.6.66: shorter update buttons and clearer update-service messages.
+# v0.6.67: shorter update buttons and clearer update-service messages.
 for _lang, _mapping in {
     "en": {
         "Обновления": "Updates",
@@ -1169,7 +1169,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.6.66: dynamic update-error localization and missing launcher release handling.
+# v0.6.67: dynamic update-error localization and missing launcher release handling.
 for _lang, _mapping in {
     "en": {
         "В репозитории {repo} не найден latest release.": "No latest release was found in repository {repo}.",
@@ -1193,7 +1193,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.6.66: update flow cleanup and startup message localization.
+# v0.6.67: update flow cleanup and startup message localization.
 for _lang, _mapping in {
     "en": {
         "Готов к запуску.": "Ready to launch.",
@@ -1235,7 +1235,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.6.66: centralized service/status/log localization.
+# v0.6.67: centralized service/status/log localization.
 for _lang, _mapping in {
     "en": {
         "Запущенный процесс этой сборки не найден.": "No running process was found for this instance.",
@@ -1280,7 +1280,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.6.66: Java preset helper text.
+# v0.6.67: Java preset helper text.
 for _lang, _mapping in {
     "en": {
         "Для этого пресета путь java.exe не нужен": "This preset does not need a java.exe path",
@@ -1298,7 +1298,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.6.66: instance combo label fallback translations.
+# v0.6.67: instance combo label fallback translations.
 for _lang, _mapping in {
     "en": {
         "официальная": "official",
@@ -1316,7 +1316,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.6.66: Java manual-only selector and compact settings.
+# v0.6.67: Java manual-only selector and compact settings.
 for _lang, _mapping in {
     "en": {
         "Для этого пресета путь java.exe не нужен": "This preset does not need a java.exe path",
@@ -1334,7 +1334,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.6.66: Microsoft account chooser and install queue throttling.
+# v0.6.67: Microsoft account chooser and install queue throttling.
 for _lang, _mapping in {
     "en": {
         "Установка/запуск выполняется в фоне. Окно может получать много логов...": "Install/launch is running in the background. The window may receive many log messages...",
@@ -1349,7 +1349,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.6.66: dashboard branding.
+# v0.6.67: dashboard branding.
 for _lang, _mapping in {
     "en": {
         "Minecraft launcher for StoneLight Community": "Minecraft launcher for StoneLight Community",
@@ -1364,7 +1364,7 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.6.66: stable button grid, short dashboard labels.
+# v0.6.67: stable button grid, short dashboard labels.
 for _lang, _mapping in {
     "en": {
         "Открыть сборку": "Open instance",
@@ -1382,84 +1382,84 @@ for _lang, _mapping in {
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
-# v0.6.66: backend/status/log message localization for Web UI.
+# v0.6.67: backend/status/log message localization for Web UI.
 BACKEND_MESSAGE_TRANSLATIONS_V0636 = {'en': {'Сборка не выбрана.': 'No instance selected.', 'Сборка не найдена.': 'Instance not found.', 'Сначала выбери или добавь сборку.': 'Select or add an instance first.', 'Сначала выбери версию Minecraft.': 'Select a Minecraft version first.', 'Неизвестный загрузчик.': 'Unknown loader.', 'Некорректные данные сборки.': 'Invalid instance data.', 'Некорректный Java preset.': 'Invalid Java preset.', 'Дождись завершения текущей операции.': 'Wait for the current operation to finish.', 'Сначала останови запущенную сборку.': 'Stop the running instance first.', 'Аккаунт не выбран.': 'No account selected.', 'Аккаунт не найден.': 'Account not found.', 'Обновлять можно только Microsoft-аккаунт.': 'Only Microsoft accounts can be refreshed.', 'Недопустимое значение настройки.': 'Invalid setting value.', 'Обновление лаунчера не найдено.': 'Launcher update not found.', 'В релизе не найден ZIP-архив обновления лаунчера.': 'No launcher update ZIP was found in the release.', 'Скачиваю обновление лаунчера...': 'Downloading launcher update...', 'Запущен скрипт обновления лаунчера. Лаунчер закроется.': 'Launcher update script started. The launcher will close.', 'Скрипт обновления лаунчера запущен. Лаунчер закроется.': 'Launcher update script started. The launcher will close.', 'Обновление официальной сборки не найдено.': 'Official instance update not found.', 'Обновление официальной сборки запущено.': 'Official instance update started.', 'Сборка не установлена': 'Instance is not installed', 'Эта команда доступна только для Forge-сборок.': 'This command is available only for Forge instances.', 'Подготавливаю запуск...': 'Preparing launch...', 'Устанавливаю сборку...': 'Installing instance...', 'Обновляю сборку...': 'Updating instance...', 'Запускаю Forge repair...': 'Starting Forge repair...', 'Запускаю Forge Installer...': 'Starting Forge Installer...', 'Проверяю Forge...': 'Checking Forge...', 'Выполняю операцию...': 'Running operation...', 'Сборка установлена/обновлена.': 'Instance installed/updated.', 'Repair завершён.': 'Repair completed.', 'Forge Installer запущен.': 'Forge Installer started.', 'Forge не найден.': 'Forge not found.', 'Для запуска нужен аккаунт. Добавь его через классический интерфейс.': 'An account is required to launch. Add it in the account manager.', 'Minecraft запущен.': 'Minecraft launched.', 'Запущенный процесс этой сборки не найден.': 'Running process for this instance was not found.', 'Останавливаю запущенную сборку...': 'Stopping running instance...', 'Сборка остановлена.': 'Instance stopped.', 'Сборка принудительно убита.': 'Instance was force-killed.', 'Не удалось остановить сборку:': 'Could not stop instance:', 'Portable Java': 'Portable Java', 'уже установлена': 'is already installed', 'Скачиваю portable Java': 'Downloading portable Java', 'Распаковываю portable Java': 'Extracting portable Java', 'установлена.': 'installed.', 'Для preset manual нужно указать путь к java.exe/javaw.exe.': 'For the manual preset, specify the path to java.exe/javaw.exe.', 'Java не найдена. Установи Java и укажи путь к java.exe/javaw.exe в лаунчере.': 'Java was not found. Install Java and set the path to java.exe/javaw.exe in the launcher.', 'Проверка Java зависла. Проверь путь к Java.': 'Java check hung. Check the Java path.', 'Не смог автоматически определить версию Java. Вывод java -version:': 'Could not automatically detect Java version. java -version output:', '<пустой вывод>': '<empty output>', 'Проверяю Java...': 'Checking Java...', 'Найдена Java': 'Found Java', 'Найдена слишком старая Java. Нужна современная Java.': 'Detected Java is too old. A modern Java version is required.', 'Укажи правильный java.exe в настройках этой сборки.': 'Set the correct java.exe in this instance settings.', 'Старый Forge/Minecraft не запускается на новых Java и может падать с ошибкой:': 'Old Forge/Minecraft does not run on new Java versions and may crash with:', 'Решение: в настройках этой сборки укажи java.exe от Java 8.': 'Fix: set Java 8 java.exe in this instance settings.', 'Скачиваю файл:': 'Downloading file:', 'Скачивание завершено.': 'Download complete.', 'Манифест официальной сборки обновлён:': 'Official instance manifest updated:', 'Не удалось записать манифест официальной сборки:': 'Could not write official instance manifest:', 'Ищу архив модов в GitHub Releases:': 'Searching for mod archive in GitHub Releases:', 'Не удалось прочитать GitHub Releases:': 'Could not read GitHub Releases:', 'Найден архив модов:': 'Found mod archive:', 'старый SHA256 из config.json для него не применяется.': 'old SHA256 from config.json is not applied to it.', 'У этой сборки не указан архив модов.': 'This instance has no mod archive set.', 'Не удалось определить ссылку на архив модов.': 'Could not determine mod archive URL.', 'Использую локальный архив модов:': 'Using local mod archive:', 'Кэшированный архив модов устарел или повреждён.': 'Cached mod archive is outdated or corrupted.', 'Не удалось скачать архив модов по ссылке': 'Could not download mod archive from URL', 'SHA256 архива модов не совпал.': 'Mod archive SHA256 mismatch.', 'Не удалось скачать подходящий архив модов.': 'Could not download a suitable mod archive.', 'Последняя ошибка:': 'Last error:', 'Проверяю и распаковываю сборку...': 'Checking and extracting instance...', 'Архив модов повреждён:': 'Mod archive is corrupted:', 'В архиве модов не найдено .jar-файлов.': 'No .jar files found in the mod archive.', 'Сборка модов установлена. Jar-файлов:': 'Modpack installed. Jar files:', 'У этой пользовательской сборки нет официального модпака для автообновления.': 'This custom instance has no official modpack for auto-update.', 'Устанавливаю/проверяю Minecraft': 'Installing/checking Minecraft', 'Устанавливаю/проверяю': 'Installing/checking', 'Модлоадер': 'Mod loader', 'недоступен в текущей версии minecraft-launcher-lib.': 'is unavailable in the current minecraft-launcher-lib version.', 'Выбрана последняя версия': 'Selected latest version', 'Будет запускаться версия:': 'Version to launch:', 'Не удалось установить': 'Could not install', 'Причина:': 'Reason:'}, 'uk': {'Сборка не выбрана.': 'Збірку не вибрано.', 'Сборка не найдена.': 'Збірку не знайдено.', 'Сначала выбери или добавь сборку.': 'Спочатку вибери або додай збірку.', 'Сначала выбери версию Minecraft.': 'Спочатку вибери версію Minecraft.', 'Неизвестный загрузчик.': 'Невідомий завантажувач.', 'Некорректные данные сборки.': 'Некоректні дані збірки.', 'Некорректный Java preset.': 'Некоректний Java preset.', 'Дождись завершения текущей операции.': 'Дочекайся завершення поточної операції.', 'Сначала останови запущенную сборку.': 'Спочатку зупини запущену збірку.', 'Аккаунт не выбран.': 'Акаунт не вибрано.', 'Аккаунт не найден.': 'Акаунт не знайдено.', 'Обновлять можно только Microsoft-аккаунт.': 'Оновлювати можна лише Microsoft-акаунт.', 'Недопустимое значение настройки.': 'Недопустиме значення налаштування.', 'Обновление лаунчера не найдено.': 'Оновлення лаунчера не знайдено.', 'В релизе не найден ZIP-архив обновления лаунчера.': 'У релізі не знайдено ZIP-архів оновлення лаунчера.', 'Скачиваю обновление лаунчера...': 'Завантажую оновлення лаунчера...', 'Запущен скрипт обновления лаунчера. Лаунчер закроется.': 'Скрипт оновлення лаунчера запущено. Лаунчер закриється.', 'Скрипт обновления лаунчера запущен. Лаунчер закроется.': 'Скрипт оновлення лаунчера запущено. Лаунчер закриється.', 'Обновление официальной сборки не найдено.': 'Оновлення офіційної збірки не знайдено.', 'Обновление официальной сборки запущено.': 'Оновлення офіційної збірки запущено.', 'Сборка не установлена': 'Збірка не встановлена', 'Эта команда доступна только для Forge-сборок.': 'Ця команда доступна лише для Forge-збірок.', 'Подготавливаю запуск...': 'Готую запуск...', 'Устанавливаю сборку...': 'Встановлюю збірку...', 'Обновляю сборку...': 'Оновлюю збірку...', 'Запускаю Forge repair...': 'Запускаю Forge repair...', 'Запускаю Forge Installer...': 'Запускаю Forge Installer...', 'Проверяю Forge...': 'Перевіряю Forge...', 'Выполняю операцию...': 'Виконую операцію...', 'Сборка установлена/обновлена.': 'Збірку встановлено/оновлено.', 'Repair завершён.': 'Repair завершено.', 'Forge Installer запущен.': 'Forge Installer запущено.', 'Forge не найден.': 'Forge не знайдено.', 'Для запуска нужен аккаунт. Добавь его через классический интерфейс.': 'Для запуску потрібен акаунт. Додай його в менеджері акаунтів.', 'Minecraft запущен.': 'Minecraft запущено.', 'Запущенный процесс этой сборки не найден.': 'Запущений процес цієї збірки не знайдено.', 'Останавливаю запущенную сборку...': 'Зупиняю запущену збірку...', 'Сборка остановлена.': 'Збірку зупинено.', 'Сборка принудительно убита.': 'Збірку примусово завершено.', 'Не удалось остановить сборку:': 'Не вдалося зупинити збірку:', 'уже установлена': 'вже встановлена', 'Скачиваю portable Java': 'Завантажую portable Java', 'Распаковываю portable Java': 'Розпаковую portable Java', 'установлена.': 'встановлена.', 'Для preset manual нужно указать путь к java.exe/javaw.exe.': 'Для preset manual потрібно вказати шлях до java.exe/javaw.exe.', 'Java не найдена. Установи Java и укажи путь к java.exe/javaw.exe в лаунчере.': 'Java не знайдена. Встанови Java і вкажи шлях до java.exe/javaw.exe у лаунчері.', 'Проверка Java зависла. Проверь путь к Java.': 'Перевірка Java зависла. Перевір шлях до Java.', 'Не смог автоматически определить версию Java. Вывод java -version:': 'Не вдалося автоматично визначити версію Java. Вивід java -version:', '<пустой вывод>': '<порожній вивід>', 'Проверяю Java...': 'Перевіряю Java...', 'Найдена Java': 'Знайдено Java', 'Найдена слишком старая Java. Нужна современная Java.': 'Знайдено занадто стару Java. Потрібна сучасна версія Java.', 'Укажи правильный java.exe в настройках этой сборки.': 'Вкажи правильний java.exe у налаштуваннях цієї збірки.', 'Старый Forge/Minecraft не запускается на новых Java и может падать с ошибкой:': 'Старий Forge/Minecraft не запускається на нових Java і може падати з помилкою:', 'Решение: в настройках этой сборки укажи java.exe от Java 8.': 'Рішення: у налаштуваннях цієї збірки вкажи java.exe від Java 8.', 'Скачиваю файл:': 'Завантажую файл:', 'Скачивание завершено.': 'Завантаження завершено.', 'Манифест официальной сборки обновлён:': 'Маніфест офіційної збірки оновлено:', 'Не удалось записать манифест официальной сборки:': 'Не вдалося записати маніфест офіційної збірки:', 'Ищу архив модов в GitHub Releases:': 'Шукаю архів модів у GitHub Releases:', 'Не удалось прочитать GitHub Releases:': 'Не вдалося прочитати GitHub Releases:', 'Найден архив модов:': 'Знайдено архів модів:', 'Найденный через GitHub Releases архив отличается от mods_zip_url; ': 'Архів, знайдений через GitHub Releases, відрізняється від mods_zip_url; ', 'старый SHA256 из config.json для него не применяется.': 'старий SHA256 з config.json для нього не застосовується.', 'У этой сборки не указан архив модов.': 'Для цієї збірки не вказано архів модів.', 'Не удалось определить ссылку на архив модов.': 'Не вдалося визначити посилання на архів модів.', 'Использую локальный архив модов:': 'Використовую локальний архів модів:', 'Кэшированный архив модов устарел или повреждён.': 'Кешований архів модів застарів або пошкоджений.', 'Не удалось скачать архив модов по ссылке': 'Не вдалося завантажити архів модів за посиланням', 'SHA256 архива модов не совпал.': 'SHA256 архіву модів не збігся.', 'Не удалось скачать подходящий архив модов.': 'Не вдалося завантажити відповідний архів модів.', 'Последняя ошибка:': 'Остання помилка:', 'Проверяю и распаковываю сборку...': 'Перевіряю та розпаковую збірку...', 'Архив модов повреждён:': 'Архів модів пошкоджений:', 'В архиве модов не найдено .jar-файлов.': 'В архіві модів не знайдено .jar-файлів.', 'Сборка модов установлена. Jar-файлов:': 'Збірку модів встановлено. Jar-файлів:', 'У этой пользовательской сборки нет официального модпака для автообновления.': 'У цієї користувацької збірки немає офіційного модпака для автооновлення.', 'Устанавливаю/проверяю Minecraft': 'Встановлюю/перевіряю Minecraft', 'Устанавливаю/проверяю': 'Встановлюю/перевіряю', 'Модлоадер': 'Модлоадер', 'недоступен в текущей версии minecraft-launcher-lib.': 'недоступний у поточній версії minecraft-launcher-lib.', 'Выбрана последняя версия': 'Вибрано останню версію', 'Будет запускаться версия:': 'Буде запускатися версія:', 'Не удалось установить': 'Не вдалося встановити', 'Причина:': 'Причина:'}, 'kk': {'Сборка не выбрана.': 'Жинақ таңдалмаған.', 'Сборка не найдена.': 'Жинақ табылмады.', 'Сначала выбери или добавь сборку.': 'Алдымен жинақты таңда немесе қос.', 'Сначала выбери версию Minecraft.': 'Алдымен Minecraft нұсқасын таңда.', 'Неизвестный загрузчик.': 'Белгісіз жүктеуші.', 'Некорректные данные сборки.': 'Жинақ деректері дұрыс емес.', 'Некорректный Java preset.': 'Java preset дұрыс емес.', 'Дождись завершения текущей операции.': 'Ағымдағы әрекет аяқталғанын күт.', 'Сначала останови запущенную сборку.': 'Алдымен іске қосылған жинақты тоқтат.', 'Аккаунт не выбран.': 'Аккаунт таңдалмаған.', 'Аккаунт не найден.': 'Аккаунт табылмады.', 'Обновлять можно только Microsoft-аккаунт.': 'Тек Microsoft аккаунтын жаңартуға болады.', 'Недопустимое значение настройки.': 'Баптау мәні жарамсыз.', 'Обновление лаунчера не найдено.': 'Лаунчер жаңартуы табылмады.', 'Скачиваю обновление лаунчера...': 'Лаунчер жаңартуы жүктеліп жатыр...', 'Запущен скрипт обновления лаунчера. Лаунчер закроется.': 'Лаунчер жаңарту скрипті іске қосылды. Лаунчер жабылады.', 'Скрипт обновления лаунчера запущен. Лаунчер закроется.': 'Лаунчер жаңарту скрипті іске қосылды. Лаунчер жабылады.', 'Обновление официальной сборки не найдено.': 'Ресми жинақ жаңартуы табылмады.', 'Обновление официальной сборки запущено.': 'Ресми жинақ жаңартуы іске қосылды.', 'Сборка не установлена': 'Жинақ орнатылмаған', 'Эта команда доступна только для Forge-сборок.': 'Бұл команда тек Forge жинақтарына қолжетімді.', 'Подготавливаю запуск...': 'Іске қосу дайындалып жатыр...', 'Устанавливаю сборку...': 'Жинақ орнатылып жатыр...', 'Обновляю сборку...': 'Жинақ жаңартылып жатыр...', 'Проверяю Forge...': 'Forge тексеріліп жатыр...', 'Выполняю операцию...': 'Әрекет орындалып жатыр...', 'Сборка установлена/обновлена.': 'Жинақ орнатылды/жаңартылды.', 'Minecraft запущен.': 'Minecraft іске қосылды.', 'Проверяю Java...': 'Java тексеріліп жатыр...', 'Найдена Java': 'Java табылды', 'Скачиваю файл:': 'Файл жүктеліп жатыр:', 'Скачивание завершено.': 'Жүктеу аяқталды.', 'Ищу архив модов в GitHub Releases:': 'Мод архиві GitHub Releases ішінен ізделіп жатыр:', 'Найден архив модов:': 'Мод архиві табылды:', 'Проверяю и распаковываю сборку...': 'Жинақ тексеріліп және ашылып жатыр...', 'Сборка модов установлена. Jar-файлов:': 'Мод жинағы орнатылды. Jar файлдары:', 'Устанавливаю/проверяю Minecraft': 'Minecraft орнатылып/тексеріліп жатыр', 'Будет запускаться версия:': 'Іске қосылатын нұсқа:', 'Не удалось установить': 'Орнату мүмкін болмады', 'Причина:': 'Себебі:'}}
 for _lang, _mapping in BACKEND_MESSAGE_TRANSLATIONS_V0636.items():
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
 
-# v0.6.66: instance icon pack backend messages.
+# v0.6.67: instance icon pack backend messages.
 BACKEND_ICON_MESSAGES_V0639 = {'en': {'Иконка не найдена.': 'Icon not found.', 'Иконка сборки обновлена.': 'Instance icon updated.'}, 'uk': {'Иконка не найдена.': 'Іконку не знайдено.', 'Иконка сборки обновлена.': 'Іконку збірки оновлено.'}, 'kk': {'Иконка не найдена.': 'Белгіше табылмады.', 'Иконка сборки обновлена.': 'Жинақ белгішесі жаңартылды.'}}
 for _lang, _mapping in BACKEND_ICON_MESSAGES_V0639.items():
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
 
-# v0.6.66: Modrinth backend messages.
+# v0.6.67: Modrinth backend messages.
 BACKEND_MODRINTH_MESSAGES_V0646 = {'en': {'Проект Modrinth не выбран.': 'No Modrinth project selected.', 'Некорректный тип проекта Modrinth.': 'Invalid Modrinth project type.', 'Установка Modrinth-сборок будет добавлена следующим этапом.': 'Modrinth modpack installation will be added in the next stage.', 'Для установки модов нужна сборка с модлоадером.': 'Installing mods requires an instance with a mod loader.', 'Для этого типа проекта пока нет папки установки.': 'This project type does not have an install folder yet.', 'Не удалось прочитать проект Modrinth.': 'Could not read Modrinth project.', 'Не найдена совместимая версия для выбранной сборки.': 'No compatible version found for the selected instance.', 'В совместимых версиях не найден подходящий файл.': 'No suitable file found in compatible versions.', 'У файла Modrinth нет ссылки для скачивания.': 'The Modrinth file has no download URL.', 'SHA1 файла Modrinth не совпал.': 'Modrinth file SHA1 mismatch.', 'Файл имеет неподдерживаемый формат.': 'The file has an unsupported format.', 'Скачиваю проект Modrinth...': 'Downloading Modrinth project...', 'Проект Modrinth установлен.': 'Modrinth project installed.'}, 'uk': {'Проект Modrinth не выбран.': 'Проєкт Modrinth не вибрано.', 'Некорректный тип проекта Modrinth.': 'Некоректний тип проєкту Modrinth.', 'Установка Modrinth-сборок будет добавлена следующим этапом.': 'Встановлення Modrinth-збірок буде додано наступним етапом.', 'Для установки модов нужна сборка с модлоадером.': 'Для встановлення модів потрібна збірка з модлоадером.', 'Для этого типа проекта пока нет папки установки.': 'Для цього типу проєкту поки немає папки встановлення.', 'Не удалось прочитать проект Modrinth.': 'Не вдалося прочитати проєкт Modrinth.', 'Не найдена совместимая версия для выбранной сборки.': 'Сумісну версію для вибраної збірки не знайдено.', 'В совместимых версиях не найден подходящий файл.': 'У сумісних версіях не знайдено відповідний файл.', 'У файла Modrinth нет ссылки для скачивания.': 'У файлу Modrinth немає посилання для завантаження.', 'SHA1 файла Modrinth не совпал.': 'SHA1 файлу Modrinth не збігся.', 'Файл имеет неподдерживаемый формат.': 'Файл має непідтримуваний формат.', 'Скачиваю проект Modrinth...': 'Завантажую проєкт Modrinth...', 'Проект Modrinth установлен.': 'Проєкт Modrinth встановлено.'}, 'kk': {'Проект Modrinth не выбран.': 'Modrinth жобасы таңдалмаған.', 'Некорректный тип проекта Modrinth.': 'Modrinth жобасының түрі дұрыс емес.', 'Установка Modrinth-сборок будет добавлена следующим этапом.': 'Modrinth модпактарын орнату келесі кезеңде қосылады.', 'Для установки модов нужна сборка с модлоадером.': 'Мод орнату үшін модлоадері бар жинақ керек.', 'Не найдена совместимая версия для выбранной сборки.': 'Таңдалған жинаққа үйлесімді нұсқа табылмады.', 'Скачиваю проект Modrinth...': 'Modrinth жобасы жүктеліп жатыр...', 'Проект Modrinth установлен.': 'Modrinth жобасы орнатылды.'}}
 for _lang, _mapping in BACKEND_MODRINTH_MESSAGES_V0646.items():
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
 
-# v0.6.66: Modrinth timeout/retry messages.
+# v0.6.67: Modrinth timeout/retry messages.
 BACKEND_MODRINTH_TIMEOUT_MESSAGES_V0647 = {'en': {'Modrinth API не ответил вовремя. Проверь соединение и повтори попытку.': 'Modrinth API did not respond in time. Check the connection and try again.', 'Превышено время ожидания загрузки файла Modrinth.': 'Modrinth file download timed out.', 'Modrinth скачал пустой файл.': 'Modrinth downloaded an empty file.', 'Не удалось скачать файл Modrinth после': 'Could not download Modrinth file after', 'попыток. Последняя ошибка:': 'attempts. Last error:'}, 'uk': {'Modrinth API не ответил вовремя. Проверь соединение и повтори попытку.': 'Modrinth API не відповів вчасно. Перевір з’єднання та повтори спробу.', 'Превышено время ожидания загрузки файла Modrinth.': 'Перевищено час очікування завантаження файлу Modrinth.', 'Modrinth скачал пустой файл.': 'Modrinth завантажив порожній файл.', 'Не удалось скачать файл Modrinth после': 'Не вдалося завантажити файл Modrinth після', 'попыток. Последняя ошибка:': 'спроб. Остання помилка:'}, 'kk': {'Modrinth API не ответил вовремя. Проверь соединение и повтори попытку.': 'Modrinth API уақытында жауап бермеді. Қосылымды тексеріп, қайталап көр.', 'Превышено время ожидания загрузки файла Modrinth.': 'Modrinth файлын жүктеу уақыты асып кетті.', 'Modrinth скачал пустой файл.': 'Modrinth бос файл жүктеді.', 'Не удалось скачать файл Modrinth после': 'Modrinth файлын жүктеу мүмкін болмады:', 'попыток. Последняя ошибка:': 'әрекет. Соңғы қате:'}}
 for _lang, _mapping in BACKEND_MODRINTH_TIMEOUT_MESSAGES_V0647.items():
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
 
-# v0.6.66: Modrinth modpack import messages.
+# v0.6.67: Modrinth modpack import messages.
 BACKEND_MODRINTH_MODPACK_MESSAGES_V0649 = {'en': {'Некорректный путь файла в модпаке.': 'Invalid file path in modpack.', 'В Modrinth-модпаке не указана версия Minecraft.': 'Minecraft version is missing in the Modrinth modpack.', 'Не удалось создать сборку из Modrinth-модпака.': 'Could not create an instance from the Modrinth modpack.', 'В .mrpack не найден modrinth.index.json.': 'modrinth.index.json was not found in the .mrpack file.', 'Некорректный modrinth.index.json.': 'Invalid modrinth.index.json.', 'Некорректный список файлов в modrinth.index.json.': 'Invalid file list in modrinth.index.json.', 'Выбранный проект Modrinth не является модпаком.': 'The selected Modrinth project is not a modpack.', 'Не найдена версия Modrinth-модпака.': 'No Modrinth modpack version found.', 'В версиях Modrinth-модпака не найден .mrpack файл.': 'No .mrpack file found in Modrinth modpack versions.', 'Скачиваю Modrinth-модпак...': 'Downloading Modrinth modpack...', 'Создаю сборку из Modrinth-модпака...': 'Creating instance from Modrinth modpack...', 'Скачиваю файлы модпака Modrinth...': 'Downloading Modrinth modpack files...', 'Modrinth-модпак установлен.': 'Modrinth modpack installed.'}, 'uk': {'Некорректный путь файла в модпаке.': 'Некоректний шлях файлу в модпаку.', 'В Modrinth-модпаке не указана версия Minecraft.': 'У Modrinth-модпаку не вказано версію Minecraft.', 'Не удалось создать сборку из Modrinth-модпака.': 'Не вдалося створити збірку з Modrinth-модпака.', 'В .mrpack не найден modrinth.index.json.': 'У .mrpack не знайдено modrinth.index.json.', 'Некорректный modrinth.index.json.': 'Некоректний modrinth.index.json.', 'Некорректный список файлов в modrinth.index.json.': 'Некоректний список файлів у modrinth.index.json.', 'Выбранный проект Modrinth не является модпаком.': 'Вибраний проєкт Modrinth не є модпаком.', 'Не найдена версия Modrinth-модпака.': 'Версію Modrinth-модпака не знайдено.', 'В версиях Modrinth-модпака не найден .mrpack файл.': 'У версіях Modrinth-модпака не знайдено .mrpack файл.', 'Скачиваю Modrinth-модпак...': 'Завантажую Modrinth-модпак...', 'Создаю сборку из Modrinth-модпака...': 'Створюю збірку з Modrinth-модпака...', 'Скачиваю файлы модпака Modrinth...': 'Завантажую файли Modrinth-модпака...', 'Modrinth-модпак установлен.': 'Modrinth-модпак встановлено.'}, 'kk': {'Некорректный путь файла в модпаке.': 'Модпактағы файл жолы дұрыс емес.', 'В Modrinth-модпаке не указана версия Minecraft.': 'Modrinth модпагында Minecraft нұсқасы көрсетілмеген.', 'Не удалось создать сборку из Modrinth-модпака.': 'Modrinth модпагынан жинақ жасау мүмкін болмады.', 'В .mrpack не найден modrinth.index.json.': '.mrpack ішінде modrinth.index.json табылмады.', 'Некорректный modrinth.index.json.': 'modrinth.index.json дұрыс емес.', 'Выбранный проект Modrinth не является модпаком.': 'Таңдалған Modrinth жобасы модпак емес.', 'Не найдена версия Modrinth-модпака.': 'Modrinth модпак нұсқасы табылмады.', 'Скачиваю Modrinth-модпак...': 'Modrinth модпагы жүктеліп жатыр...', 'Создаю сборку из Modrinth-модпака...': 'Modrinth модпагынан жинақ жасалып жатыр...', 'Скачиваю файлы модпака Modrinth...': 'Modrinth модпак файлдары жүктеліп жатыр...', 'Modrinth-модпак установлен.': 'Modrinth модпагы орнатылды.'}}
 for _lang, _mapping in BACKEND_MODRINTH_MODPACK_MESSAGES_V0649.items():
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
 
-# v0.6.66: Modrinth target-instance install messages.
+# v0.6.67: Modrinth target-instance install messages.
 BACKEND_MODRINTH_TARGET_INSTANCE_MESSAGES_V0650 = {'en': {'Modrinth-модпак нельзя установить поверх официальной сборки.': 'A Modrinth modpack cannot be installed over the official instance.', 'Не удалось обновить выбранную сборку под Modrinth-модпак.': 'Could not update the selected instance for the Modrinth modpack.', 'Устанавливаю Modrinth-модпак в выбранную сборку...': 'Installing Modrinth modpack into the selected instance...', 'Modrinth-модпак установлен в выбранную сборку.': 'Modrinth modpack installed into the selected instance.'}, 'uk': {'Modrinth-модпак нельзя установить поверх официальной сборки.': 'Modrinth-модпак не можна встановити поверх офіційної збірки.', 'Не удалось обновить выбранную сборку под Modrinth-модпак.': 'Не вдалося оновити вибрану збірку під Modrinth-модпак.', 'Устанавливаю Modrinth-модпак в выбранную сборку...': 'Встановлюю Modrinth-модпак у вибрану збірку...', 'Modrinth-модпак установлен в выбранную сборку.': 'Modrinth-модпак встановлено у вибрану збірку.'}, 'kk': {'Modrinth-модпак нельзя установить поверх официальной сборки.': 'Modrinth модпагын ресми жинақтың үстіне орнатуға болмайды.', 'Не удалось обновить выбранную сборку под Modrinth-модпак.': 'Таңдалған жинақты Modrinth модпагына бейімдеу мүмкін болмады.', 'Устанавливаю Modrinth-модпак в выбранную сборку...': 'Modrinth модпагы таңдалған жинаққа орнатылып жатыр...', 'Modrinth-модпак установлен в выбранную сборку.': 'Modrinth модпагы таңдалған жинаққа орнатылды.'}}
 for _lang, _mapping in BACKEND_MODRINTH_TARGET_INSTANCE_MESSAGES_V0650.items():
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
 
-# v0.6.66: strict Modrinth modpack compatibility messages.
+# v0.6.67: strict Modrinth modpack compatibility messages.
 BACKEND_MODRINTH_STRICT_MESSAGES_V0651 = {'en': {'У выбранной сборки не указана версия Minecraft.': 'The selected instance has no Minecraft version.', 'Не найдена версия Modrinth-модпака для выбранной сборки:': 'No Modrinth modpack version found for the selected instance:', 'В версиях Modrinth-модпака не найден .mrpack файл для выбранной сборки:': 'No .mrpack file found for the selected instance:', 'Modrinth-модпак не совпадает с выбранной сборкой: нужен Minecraft': 'Modrinth modpack does not match the selected instance: required Minecraft', 'а найден Minecraft': 'but found Minecraft', 'Modrinth-модпак не совпадает с выбранной сборкой: нужен loader': 'Modrinth modpack does not match the selected instance: required loader', 'а найден loader': 'but found loader'}, 'uk': {'У выбранной сборки не указана версия Minecraft.': 'У вибраній збірці не вказано версію Minecraft.', 'Не найдена версия Modrinth-модпака для выбранной сборки:': 'Версію Modrinth-модпака для вибраної збірки не знайдено:', 'В версиях Modrinth-модпака не найден .mrpack файл для выбранной сборки:': 'У версіях Modrinth-модпака не знайдено .mrpack файл для вибраної збірки:', 'Modrinth-модпак не совпадает с выбранной сборкой: нужен Minecraft': 'Modrinth-модпак не збігається з вибраною збіркою: потрібен Minecraft', 'а найден Minecraft': 'а знайдено Minecraft', 'Modrinth-модпак не совпадает с выбранной сборкой: нужен loader': 'Modrinth-модпак не збігається з вибраною збіркою: потрібен loader', 'а найден loader': 'а знайдено loader'}, 'kk': {'У выбранной сборки не указана версия Minecraft.': 'Таңдалған жинақта Minecraft нұсқасы көрсетілмеген.', 'Не найдена версия Modrinth-модпака для выбранной сборки:': 'Таңдалған жинаққа арналған Modrinth модпак нұсқасы табылмады:', 'В версиях Modrinth-модпака не найден .mrpack файл для выбранной сборки:': 'Таңдалған жинаққа арналған .mrpack файлы табылмады:', 'Modrinth-модпак не совпадает с выбранной сборкой: нужен Minecraft': 'Modrinth модпагы таңдалған жинаққа сәйкес емес: қажет Minecraft', 'а найден Minecraft': 'табылған Minecraft', 'Modrinth-модпак не совпадает с выбранной сборкой: нужен loader': 'Modrinth модпагы таңдалған жинаққа сәйкес емес: қажет loader', 'а найден loader': 'табылған loader'}}
 for _lang, _mapping in BACKEND_MODRINTH_STRICT_MESSAGES_V0651.items():
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
 
-# v0.6.66: external URL messages.
+# v0.6.67: external URL messages.
 BACKEND_EXTERNAL_URL_MESSAGES_V0652 = {'en': {'Некорректная ссылка.': 'Invalid link.'}, 'uk': {'Некорректная ссылка.': 'Некоректне посилання.'}, 'kk': {'Некорректная ссылка.': 'Сілтеме дұрыс емес.'}}
 for _lang, _mapping in BACKEND_EXTERNAL_URL_MESSAGES_V0652.items():
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
 
-# v0.6.66: Modrinth filter install messages.
+# v0.6.67: Modrinth filter install messages.
 BACKEND_MODRINTH_FILTER_MESSAGES_V0655 = {'en': {'Не найдена совместимая версия для выбранных фильтров.': 'No compatible version found for the selected filters.'}, 'uk': {'Не найдена совместимая версия для выбранных фильтров.': 'Сумісну версію для вибраних фільтрів не знайдено.'}, 'kk': {'Не найдена совместимая версия для выбранных фильтров.': 'Таңдалған сүзгілерге үйлесімді нұсқа табылмады.'}}
 for _lang, _mapping in BACKEND_MODRINTH_FILTER_MESSAGES_V0655.items():
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
 
-# v0.6.66: CurseForge backend messages.
+# v0.6.67: CurseForge backend messages.
 BACKEND_CURSEFORGE_MESSAGES_V0658 = {'en': {'Для CurseForge нужен Core API key.': 'CurseForge Core API key is required.', 'CurseForge API key сохранён.': 'CurseForge API key saved.', 'CurseForge API key очищен.': 'CurseForge API key cleared.'}, 'uk': {'Для CurseForge нужен Core API key.': 'Для CurseForge потрібен Core API key.', 'CurseForge API key сохранён.': 'CurseForge API key збережено.', 'CurseForge API key очищен.': 'CurseForge API key очищено.'}, 'kk': {'Для CurseForge нужен Core API key.': 'CurseForge Core API key қажет.', 'CurseForge API key сохранён.': 'CurseForge API key сақталды.', 'CurseForge API key очищен.': 'CurseForge API key тазартылды.'}}
 for _lang, _mapping in BACKEND_CURSEFORGE_MESSAGES_V0658.items():
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
 
-# v0.6.66: Modrinth modpack update messages.
+# v0.6.67: Modrinth modpack update messages.
 BACKEND_MODRINTH_MODPACK_UPDATE_MESSAGES_V0659 = {'en': {'У этой сборки нет связи с Modrinth-модпаком.': 'This instance is not linked to a Modrinth modpack.', 'Сборка установлена из Modrinth-модпака.': 'This instance was installed from a Modrinth modpack.', 'Доступно обновление Modrinth-модпака.': 'A Modrinth modpack update is available.', 'Modrinth-модпак уже актуален.': 'The Modrinth modpack is already up to date.', 'Modrinth-модпак обновлён.': 'Modrinth modpack updated.', 'В сборке не сохранён ID проекта Modrinth.': 'The instance has no saved Modrinth project ID.', 'Не найдены совместимые версии Modrinth-модпака.': 'No compatible Modrinth modpack versions were found.', 'В совместимых версиях Modrinth-модпака не найден .mrpack файл.': 'No .mrpack file was found in compatible Modrinth versions.'}, 'uk': {'У этой сборки нет связи с Modrinth-модпаком.': 'Ця збірка не пов’язана з Modrinth-модпаком.', 'Сборка установлена из Modrinth-модпака.': 'Цю збірку встановлено з Modrinth-модпака.', 'Доступно обновление Modrinth-модпака.': 'Доступне оновлення Modrinth-модпака.', 'Modrinth-модпак уже актуален.': 'Modrinth-модпак уже актуальний.', 'Modrinth-модпак обновлён.': 'Modrinth-модпак оновлено.', 'В сборке не сохранён ID проекта Modrinth.': 'У збірці не збережено ID проєкту Modrinth.', 'Не найдены совместимые версии Modrinth-модпака.': 'Сумісні версії Modrinth-модпака не знайдено.', 'В совместимых версиях Modrinth-модпака не найден .mrpack файл.': 'У сумісних версіях Modrinth-модпака не знайдено .mrpack файл.'}, 'kk': {'У этой сборки нет связи с Modrinth-модпаком.': 'Бұл жинақ Modrinth модпагымен байланыспаған.', 'Сборка установлена из Modrinth-модпака.': 'Бұл жинақ Modrinth модпагынан орнатылған.', 'Доступно обновление Modrinth-модпака.': 'Modrinth модпагының жаңартуы бар.', 'Modrinth-модпак уже актуален.': 'Modrinth модпагы өзекті.', 'Modrinth-модпак обновлён.': 'Modrinth модпагы жаңартылды.', 'В сборке не сохранён ID проекта Modrinth.': 'Жинақта Modrinth жоба ID сақталмаған.', 'Не найдены совместимые версии Modrinth-модпака.': 'Үйлесімді Modrinth модпак нұсқалары табылмады.', 'В совместимых версиях Modrinth-модпака не найден .mrpack файл.': 'Үйлесімді Modrinth нұсқаларында .mrpack файлы табылмады.'}}
 for _lang, _mapping in BACKEND_MODRINTH_MODPACK_UPDATE_MESSAGES_V0659.items():
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
 
 
 
-# v0.6.66: Modrinth smart prune status messages.
+# v0.6.67: Modrinth smart prune status messages.
 BACKEND_MODRINTH_SMART_PRUNE_MESSAGES_V0660 = {'en': {'Удаляю устаревшие файлы Modrinth-модпака...': 'Removing obsolete Modrinth modpack files...'}, 'uk': {'Удаляю устаревшие файлы Modrinth-модпака...': 'Видаляю застарілі файли Modrinth-модпака...'}, 'kk': {'Удаляю устаревшие файлы Modrinth-модпака...': 'Ескірген Modrinth модпак файлдарын жою...'}}
 for _lang, _mapping in BACKEND_MODRINTH_SMART_PRUNE_MESSAGES_V0660.items():
     TRANSLATIONS.setdefault(_lang, {}).update(_mapping)
