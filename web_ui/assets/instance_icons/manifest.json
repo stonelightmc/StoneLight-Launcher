@@ -1,0 +1,359 @@
+[
+  {
+    "id": "vanilla",
+    "label": "Vanilla",
+    "category": "type",
+    "url": "assets/instance_icons/vanilla.svg",
+    "terms": "vanilla classic survival grass"
+  },
+  {
+    "id": "modded",
+    "label": "Modded",
+    "category": "type",
+    "url": "assets/instance_icons/modded.svg",
+    "terms": "modded mods custom pack puzzle"
+  },
+  {
+    "id": "tech",
+    "label": "Tech",
+    "category": "type",
+    "url": "assets/instance_icons/tech.svg",
+    "terms": "technology automation redstone machines"
+  },
+  {
+    "id": "magic",
+    "label": "Magic",
+    "category": "type",
+    "url": "assets/instance_icons/magic.svg",
+    "terms": "magic spells fantasy portal"
+  },
+  {
+    "id": "rpg",
+    "label": "RPG",
+    "category": "type",
+    "url": "assets/instance_icons/rpg.svg",
+    "terms": "roleplay classes fantasy quest"
+  },
+  {
+    "id": "adventure",
+    "label": "Adventure",
+    "category": "type",
+    "url": "assets/instance_icons/adventure.svg",
+    "terms": "adventure exploration map"
+  },
+  {
+    "id": "building",
+    "label": "Building",
+    "category": "type",
+    "url": "assets/instance_icons/building.svg",
+    "terms": "building creative base architecture"
+  },
+  {
+    "id": "pvp",
+    "label": "PvP",
+    "category": "type",
+    "url": "assets/instance_icons/pvp.svg",
+    "terms": "pvp combat sword arena"
+  },
+  {
+    "id": "hardcore",
+    "label": "Hardcore",
+    "category": "type",
+    "url": "assets/instance_icons/hardcore.svg",
+    "terms": "hardcore survival heart"
+  },
+  {
+    "id": "creative",
+    "label": "Creative",
+    "category": "type",
+    "url": "assets/instance_icons/creative.svg",
+    "terms": "creative build blocks"
+  },
+  {
+    "id": "skyblock",
+    "label": "SkyBlock",
+    "category": "type",
+    "url": "assets/instance_icons/skyblock.svg",
+    "terms": "skyblock island void"
+  },
+  {
+    "id": "oneblock",
+    "label": "OneBlock",
+    "category": "type",
+    "url": "assets/instance_icons/oneblock.svg",
+    "terms": "oneblock island challenge"
+  },
+  {
+    "id": "cobblemon",
+    "label": "Cobblemon",
+    "category": "type",
+    "url": "assets/instance_icons/cobblemon.svg",
+    "terms": "cobblemon pixelmon creatures"
+  },
+  {
+    "id": "create",
+    "label": "Create",
+    "category": "type",
+    "url": "assets/instance_icons/create.svg",
+    "terms": "create cog gears mechanics"
+  },
+  {
+    "id": "quest",
+    "label": "Quest",
+    "category": "type",
+    "url": "assets/instance_icons/quest.svg",
+    "terms": "quest book story tasks"
+  },
+  {
+    "id": "performance",
+    "label": "Performance",
+    "category": "type",
+    "url": "assets/instance_icons/performance.svg",
+    "terms": "performance fps optimization"
+  },
+  {
+    "id": "shaders",
+    "label": "Shaders",
+    "category": "type",
+    "url": "assets/instance_icons/shaders.svg",
+    "terms": "shaders lighting visuals"
+  },
+  {
+    "id": "testing",
+    "label": "Testing",
+    "category": "type",
+    "url": "assets/instance_icons/testing.svg",
+    "terms": "testing dev beta experimental"
+  },
+  {
+    "id": "old_versions",
+    "label": "Old versions",
+    "category": "type",
+    "url": "assets/instance_icons/old_versions.svg",
+    "terms": "old versions legacy classic"
+  },
+  {
+    "id": "snapshots",
+    "label": "Snapshots",
+    "category": "type",
+    "url": "assets/instance_icons/snapshots.svg",
+    "terms": "snapshots preview beta"
+  },
+  {
+    "id": "grass",
+    "label": "Grass",
+    "category": "biome",
+    "url": "assets/instance_icons/grass.svg",
+    "terms": "grass overworld biome vanilla"
+  },
+  {
+    "id": "cave",
+    "label": "Cave",
+    "category": "biome",
+    "url": "assets/instance_icons/cave.svg",
+    "terms": "cave mining underground"
+  },
+  {
+    "id": "deep_dark",
+    "label": "Deep Dark",
+    "category": "biome",
+    "url": "assets/instance_icons/deep_dark.svg",
+    "terms": "deep dark warden sculk"
+  },
+  {
+    "id": "jungle",
+    "label": "Jungle",
+    "category": "biome",
+    "url": "assets/instance_icons/jungle.svg",
+    "terms": "jungle trees vines"
+  },
+  {
+    "id": "cherry",
+    "label": "Cherry Grove",
+    "category": "biome",
+    "url": "assets/instance_icons/cherry.svg",
+    "terms": "cherry grove pink blossom"
+  },
+  {
+    "id": "swamp",
+    "label": "Swamp",
+    "category": "biome",
+    "url": "assets/instance_icons/swamp.svg",
+    "terms": "swamp mud water"
+  },
+  {
+    "id": "mountain",
+    "label": "Mountain",
+    "category": "biome",
+    "url": "assets/instance_icons/mountain.svg",
+    "terms": "mountain peaks cliffs"
+  },
+  {
+    "id": "village",
+    "label": "Village",
+    "category": "biome",
+    "url": "assets/instance_icons/village.svg",
+    "terms": "village villagers houses"
+  },
+  {
+    "id": "ocean",
+    "label": "Ocean",
+    "category": "biome",
+    "url": "assets/instance_icons/ocean.svg",
+    "terms": "ocean water sea"
+  },
+  {
+    "id": "desert",
+    "label": "Desert",
+    "category": "biome",
+    "url": "assets/instance_icons/desert.svg",
+    "terms": "desert sand sun"
+  },
+  {
+    "id": "snow",
+    "label": "Snow",
+    "category": "biome",
+    "url": "assets/instance_icons/snow.svg",
+    "terms": "snow ice winter"
+  },
+  {
+    "id": "nether",
+    "label": "Nether",
+    "category": "biome",
+    "url": "assets/instance_icons/nether.svg",
+    "terms": "nether fire lava"
+  },
+  {
+    "id": "end",
+    "label": "End",
+    "category": "biome",
+    "url": "assets/instance_icons/end.svg",
+    "terms": "end void dragon"
+  },
+  {
+    "id": "fabric",
+    "label": "Fabric",
+    "category": "loader",
+    "url": "assets/instance_icons/fabric.svg",
+    "terms": "fabric loader mods"
+  },
+  {
+    "id": "forge",
+    "label": "Forge",
+    "category": "loader",
+    "url": "assets/instance_icons/forge.svg",
+    "terms": "forge loader mods"
+  },
+  {
+    "id": "neoforge",
+    "label": "NeoForge",
+    "category": "loader",
+    "url": "assets/instance_icons/neoforge.svg",
+    "terms": "neoforge loader mods"
+  },
+  {
+    "id": "quilt",
+    "label": "Quilt",
+    "category": "loader",
+    "url": "assets/instance_icons/quilt.svg",
+    "terms": "quilt loader mods"
+  },
+  {
+    "id": "server",
+    "label": "Server",
+    "category": "utility",
+    "url": "assets/instance_icons/server.svg",
+    "terms": "server multiplayer network"
+  },
+  {
+    "id": "backup",
+    "label": "Backup",
+    "category": "utility",
+    "url": "assets/instance_icons/backup.svg",
+    "terms": "backup save archive"
+  },
+  {
+    "id": "experimental",
+    "label": "Experimental",
+    "category": "utility",
+    "url": "assets/instance_icons/experimental.svg",
+    "terms": "experimental lab unstable"
+  },
+  {
+    "id": "repair",
+    "label": "Repair",
+    "category": "utility",
+    "url": "assets/instance_icons/repair.svg",
+    "terms": "repair fix tools"
+  },
+  {
+    "id": "favorite",
+    "label": "Favorite",
+    "category": "utility",
+    "url": "assets/instance_icons/favorite.svg",
+    "terms": "favorite star pinned"
+  },
+  {
+    "id": "archive",
+    "label": "Archive",
+    "category": "utility",
+    "url": "assets/instance_icons/archive.svg",
+    "terms": "archive storage old"
+  },
+  {
+    "id": "local",
+    "label": "Local",
+    "category": "utility",
+    "url": "assets/instance_icons/local.svg",
+    "terms": "local offline desktop"
+  },
+  {
+    "id": "multiplayer",
+    "label": "Multiplayer",
+    "category": "utility",
+    "url": "assets/instance_icons/multiplayer.svg",
+    "terms": "multiplayer friends server"
+  },
+  {
+    "id": "cozy",
+    "label": "Cozy",
+    "category": "atmosphere",
+    "url": "assets/instance_icons/cozy.svg",
+    "terms": "cozy calm cottage"
+  },
+  {
+    "id": "horror",
+    "label": "Horror",
+    "category": "atmosphere",
+    "url": "assets/instance_icons/horror.svg",
+    "terms": "horror dark scary"
+  },
+  {
+    "id": "space",
+    "label": "Space",
+    "category": "atmosphere",
+    "url": "assets/instance_icons/space.svg",
+    "terms": "space stars sci-fi"
+  },
+  {
+    "id": "medieval",
+    "label": "Medieval",
+    "category": "atmosphere",
+    "url": "assets/instance_icons/medieval.svg",
+    "terms": "medieval castle knights"
+  },
+  {
+    "id": "steampunk",
+    "label": "Steampunk",
+    "category": "atmosphere",
+    "url": "assets/instance_icons/steampunk.svg",
+    "terms": "steampunk gears brass"
+  },
+  {
+    "id": "futuristic",
+    "label": "Futuristic",
+    "category": "atmosphere",
+    "url": "assets/instance_icons/futuristic.svg",
+    "terms": "futuristic neon sci-fi"
+  }
+]

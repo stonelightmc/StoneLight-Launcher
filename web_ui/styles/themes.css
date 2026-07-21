@@ -1,0 +1,270 @@
+:root,
+html[data-theme="dark"] {
+  --bg: #0b1118;
+  --bg2: #111a25;
+  --bg-gradient:
+    radial-gradient(circle at 14% 0%, rgba(255,179,71,.22), transparent 32%),
+    radial-gradient(circle at 88% 10%, rgba(244,124,56,.14), transparent 30%),
+    linear-gradient(135deg, #0b1118 0%, #101827 46%, #17212e 100%);
+  --body-glow: linear-gradient(120deg, rgba(255,179,71,.10), transparent 34%, rgba(255,185,87,.12));
+  --noise-opacity: .10;
+  --noise-blend: screen;
+  --panel: rgba(18, 26, 37, .74);
+  --panel-strong: rgba(23, 33, 47, .88);
+  --input: rgba(12, 19, 28, .82);
+  --line: rgba(255, 255, 255, .105);
+  --text: #f5f7fb;
+  --muted: #a7b4c6;
+  --accent: #ffb347;
+  --accent-hover: #ffd36e;
+  --accent2: #f47c38;
+  --accent-text: #2f1a07;
+  --accent-soft: rgba(255,179,71,.15);
+  --accent-soft-text: #ffc979;
+  --accent-line: rgba(255,179,71,.36);
+  --accent-gradient: linear-gradient(135deg, #f47c38 0%, #ffb347 52%, #ffd36e 100%);
+  --button: rgba(30, 43, 61, .86);
+  --button-hover: rgba(47, 63, 84, .94);
+  --button-text: #f5f7fb;
+  --danger: #ff6762;
+  --danger-hover: #ff7f72;
+  --danger-text: #ffffff;
+  --chip: rgba(255,255,255,.07);
+  --chip-line: rgba(255,255,255,.10);
+  --chip-text: #dbe6f4;
+  --shadow: 0 24px 80px rgba(0,0,0,.52);
+  --shadow-soft: 0 16px 42px rgba(0,0,0,.32);
+  --shadow-hover: 0 22px 58px rgba(0,0,0,.48);
+  --panel-gradient: linear-gradient(180deg, rgba(31, 43, 59, .92), rgba(16, 24, 36, .82));
+  --panel-strong-gradient: linear-gradient(180deg, rgba(35, 48, 66, .94), rgba(20, 29, 42, .88));
+  --card-glow: radial-gradient(circle at top right, rgba(255,179,71,.24), transparent 42%);
+  --overlay: rgba(4,9,15,.76);
+}
+
+html[data-theme="light"] {
+  --bg: #fff7ea;
+  --bg2: #f4e6d2;
+  --bg-gradient:
+    radial-gradient(circle at 14% 0%, rgba(255, 179, 71, .72), transparent 32%),
+    radial-gradient(circle at 88% 8%, rgba(255, 244, 209, .95), transparent 34%),
+    linear-gradient(135deg, #fff8ec 0%, #f4e6d2 50%, #fff1dd 100%);
+  --body-glow: linear-gradient(120deg, rgba(255,255,255,.68), transparent 34%, rgba(244,124,56,.16));
+  --noise-opacity: .055;
+  --noise-blend: multiply;
+  --panel: rgba(255,255,255,.62);
+  --panel-strong: rgba(255,255,255,.82);
+  --input: rgba(255,250,241,.76);
+  --line: rgba(96, 66, 37, .20);
+  --text: #2d2118;
+  --muted: #6d5848;
+  --accent: #ffb347;
+  --accent-hover: #ffd36e;
+  --accent2: #f47c38;
+  --accent-text: #33200b;
+  --accent-soft: rgba(255,179,71,.19);
+  --accent-soft-text: #8a4318;
+  --accent-line: rgba(244,124,56,.42);
+  --accent-gradient: linear-gradient(135deg, #f47c38 0%, #ffb347 52%, #ffd36e 100%);
+  --button: rgba(255,255,255,.58);
+  --button-hover: rgba(255,255,255,.86);
+  --button-text: #382818;
+  --danger: #d86458;
+  --danger-hover: #ef7668;
+  --danger-text: #ffffff;
+  --chip: rgba(255,255,255,.52);
+  --chip-line: rgba(96,66,37,.18);
+  --chip-text: #604d3e;
+  --shadow: 0 24px 70px rgba(117,70,24,.18);
+  --shadow-soft: 0 14px 34px rgba(117,70,24,.14);
+  --shadow-hover: 0 20px 48px rgba(117,70,24,.20);
+  --panel-gradient: linear-gradient(180deg, rgba(255,255,255,.88), rgba(255,248,235,.64));
+  --panel-strong-gradient: linear-gradient(180deg, rgba(255,255,255,.94), rgba(255,248,235,.74));
+  --card-glow: radial-gradient(circle at top right, rgba(255,174,67,.34), transparent 42%);
+  --overlay: rgba(255,247,234,.82);
+}
+
+html[data-theme="laconic"] {
+  --bg: #111315;
+  --bg2: #181a1d;
+  --bg-gradient:
+    radial-gradient(circle at 14% 0%, rgba(217,217,212,.085), transparent 32%),
+    radial-gradient(circle at 88% 10%, rgba(81,85,90,.14), transparent 34%),
+    linear-gradient(135deg, #101214 0%, #151719 48%, #1b1e21 100%);
+  --body-glow: linear-gradient(120deg, rgba(239,239,235,.045), transparent 36%, rgba(217,217,212,.04));
+  --noise-opacity: .07;
+  --noise-blend: screen;
+  --panel: rgba(24, 26, 29, .76);
+  --panel-strong: rgba(27, 30, 33, .90);
+  --input: rgba(16, 18, 20, .82);
+  --line: rgba(244,244,242,.12);
+  --text: #f4f4f2;
+  --muted: #a8abae;
+  --accent: #d9d9d4;
+  --accent-hover: #efefeb;
+  --accent2: #8f9499;
+  --accent-text: #151515;
+  --accent-soft: rgba(217,217,212,.10);
+  --accent-soft-text: #e9e9e5;
+  --accent-line: rgba(217,217,212,.24);
+  --accent-gradient: linear-gradient(135deg, #bfc1bd 0%, #d9d9d4 55%, #efefeb 100%);
+  --button: rgba(36,39,42,.84);
+  --button-hover: rgba(48,52,56,.94);
+  --button-text: #f1f1ef;
+  --danger: #a84940;
+  --danger-hover: #bd584e;
+  --danger-text: #fff;
+  --chip: rgba(36,39,42,.72);
+  --chip-line: rgba(244,244,242,.12);
+  --chip-text: #d5d6d4;
+  --shadow: 0 22px 68px rgba(0,0,0,.38);
+  --shadow-soft: 0 14px 36px rgba(0,0,0,.26);
+  --shadow-hover: 0 20px 52px rgba(0,0,0,.42);
+  --panel-gradient: linear-gradient(180deg, rgba(31,34,37,.88), rgba(20,22,24,.76));
+  --panel-strong-gradient: linear-gradient(180deg, rgba(36,39,42,.92), rgba(24,26,29,.84));
+  --card-glow: radial-gradient(circle at top right, rgba(217,217,212,.105), transparent 42%);
+  --overlay: rgba(10,11,12,.80);
+}
+
+
+html[data-theme="laconic_light"] {
+  --bg: #f4f1ec;
+  --bg2: #e8e1d7;
+  --bg-gradient:
+    radial-gradient(circle at 14% 0%, rgba(143,184,168,.34), transparent 34%),
+    radial-gradient(circle at 88% 10%, rgba(255,255,255,.74), transparent 34%),
+    linear-gradient(135deg, #f8f5ef 0%, #e8e1d7 50%, #fbf8f2 100%);
+  --body-glow: linear-gradient(120deg, rgba(255,255,255,.68), transparent 36%, rgba(143,184,168,.18));
+  --noise-opacity: .045;
+  --noise-blend: multiply;
+  --panel: rgba(251,248,242,.70);
+  --panel-strong: rgba(255,255,255,.84);
+  --input: rgba(240,236,228,.82);
+  --line: rgba(92,73,52,.18);
+  --text: #2f3440;
+  --muted: #7c8792;
+  --accent: #8fb8a8;
+  --accent-hover: #7aa895;
+  --accent2: #c7a66a;
+  --accent-text: #11251f;
+  --accent-soft: rgba(143,184,168,.18);
+  --accent-soft-text: #28463b;
+  --accent-line: rgba(143,184,168,.42);
+  --accent-gradient: linear-gradient(135deg, #7aa895 0%, #8fb8a8 55%, #b7d3c7 100%);
+  --button: rgba(143,184,168,.88);
+  --button-hover: rgba(122,168,149,.96);
+  --button-text: #11251f;
+  --danger: #c96f5d;
+  --danger-hover: #ad5949;
+  --danger-text: #ffffff;
+  --chip: rgba(232,225,215,.72);
+  --chip-line: rgba(92,73,52,.16);
+  --chip-text: #42505b;
+  --shadow: 0 18px 48px rgba(92,73,52,.14);
+  --shadow-soft: 0 12px 30px rgba(92,73,52,.10);
+  --shadow-hover: 0 20px 52px rgba(92,73,52,.18);
+  --panel-gradient: linear-gradient(180deg, rgba(255,255,255,.86), rgba(251,248,242,.66));
+  --panel-strong-gradient: linear-gradient(180deg, rgba(255,255,255,.94), rgba(251,248,242,.78));
+  --card-glow: radial-gradient(circle at top right, rgba(143,184,168,.28), transparent 42%);
+  --overlay: rgba(244,241,236,.84);
+}
+
+html[data-theme="neon"] {
+  --bg: #070913;
+  --bg2: #10182d;
+  --bg-gradient:
+    radial-gradient(circle at 13% 0%, rgba(0,245,255,.24), transparent 34%),
+    radial-gradient(circle at 90% 12%, rgba(255,77,216,.20), transparent 36%),
+    linear-gradient(135deg, #070913 0%, #0b1130 48%, #160c2e 100%);
+  --body-glow: linear-gradient(120deg, rgba(0,245,255,.10), transparent 35%, rgba(255,77,216,.12));
+  --noise-opacity: .10;
+  --noise-blend: screen;
+  --panel: rgba(14,18,39,.72);
+  --panel-strong: rgba(18,23,49,.88);
+  --input: rgba(7,9,19,.82);
+  --line: rgba(0,245,255,.22);
+  --text: #f4fbff;
+  --muted: #9db2d1;
+  --accent: #00f5ff;
+  --accent-hover: #79fbff;
+  --accent2: #ff4dd8;
+  --accent-text: #061014;
+  --accent-soft: rgba(0,245,255,.14);
+  --accent-soft-text: #90fbff;
+  --accent-line: rgba(0,245,255,.42);
+  --accent-gradient: linear-gradient(135deg, #00f5ff 0%, #7c5cff 48%, #ff4dd8 100%);
+  --button: rgba(21,30,63,.82);
+  --button-hover: rgba(33,45,93,.94);
+  --button-text: #f4fbff;
+  --danger: #ff4268;
+  --danger-hover: #ff6b86;
+  --danger-text: #ffffff;
+  --chip: rgba(0,245,255,.08);
+  --chip-line: rgba(0,245,255,.18);
+  --chip-text: #d7faff;
+  --shadow: 0 24px 76px rgba(0,0,0,.50);
+  --shadow-soft: 0 0 28px rgba(0,245,255,.12), 0 14px 34px rgba(0,0,0,.34);
+  --shadow-hover: 0 0 34px rgba(0,245,255,.20), 0 22px 58px rgba(0,0,0,.50);
+  --panel-gradient: linear-gradient(180deg, rgba(22,29,63,.88), rgba(9,12,26,.76));
+  --panel-strong-gradient: linear-gradient(180deg, rgba(27,36,78,.92), rgba(12,16,35,.86));
+  --card-glow: radial-gradient(circle at top right, rgba(0,245,255,.20), transparent 36%), radial-gradient(circle at bottom left, rgba(255,77,216,.12), transparent 42%);
+  --overlay: rgba(5,7,15,.84);
+}
+
+html[data-theme="retro_future"] {
+  --bg: #170f28;
+  --bg2: #271439;
+  --bg-gradient:
+    radial-gradient(circle at 14% 0%, rgba(255,190,92,.26), transparent 32%),
+    radial-gradient(circle at 88% 12%, rgba(255,76,162,.20), transparent 35%),
+    linear-gradient(135deg, #170f28 0%, #281543 46%, #2c1830 100%);
+  --body-glow: linear-gradient(120deg, rgba(255,190,92,.12), transparent 36%, rgba(255,76,162,.14));
+  --noise-opacity: .09;
+  --noise-blend: screen;
+  --panel: rgba(39,20,57,.72);
+  --panel-strong: rgba(49,26,70,.88);
+  --input: rgba(23,15,40,.82);
+  --line: rgba(255,190,92,.18);
+  --text: #fff1dc;
+  --muted: #d2afd0;
+  --accent: #ffbe5c;
+  --accent-hover: #ffd082;
+  --accent2: #ff4ca2;
+  --accent-text: #2d1606;
+  --accent-soft: rgba(255,190,92,.14);
+  --accent-soft-text: #ffd58e;
+  --accent-line: rgba(255,190,92,.38);
+  --accent-gradient: linear-gradient(135deg, #ff8a3d 0%, #ffbe5c 54%, #ff4ca2 100%);
+  --button: rgba(55,29,78,.82);
+  --button-hover: rgba(72,38,101,.94);
+  --button-text: #fff1dc;
+  --danger: #ff5a78;
+  --danger-hover: #ff7791;
+  --danger-text: #ffffff;
+  --chip: rgba(255,190,92,.08);
+  --chip-line: rgba(255,190,92,.18);
+  --chip-text: #ffe4bd;
+  --shadow: 0 24px 76px rgba(12,5,24,.48);
+  --shadow-soft: 0 0 26px rgba(255,190,92,.10), 0 14px 34px rgba(12,5,24,.32);
+  --shadow-hover: 0 0 34px rgba(255,76,162,.14), 0 22px 58px rgba(12,5,24,.48);
+  --panel-gradient: linear-gradient(180deg, rgba(58,31,83,.88), rgba(31,18,52,.76));
+  --panel-strong-gradient: linear-gradient(180deg, rgba(67,35,95,.92), rgba(37,22,60,.86));
+  --card-glow: radial-gradient(circle at top right, rgba(255,190,92,.20), transparent 38%), radial-gradient(circle at bottom left, rgba(255,76,162,.12), transparent 42%);
+  --overlay: rgba(16,8,29,.82);
+}
+
+html,
+body,
+.card,
+.button,
+.select,
+.status-bar,
+.menu__popup,
+.log-drawer,
+.context-menu,
+.chip {
+  transition:
+    background-color 220ms ease,
+    color 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease;
+}

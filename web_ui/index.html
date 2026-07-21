@@ -1,0 +1,890 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StoneLight Launcher</title>
+  <link rel="stylesheet" href="styles/base.css?v=0.6.66">
+  <link rel="stylesheet" href="styles/themes.css?v=0.6.66">
+  <link rel="stylesheet" href="styles/layout.css?v=0.6.66">
+  <link rel="stylesheet" href="styles/animations.css?v=0.6.66">
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <header class="menu-bar" aria-label="Application menu">
+      <nav class="app-menu">
+        <div class="menu">
+          <button class="menu__trigger" data-menu="file" data-i18n="menu.file">File</button>
+          <div class="menu__popup" data-menu-popup="file">
+            <button data-command="add-instance" data-i18n="menu.addInstance">Add instance</button>
+            <button data-command="install-official" data-i18n="menu.installOfficial">Install official instance</button>
+            <button data-command="account-manager" data-i18n="menu.accounts">Account manager</button>
+          </div>
+        </div>
+        <div class="menu">
+          <button class="menu__trigger" data-menu="view" data-i18n="menu.view">View</button>
+          <div class="menu__popup" data-menu-popup="view">
+            <label class="menu__field">
+              <span data-i18n="menu.theme">Theme</span>
+              <select id="themeSelect"></select>
+            </label>
+            <label class="menu__field">
+              <span data-i18n="menu.language">Language</span>
+              <select id="languageSelect"></select>
+            </label>
+            <div class="menu__separator"></div>
+            <button data-command="toggle-log" data-i18n="menu.console">Console</button>
+          </div>
+        </div>
+        <div class="menu">
+          <button class="menu__trigger" data-menu="tools" data-i18n="menu.tools">Tools</button>
+          <div class="menu__popup" data-menu-popup="tools">
+            <button data-command="open-folder" data-i18n="menu.openFolder">Open folder</button>
+            <button data-command="open-log" data-i18n="menu.openLog">Open log</button>
+            <button data-command="bug-report" data-i18n="menu.reportBug">Report a bug</button>
+            <div class="menu__separator"></div>
+            <button data-command="check-updates" data-i18n="menu.checkUpdates">Check updates</button>
+          </div>
+        </div>
+        <div class="menu">
+          <button class="menu__trigger" data-menu="help" data-i18n="menu.help">Help</button>
+          <div class="menu__popup" data-menu-popup="help">
+            <button data-command="github" data-i18n="menu.github">GitHub</button>
+            <button data-command="community-site" data-i18n="menu.communitySite">Community site</button>
+            <button data-command="community-discord" data-i18n="menu.communityDiscord">Community Discord</button>
+            <div class="menu__separator"></div>
+            <button data-command="about" data-i18n="menu.about">About</button>
+          </div>
+        </div>
+      </nav>
+
+      <div class="menu-bar__spacer"></div>
+      <span id="versionLabel" class="version-label">v0.6.66</span>
+    </header>
+
+    <section class="hero card card--strong" id="hero">
+      <div class="hero__icon">
+        <img src="assets/stonelight_logo_128.png" alt="" aria-hidden="true">
+      </div>
+      <div class="hero__copy">
+        <h1>StoneLight Launcher</h1>
+        <div class="hero__selection">
+          <span class="hero__selection-label" data-i18n="hero.selected">Selected:</span>
+          <strong id="heroTitle">—</strong>
+          <span id="heroSubtitle" class="muted" data-i18n="hero.empty">Choose an instance to begin.</span>
+        </div>
+        <div class="chip-row" id="heroChips"></div>
+      </div>
+    </section>
+
+    <main class="workspace">
+      <aside class="left-rail card card--strong">
+        <div class="section-heading">
+          <span data-i18n="actions.title">Actions</span>
+          <span class="section-heading__line"></span>
+        </div>
+
+        <button class="button button--primary button--play" data-action="play">
+          <span class="button__icon">▶</span>
+          <span data-i18n="actions.play">Play</span>
+        </button>
+        <button class="button" data-action="install">
+          <span class="button__icon">↓</span>
+          <span data-i18n="actions.install">Install</span>
+        </button>
+        <button class="button button--danger" data-action="stop">
+          <span class="button__icon">■</span>
+          <span data-i18n="actions.stop">Stop</span>
+        </button>
+        <button class="button" data-command="toggle-log">
+          <span class="button__icon">≡</span>
+          <span data-i18n="actions.log">Log</span>
+        </button>
+        <button class="button" data-action="check_updates">
+          <span class="button__icon">↻</span>
+          <span data-i18n="actions.updates">Updates</span>
+        </button>
+
+        <div id="officialCta" class="official-cta hidden">
+          <div class="official-cta__title" data-i18n="official.title">Official StoneLight</div>
+          <div class="official-cta__text" data-i18n="official.text">Recommended, but optional.</div>
+          <button class="button button--accent-soft" data-action="official_install" data-i18n="official.install">
+            Install official instance
+          </button>
+        </div>
+      </aside>
+
+      <section class="center-panel card">
+        <div class="tabs" role="tablist">
+          <button class="tab is-active" data-tab="instances" role="tab" data-i18n="tabs.instances">Instances</button>
+          <button class="tab" data-tab="modrinth" role="tab">Modrinth</button>
+        </div>
+
+        <div class="tab-content is-active" data-tab-content="instances">
+          <div class="content-toolbar">
+            <div>
+              <h2 data-i18n="instances.title">Your instances</h2>
+              <p class="muted" data-i18n="instances.subtitle">Choose a tile to make it active.</p>
+            </div>
+          </div>
+          <div id="instancesGrid" class="instances-grid"></div>
+          <div id="emptyState" class="empty-state hidden">
+            <div class="empty-state__icon">◇</div>
+            <h3 data-i18n="empty.title">No instances yet</h3>
+            <p data-i18n="empty.text">Install StoneLight, create a custom instance, or import one.</p>
+            <div class="empty-state__actions">
+              <button class="button button--primary" data-action="official_install" data-i18n="official.install">Install official instance</button>
+              <button class="button" data-command="add-instance" data-i18n="instances.createClassic">Додати збірку</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-content" data-tab-content="modrinth">
+          <section class="catalog-panel modrinth-panel">
+            <div class="catalog-hero">
+              <div>
+                <div class="placeholder__badge">MODRINTH</div>
+                <h2 data-i18n="modrinth.title">Modrinth</h2>
+                <p data-i18n="modrinth.text">Search, filter, install projects and update Modrinth modpacks directly from the launcher.</p>
+              </div>
+              <div id="modrinthSelectedInstance" class="catalog-selected-instance"></div>
+            </div>
+
+            <form id="modrinthSearchForm" class="catalog-search">
+              <label class="form-field catalog-search__query">
+                <span data-i18n="modrinth.search">Search</span>
+                <input id="modrinthQueryInput" class="text-input" type="search" autocomplete="off" placeholder="Sodium, Iris, Fresh Animations...">
+              </label>
+
+              <label class="form-field">
+                <span data-i18n="modrinth.type">Type</span>
+                <select id="modrinthTypeSelect" class="select">
+                  <option value="mod" data-i18n="modrinth.typeMod">Mods</option>
+                  <option value="resourcepack" data-i18n="modrinth.typeResourcepack">Resource packs</option>
+                  <option value="shader" data-i18n="modrinth.typeShader">Shaders</option>
+                  <option value="modpack" data-i18n="modrinth.typeModpack">Modpacks</option>
+                </select>
+              </label>
+
+              <label class="form-field">
+                <span data-i18n="modrinth.sort">Sort</span>
+                <select id="modrinthSortSelect" class="select">
+                  <option value="relevance" data-i18n="modrinth.sortRelevance">Relevance</option>
+                  <option value="downloads" data-i18n="modrinth.sortDownloads">Downloads</option>
+                  <option value="updated" data-i18n="modrinth.sortUpdated">Updated</option>
+                  <option value="follows" data-i18n="modrinth.sortFollows">Follows</option>
+                </select>
+              </label>
+
+              <button id="modrinthSearchButton" class="button button--primary catalog-search__button" type="submit" data-i18n="modrinth.searchButton">Search</button>
+            </form>
+
+            <section id="modrinthFilters" class="catalog-filters hidden" aria-label="Modrinth filters">
+              <div class="catalog-filters__head">
+                <div>
+                  <h3 data-i18n="modrinth.filtersTitle">Filters</h3>
+                  <p id="modrinthFiltersHint" data-i18n="modrinth.filtersHint">Default filters follow the selected instance.</p>
+                </div>
+                <div class="catalog-filters__actions">
+                  <label class="catalog-toggle">
+                    <input id="modrinthShowSnapshotsCheckbox" type="checkbox">
+                    <span data-i18n="modrinth.showSnapshots">Show all versions</span>
+                  </label>
+                  <button id="modrinthResetFiltersButton" class="button button--compact" type="button" data-i18n="modrinth.resetFilters">Reset filters</button>
+                </div>
+              </div>
+              <div id="modrinthFilterFields" class="catalog-filter-fields"></div>
+              <div id="modrinthFilterGroups" class="catalog-filter-groups"></div>
+            </section>
+
+            <div id="modrinthStatus" class="form-note hidden"></div>
+            <div id="modrinthResults" class="catalog-results"></div>
+            <nav id="modrinthPagination" class="catalog-pagination hidden" aria-label="Modrinth pages"></nav>
+            <div id="modrinthEmpty" class="empty-state catalog-empty hidden">
+              <div class="empty-state__icon">◇</div>
+              <h3 data-i18n="modrinth.emptyTitle">Nothing found</h3>
+              <p data-i18n="modrinth.emptyText">Try another query or content type.</p>
+            </div>
+          </section>
+        </div>
+
+      </section>
+
+      <aside class="right-rail">
+        <section class="card side-card">
+          <div class="section-heading">
+            <span data-i18n="account.title">Account manager</span>
+            <span class="section-heading__line"></span>
+          </div>
+          <div id="accountCard"></div>
+          <select id="accountSelect" class="select"></select>
+          <div class="account-card-actions">
+            <button class="button button--compact" data-command="account-manager" data-i18n="account.manage">Manage accounts</button>
+            <button class="button button--compact" data-command="refresh-accounts" data-i18n="account.refreshList">Refresh</button>
+          </div>
+        </section>
+
+        <section class="card side-card">
+          <div class="section-heading">
+            <span data-i18n="launch.title">Launch settings</span>
+            <span class="section-heading__line"></span>
+          </div>
+          <dl class="summary-list" id="javaSummary"></dl>
+          <button class="button button--compact" data-command="launch-settings" data-i18n="launch.change">Change settings</button>
+        </section>
+
+        <section class="card side-card">
+          <div class="section-heading">
+            <span data-i18n="instanceTools.title">Selected instance</span>
+            <span class="section-heading__line"></span>
+          </div>
+          <button class="button button--compact" data-command="instance-window" data-i18n="instanceTools.window">Instance window</button>
+          <button class="button button--compact" data-command="open-folder" data-i18n="instanceTools.folder">Instance folder</button>
+          <button class="button button--compact button--danger-soft" data-command="delete-selected-instance" data-i18n="instanceTools.delete">Delete</button>
+        </section>
+      </aside>
+    </main>
+
+    <footer class="status-bar">
+      <div class="status-bar__state">
+        <span id="statusDot" class="status-dot"></span>
+        <span id="statusText" data-i18n="status.ready">Ready.</span>
+      </div>
+      <div class="status-progress">
+        <div id="progressBar" class="status-progress__fill"></div>
+      </div>
+      <button class="status-bar__details" data-command="toggle-log" data-i18n="status.details">Details</button>
+    </footer>
+
+    <section id="logDrawer" class="log-drawer" aria-hidden="true">
+      <header class="log-drawer__header">
+        <strong data-i18n="log.title">Launcher log</strong>
+        <div>
+          <button class="icon-button" data-command="open-log" title="Open launcher.log">↗</button>
+          <button class="icon-button" data-command="toggle-log" title="Close">×</button>
+        </div>
+      </header>
+      <pre id="logOutput" class="log-output"></pre>
+    </section>
+
+    <div id="contextMenu" class="context-menu hidden" role="menu">
+      <button data-context-action="play" data-i18n="actions.play">Play</button>
+      <button data-context-action="folder" data-i18n="instanceTools.folder">Instance folder</button>
+      <button data-context-action="window" data-i18n="instanceTools.window">Instance window</button>
+      <div class="context-menu__separator"></div>
+      <button data-context-action="icon" data-i18n="instanceTools.icon">Choose icon</button>
+    </div>
+
+
+
+    <div id="iconPickerBackdrop" class="modal-backdrop hidden" aria-hidden="true">
+      <section id="iconPickerDialog" class="modal-card icon-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="iconPickerTitle">
+        <header class="modal-card__header">
+          <div>
+            <div class="eyebrow" data-i18n="iconPicker.eyebrow">Instance icon</div>
+            <h2 id="iconPickerTitle" data-i18n="iconPicker.title">Choose icon</h2>
+            <p id="iconPickerSubtitle" class="modal-subtitle"></p>
+          </div>
+          <button id="iconPickerClose" class="icon-button" type="button" aria-label="Close">×</button>
+        </header>
+
+        <div class="icon-picker__body">
+          <div class="icon-picker__toolbar">
+            <label class="icon-picker__search">
+              <span data-i18n="iconPicker.search">Search</span>
+              <input id="iconPickerSearch" class="text-input" type="search" autocomplete="off" placeholder="vanilla, forge, nether...">
+            </label>
+            <button id="iconPickerClear" class="button button--compact" type="button" data-i18n="iconPicker.clear">Clear</button>
+          </div>
+
+          <div id="iconPickerCategories" class="icon-picker__categories"></div>
+          <div id="iconPickerGrid" class="icon-picker__grid"></div>
+          <div id="iconPickerEmpty" class="form-note hidden" data-i18n="iconPicker.empty">No icons found.</div>
+
+          <footer class="modal-card__footer icon-picker__footer">
+            <span id="iconPickerSelectedLabel" class="muted"></span>
+            <span class="modal-card__footer-spacer"></span>
+            <button id="iconPickerReset" class="button button--compact" type="button" data-i18n="iconPicker.reset">Reset icon</button>
+            <button id="iconPickerCancel" class="button button--compact button--secondary-inline" type="button" data-i18n="editor.cancel">Cancel</button>
+          </footer>
+        </div>
+      </section>
+    </div>
+
+
+    <div id="instanceEditorBackdrop" class="modal-backdrop hidden" aria-hidden="true">
+      <section id="instanceEditor" class="modal-card" role="dialog" aria-modal="true" aria-labelledby="instanceEditorTitle">
+        <header class="modal-card__header">
+          <div>
+            <div class="eyebrow" data-i18n="editor.eyebrow">Instance manager</div>
+            <h2 id="instanceEditorTitle" data-i18n="editor.createTitle">Create instance</h2>
+          </div>
+          <button id="instanceEditorClose" class="icon-button" type="button" aria-label="Close">×</button>
+        </header>
+
+        <form id="instanceEditorForm" class="instance-form instance-form--editor">
+          <input id="instanceEditorId" type="hidden">
+
+          <label class="form-field form-field--wide">
+            <span data-i18n="editor.name">Name</span>
+            <input id="instanceNameInput" class="text-input" type="text" maxlength="32" autocomplete="off" required>
+          </label>
+
+          <label class="form-field">
+            <span data-i18n="editor.minecraft">Minecraft version</span>
+            <div class="input-action-row">
+              <input
+                id="instanceMinecraftInput"
+                class="text-input"
+                type="text"
+               
+                maxlength="40"
+                autocomplete="off"
+                required
+              >
+              <button
+                id="loadMinecraftVersionsButton"
+                class="icon-button input-action-row__button"
+                type="button"
+                data-i18n-title="editor.loadVersions"
+                title="Load versions"
+              >↻</button>
+            </div>
+            <small id="minecraftVersionsNote" class="form-help"></small>
+          </label>
+
+          <label class="form-field">
+            <span data-i18n="editor.versionType">Version type</span>
+            <select id="instanceVersionTypeSelect" class="select">
+              <option value="release">Release</option>
+              <option value="snapshot">Snapshot</option>
+            </select>
+          </label>
+
+          <label class="form-field">
+            <span data-i18n="editor.loader">Mod loader</span>
+            <select id="instanceLoaderSelect" class="select">
+              <option value="vanilla">Vanilla</option>
+              <option value="fabric">Fabric</option>
+              <option value="forge">Forge</option>
+              <option value="quilt">Quilt</option>
+              <option value="neoforge">NeoForge</option>
+            </select>
+          </label>
+
+          <label class="form-field">
+            <span data-i18n="editor.loaderVersion">Loader version</span>
+            <div class="input-action-row">
+              <input
+                id="instanceLoaderVersionInput"
+                class="text-input"
+                type="text"
+               
+                maxlength="80"
+                autocomplete="off"
+              >
+              <button
+                id="loadLoaderVersionsButton"
+                class="icon-button input-action-row__button"
+                type="button"
+                data-i18n-title="editor.loadVersions"
+                title="Load versions"
+              >↻</button>
+            </div>
+            <small id="loaderVersionsNote" class="form-help"></small>
+          </label>
+
+          <label class="form-field">
+            <span data-i18n="editor.javaPreset">Java preset</span>
+            <select id="instanceJavaPresetSelect" class="select">
+              <option value="auto">Auto</option>
+              <option value="global">Global</option>
+              <option value="java8">Java 8</option>
+              <option value="java16">Java 16</option>
+              <option value="java17">Java 17</option>
+              <option value="java21">Java 21</option>
+              <option value="java25">Java 25</option>
+              <option value="manual">Manual</option>
+            </select>
+          </label>
+
+          <label id="instanceJavaPathField" class="form-field">
+            <span data-i18n="editor.javaPath">Java executable</span>
+            <input id="instanceJavaPathInput" class="text-input" type="text" autocomplete="off">
+          </label>
+
+          <div id="instanceLockedNote" class="form-note form-field--wide hidden" data-i18n="editor.lockedNote">
+            Official instance parameters are protected. Only the Java preset can be changed here.
+          </div>
+
+          <div id="instanceEditorError" class="form-error form-field--wide hidden"></div>
+
+          <label id="deleteFilesRow" class="check-row form-field--wide hidden">
+            <input id="deleteInstanceFiles" type="checkbox">
+            <span data-i18n="editor.deleteFiles">Also delete instance files from disk</span>
+          </label>
+
+          <footer class="modal-card__footer form-field--wide">
+            <button id="deleteInstanceButton" class="button button--danger button--compact hidden" type="button" data-i18n="editor.delete">Delete</button>
+            <span class="modal-card__footer-spacer"></span>
+            <button id="instanceEditorCancel" class="button button--compact button--secondary-inline" type="button" data-i18n="editor.cancel">Cancel</button>
+            <button id="instanceEditorSave" class="button button--primary button--compact button--secondary-inline" type="submit" data-i18n="editor.save">Save</button>
+          </footer>
+        </form>
+      </section>
+    </div>
+
+
+
+
+    <div id="instanceWindowBackdrop" class="modal-backdrop hidden" aria-hidden="true">
+      <section id="instanceWindow" class="modal-card instance-window" role="dialog" aria-modal="true" aria-labelledby="instanceWindowTitle">
+        <header class="modal-card__header">
+          <div>
+            <div class="eyebrow" data-i18n="instanceWindow.eyebrow">Instance window</div>
+            <h2 id="instanceWindowTitle">—</h2>
+            <p id="instanceWindowSubtitle" class="modal-subtitle"></p>
+          </div>
+          <button id="instanceWindowClose" class="icon-button" type="button" aria-label="Close">×</button>
+        </header>
+
+        <div class="instance-window__tabs" role="tablist">
+          <button class="instance-window__tab is-active" type="button" data-instance-window-tab="overview" data-i18n="instanceWindow.overview">Overview</button>
+          <button class="instance-window__tab" type="button" data-instance-window-tab="folders" data-i18n="instanceWindow.folders">Folders</button>
+          <button class="instance-window__tab" type="button" data-instance-window-tab="settings" data-i18n="instanceWindow.settings">Settings</button>
+        </div>
+
+        <div class="instance-window__body">
+          <section class="instance-window__panel is-active" data-instance-window-panel="overview">
+            <div class="instance-window__summary" id="instanceWindowSummary"></div>
+            <div id="officialUpdateNotice" class="official-update-notice hidden"></div>
+            <div id="modrinthModpackUpdateNotice" class="official-update-notice modrinth-modpack-update hidden"></div>
+            <div class="instance-window__actions instance-window__actions--main">
+              <button class="button button--primary button--compact" data-instance-window-action="play" data-i18n="actions.play">Play</button>
+              <button class="button button--accent-soft button--compact hidden" id="officialUpdateButton" data-instance-window-action="update" data-i18n="instanceWindow.updateOfficial">Update instance</button>
+              <button class="button button--compact hidden" id="modrinthModpackCheckButton" data-instance-window-action="modrinth-modpack-check" data-i18n="modrinthModpack.check">Check modpack</button>
+              <button class="button button--accent-soft button--compact hidden" id="modrinthModpackUpdateButton" data-instance-window-action="modrinth-modpack-update" data-i18n="modrinthModpack.update">Update modpack</button>
+              <button class="button button--danger-soft button--compact" data-instance-window-action="stop" data-i18n="actions.stop">Stop</button>
+              <button class="button button--compact" data-instance-window-action="folder" data-i18n="instanceTools.folder">Instance folder</button>
+            </div>
+            <div id="forgeToolsRow" class="forge-tools-row hidden">
+              <button class="button button--compact" data-instance-window-action="forge-manual" data-i18n="forge.manual">Manual Forge Installer</button>
+              <button class="button button--compact" data-instance-window-action="forge-repair" data-i18n="forge.repair">Repair</button>
+              <button class="button button--compact" data-instance-window-action="forge-check" data-i18n="forge.check">Check Forge</button>
+            </div>
+          </section>
+
+          <section class="instance-window__panel" data-instance-window-panel="folders">
+            <p class="muted" data-i18n="instanceWindow.foldersHint">Preview and manage useful folders of the selected instance.</p>
+            <div class="folder-subtabs" id="folderSubtabs"></div>
+            <div class="folder-panel-toolbar">
+              <div>
+                <strong id="folderPanelTitle">mods</strong>
+                <p id="folderPanelPath" class="muted"></p>
+              </div>
+              <div class="mods-toolbar__actions">
+                <button class="button button--compact" id="refreshFolderButton" type="button" data-i18n="instanceWindow.refreshMods">Refresh</button>
+                <button class="button button--compact" id="openCurrentFolderButton" type="button" data-i18n="instanceWindow.openFolder">Open folder</button>
+              </div>
+            </div>
+            <div id="folderFileList" class="mods-list"></div>
+            <pre id="instanceConsoleOutput" class="instance-console-output hidden" tabindex="0" aria-label="Instance console"></pre>
+            <div id="folderFileEmpty" class="form-note hidden" data-i18n="instanceWindow.emptyFolder">Folder is empty.</div>
+          </section>
+
+          <section class="instance-window__panel" data-instance-window-panel="settings">
+            <form id="instanceWindowSettingsForm" class="instance-form instance-form--embedded">
+              <label class="form-field form-field--wide">
+                <span data-i18n="editor.name">Name</span>
+                <input id="windowSettingsName" class="text-input" type="text" maxlength="32" autocomplete="off" required>
+              </label>
+              <label class="form-field">
+                <span data-i18n="editor.minecraft">Minecraft version</span>
+                <div class="input-action-row">
+                  <input id="windowSettingsMinecraft" class="text-input" type="text" maxlength="40" autocomplete="off" required>
+                  <button id="windowSettingsLoadMinecraftVersionsButton" class="icon-button input-action-row__button" type="button" data-i18n-title="editor.loadVersions" title="Load versions">↻</button>
+                </div>
+                <small id="windowSettingsMinecraftVersionsNote" class="form-help"></small>
+              </label>
+              <label class="form-field">
+                <span data-i18n="editor.versionType">Version type</span>
+                <select id="windowSettingsVersionType" class="select">
+                  <option value="release">Release</option>
+                  <option value="snapshot">Snapshot</option>
+                </select>
+              </label>
+              <label class="form-field">
+                <span data-i18n="editor.loader">Mod loader</span>
+                <select id="windowSettingsLoader" class="select">
+                  <option value="vanilla">Vanilla</option>
+                  <option value="fabric">Fabric</option>
+                  <option value="forge">Forge</option>
+                  <option value="quilt">Quilt</option>
+                  <option value="neoforge">NeoForge</option>
+                </select>
+              </label>
+              <label class="form-field">
+                <span data-i18n="editor.loaderVersion">Loader version</span>
+                <div class="input-action-row">
+                  <input id="windowSettingsLoaderVersion" class="text-input" type="text" maxlength="80" autocomplete="off">
+                  <button id="windowSettingsLoadLoaderVersionsButton" class="icon-button input-action-row__button" type="button" data-i18n-title="editor.loadVersions" title="Load versions">↻</button>
+                </div>
+                <small id="windowSettingsLoaderVersionsNote" class="form-help"></small>
+              </label>
+              <label class="form-field">
+                <span data-i18n="editor.javaPreset">Java preset</span>
+                <select id="windowSettingsJavaPreset" class="select">
+                  <option value="auto">Auto</option>
+                  <option value="global">Global</option>
+                  <option value="java8">Java 8</option>
+                  <option value="java16">Java 16</option>
+                  <option value="java17">Java 17</option>
+                  <option value="java21">Java 21</option>
+                  <option value="java25">Java 25</option>
+                  <option value="manual">Manual</option>
+                </select>
+              </label>
+              <label id="windowSettingsJavaPathField" class="form-field">
+                <span data-i18n="editor.javaPath">Java executable</span>
+                <input id="windowSettingsJavaPath" class="text-input" type="text" autocomplete="off">
+              </label>
+              <div id="windowSettingsLockedNote" class="form-note form-field--wide hidden" data-i18n="editor.lockedNote">
+                Official instance parameters are protected. Only the Java preset can be changed here.
+              </div>
+              <div id="windowSettingsError" class="form-error form-field--wide hidden"></div>
+              <footer class="modal-card__footer form-field--wide instance-settings-footer">
+                <button id="windowSettingsSave" class="button button--primary button--compact" type="submit" data-i18n="editor.save">Save</button>
+                <button class="button button--danger button--compact" type="button" data-instance-window-action="delete" data-i18n="instanceTools.delete">Delete</button>
+              </footer>
+            </form>
+          </section>
+        </div>
+      </section>
+    </div>
+
+
+
+    <div id="updateCenterBackdrop" class="modal-backdrop hidden" aria-hidden="true">
+      <section id="updateCenterDialog" class="modal-card update-center-dialog" role="dialog" aria-modal="true" aria-labelledby="updateCenterTitle">
+        <header class="modal-card__header">
+          <div>
+            <div class="eyebrow" data-i18n="updates.eyebrow">Updates</div>
+            <h2 id="updateCenterTitle" data-i18n="updates.centerTitle">Update center</h2>
+          </div>
+          <button id="updateCenterClose" class="icon-button" type="button" aria-label="Close">×</button>
+        </header>
+
+        <div class="update-center-body">
+          <p class="modal-subtitle" data-i18n="updates.centerHint">
+            Check launcher and official instance updates separately.
+          </p>
+
+          <div id="updateCenterStatus" class="form-note hidden"></div>
+
+          <div class="update-center-grid">
+            <article class="update-card" id="launcherUpdateCard">
+              <div class="update-card__top">
+                <div>
+                  <div class="update-card__label" data-i18n="updates.launcher">Launcher</div>
+                  <div class="update-card__title" id="launcherUpdateTitle">—</div>
+                </div>
+                <span class="update-card__badge" id="launcherUpdateBadge">—</span>
+              </div>
+              <dl class="update-card__details" id="launcherUpdateDetails"></dl>
+              <button id="updateLauncherButton" class="button button--primary button--compact hidden" type="button" data-i18n="updates.updateLauncher">Update launcher</button>
+            </article>
+
+            <article class="update-card" id="officialUpdateCard">
+              <div class="update-card__top">
+                <div>
+                  <div class="update-card__label" data-i18n="updates.official">Official instance</div>
+                  <div class="update-card__title" id="officialUpdateTitle">—</div>
+                </div>
+                <span class="update-card__badge" id="officialUpdateBadge">—</span>
+              </div>
+              <dl class="update-card__details" id="officialUpdateDetails"></dl>
+              <button id="updateOfficialButton" class="button button--primary button--compact hidden" type="button" data-i18n="updates.updateOfficial">Update official instance</button>
+            </article>
+          </div>
+
+          <footer class="modal-card__footer update-center-footer">
+            <button id="updateCenterRefresh" class="button button--compact" type="button" data-i18n="updates.refresh">Check again</button>
+            <span class="modal-card__footer-spacer"></span>
+            <button id="updateCenterCancel" class="button button--compact button--secondary-inline" type="button" data-i18n="editor.cancel">Cancel</button>
+          </footer>
+        </div>
+      </section>
+    </div>
+
+    <div id="aboutBackdrop" class="modal-backdrop hidden" aria-hidden="true">
+      <section id="aboutDialog" class="modal-card about-dialog" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+        <header class="modal-card__header">
+          <div>
+            <div class="eyebrow" data-i18n="about.eyebrow">About</div>
+            <h2 id="aboutTitle" data-i18n="about.title">StoneLight Launcher</h2>
+          </div>
+          <button id="aboutClose" class="icon-button" type="button" aria-label="Close">×</button>
+        </header>
+
+        <div class="about-body">
+          <div class="about-logo">
+            <img src="assets/stonelight_logo_128.png" alt="" aria-hidden="true">
+          </div>
+          <div class="about-info">
+            <p class="about-version"><strong id="aboutVersion">StoneLight Launcher</strong></p>
+            <p class="modal-subtitle" data-i18n="about.description">
+              Launcher for the StoneLight community with custom instances, accounts, official pack updates and Modrinth integration.
+            </p>
+            <div class="about-feature-grid">
+              <div class="summary-card">
+                <div class="summary-card__label" data-i18n="about.modrinth">Modrinth</div>
+                <div class="summary-card__value" data-i18n="about.modrinthStatus">Search, install and modpack updates</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-card__label" data-i18n="about.official">Official pack</div>
+                <div class="summary-card__value" data-i18n="about.officialStatus">Separate StoneLight update flow</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-card__label" data-i18n="about.curseforge">CurseForge</div>
+                <div class="summary-card__value" data-i18n="about.curseforgeStatus">Disabled due to API policy</div>
+              </div>
+            </div>
+            <p class="form-help" data-i18n="about.note">
+              Some platform integrations depend on external API policies and may be unavailable.
+            </p>
+          </div>
+        </div>
+
+        <footer class="modal-card__footer about-footer">
+          <button id="aboutGithubButton" class="button button--compact" type="button" data-command="github" data-i18n="menu.github">GitHub</button>
+          <button id="aboutSiteButton" class="button button--compact" type="button" data-command="community-site" data-i18n="menu.communitySite">Community site</button>
+          <span class="modal-card__footer-spacer"></span>
+          <button id="aboutCloseFooter" class="button button--compact button--secondary-inline" type="button" data-i18n="editor.cancel">Close</button>
+        </footer>
+      </section>
+    </div>
+
+    <div id="launchSettingsBackdrop" class="modal-backdrop hidden" aria-hidden="true">
+      <section id="launchSettingsDialog" class="modal-card launch-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="launchSettingsTitle">
+        <header class="modal-card__header">
+          <div>
+            <div class="eyebrow" data-i18n="launch.eyebrow">Global</div>
+            <h2 id="launchSettingsTitle" data-i18n="launch.title">Global launch settings</h2>
+          </div>
+          <button id="launchSettingsClose" class="icon-button" type="button" aria-label="Close">×</button>
+        </header>
+
+        <form id="launchSettingsForm" class="instance-form launch-settings-form">
+          <div class="form-section-title form-field--wide" data-i18n="launch.sectionMemory">Memory</div>
+
+          <label class="form-field">
+            <span data-i18n="launch.ramMin">Minimum RAM, MB</span>
+            <input id="globalRamMinInput" class="text-input" type="number" min="256" max="65536" step="128" autocomplete="off">
+          </label>
+
+          <label class="form-field">
+            <span data-i18n="launch.ramMax">Maximum RAM, MB</span>
+            <input id="globalRamMaxInput" class="text-input" type="number" min="1024" max="131072" step="128" autocomplete="off">
+          </label>
+
+          <div class="form-section-title form-field--wide" data-i18n="launch.sectionWindow">Game window</div>
+
+          <label class="form-field">
+            <span data-i18n="launch.windowMode">Window mode</span>
+            <select id="globalWindowModeSelect" class="select">
+              <option value="unchanged" data-i18n="launch.unchanged">Do not change</option>
+              <option value="windowed" data-i18n="launch.windowed">Windowed</option>
+              <option value="fullscreen" data-i18n="launch.fullscreen">Fullscreen</option>
+            </select>
+          </label>
+
+          <label class="form-field">
+            <span data-i18n="launch.windowWidth">Window width</span>
+            <input id="globalWindowWidthInput" class="text-input" type="number" min="320" max="7680" step="1" autocomplete="off" placeholder="1280">
+          </label>
+
+          <label class="form-field">
+            <span data-i18n="launch.windowHeight">Window height</span>
+            <input id="globalWindowHeightInput" class="text-input" type="number" min="240" max="4320" step="1" autocomplete="off" placeholder="720">
+          </label>
+
+          <div class="form-note form-field--wide" data-i18n="launch.emptyNote">
+            Empty window size means the launcher will not pass a custom resolution.
+          </div>
+
+          <div class="form-section-title form-field--wide" data-i18n="launch.sectionGameOptions">Game options</div>
+
+          <label class="form-field form-field--wide">
+            <span data-i18n="launch.graphicsProfile">Graphics profile</span>
+            <select id="globalGraphicsProfileSelect" class="select">
+              <option value="unchanged" data-i18n="launch.unchanged">Do not change</option>
+              <option value="performance" data-i18n="launch.profilePerformance">Performance</option>
+              <option value="balanced" data-i18n="launch.profileBalanced">Balanced</option>
+              <option value="quality" data-i18n="launch.profileQuality">Quality</option>
+              <option value="custom" data-i18n="launch.profileCustom">Custom</option>
+            </select>
+          </label>
+
+          <label class="form-field">
+            <span data-i18n="launch.renderDistance">Render distance</span>
+            <input id="globalRenderDistanceInput" class="text-input" type="number" min="2" max="64" step="1" autocomplete="off" placeholder="12">
+          </label>
+
+          <label class="form-field">
+            <span data-i18n="launch.simulationDistance">Simulation distance</span>
+            <input id="globalSimulationDistanceInput" class="text-input" type="number" min="2" max="32" step="1" autocomplete="off" placeholder="8">
+          </label>
+
+          <label class="form-field">
+            <span data-i18n="launch.fpsLimit">FPS limit</span>
+            <input id="globalFpsLimitInput" class="text-input" type="number" min="10" max="1000" step="1" autocomplete="off" placeholder="120">
+          </label>
+
+          <label class="form-field">
+            <span data-i18n="launch.vsync">VSync</span>
+            <select id="globalVsyncSelect" class="select">
+              <option value="unchanged" data-i18n="launch.unchanged">Do not change</option>
+              <option value="on" data-i18n="launch.enabled">Enabled</option>
+              <option value="off" data-i18n="launch.disabled">Disabled</option>
+            </select>
+          </label>
+
+          <label class="form-field">
+            <span data-i18n="launch.graphics">Graphics</span>
+            <select id="globalGraphicsSelect" class="select">
+              <option value="unchanged" data-i18n="launch.unchanged">Do not change</option>
+              <option value="fast">Fast</option>
+              <option value="fancy">Fancy</option>
+              <option value="fabulous">Fabulous</option>
+            </select>
+          </label>
+
+          <label class="form-field">
+            <span data-i18n="launch.particles">Particles</span>
+            <select id="globalParticlesSelect" class="select">
+              <option value="unchanged" data-i18n="launch.unchanged">Do not change</option>
+              <option value="all" data-i18n="launch.particlesAll">All</option>
+              <option value="decreased" data-i18n="launch.particlesDecreased">Decreased</option>
+              <option value="minimal" data-i18n="launch.particlesMinimal">Minimal</option>
+            </select>
+          </label>
+
+          <div class="form-note form-field--wide" data-i18n="launch.gameOptionsNote">
+            Empty fields and “Do not change” preserve the player's in-game settings.
+          </div>
+
+          <div id="launchSettingsError" class="form-error form-field--wide hidden"></div>
+
+          <footer class="modal-card__footer form-field--wide launch-settings-footer">
+            <button id="launchSettingsReset" class="button button--compact" type="button" data-i18n="launch.reset">Reset</button>
+            <span class="modal-card__footer-spacer"></span>
+            <button class="button button--compact button--secondary-inline" id="launchSettingsCancel" type="button" data-i18n="editor.cancel">Cancel</button>
+            <button class="button button--primary button--compact" id="launchSettingsSave" type="submit" data-i18n="editor.save">Save</button>
+          </footer>
+        </form>
+      </section>
+    </div>
+
+        <div id="accountManagerBackdrop" class="modal-backdrop hidden" aria-hidden="true">
+      <section id="accountManager" class="modal-card account-manager" role="dialog" aria-modal="true" aria-labelledby="accountManagerTitle">
+        <header class="modal-card__header">
+          <div>
+            <div class="eyebrow" data-i18n="account.eyebrow">Account manager</div>
+            <h2 id="accountManagerTitle" data-i18n="account.managerTitle">Accounts</h2>
+          </div>
+          <button id="accountManagerClose" class="icon-button" type="button" aria-label="Close">×</button>
+        </header>
+
+        <div class="account-manager__body">
+          <section class="account-manager__panel">
+            <div class="section-heading">
+              <span data-i18n="account.saved">Saved accounts</span>
+              <span class="section-heading__line"></span>
+            </div>
+            <div id="accountManagerList" class="account-manager__list"></div>
+            <div id="accountManagerEmpty" class="form-note hidden" data-i18n="account.noSaved">
+              No accounts yet.
+            </div>
+          </section>
+
+          <section class="account-manager__panel">
+            <div class="section-heading">
+              <span data-i18n="account.actions">Actions</span>
+              <span class="section-heading__line"></span>
+            </div>
+
+            <button id="addMicrosoftAccountButton" class="button button--primary button--compact" type="button" data-i18n="account.addMicrosoft">
+              Add Microsoft account
+            </button>
+            <p class="form-help" data-i18n="account.microsoftNativeNote">
+              Microsoft login opens in your browser and returns to this window automatically.
+            </p>
+
+            <label class="form-field">
+              <span data-i18n="account.offlineName">Offline nickname</span>
+              <input id="offlineAccountNameInput" class="text-input" type="text" maxlength="16" autocomplete="off" placeholder="PlayerName">
+            </label>
+            <button id="addOfflineAccountButton" class="button button--compact" type="button" data-i18n="account.addOffline">
+              Add offline account
+            </button>
+            <p id="offlineAccountNote" class="form-help"></p>
+
+            <div id="accountManagerError" class="form-error hidden"></div>
+
+            <footer class="modal-card__footer">
+              <button id="deleteAccountButton" class="button button--danger button--compact" type="button" data-i18n="account.delete">
+                Delete account
+              </button>
+              <button id="refreshAccountButton" class="button button--compact" type="button" data-i18n="account.refresh">
+                Refresh license
+              </button>
+            </footer>
+          </section>
+        </div>
+      </section>
+    </div>
+
+    <div id="versionPickerBackdrop" class="modal-backdrop hidden" aria-hidden="true">
+      <section id="versionPicker" class="modal-card version-picker" role="dialog" aria-modal="true" aria-labelledby="versionPickerTitle">
+        <header class="modal-card__header">
+          <div>
+            <div class="eyebrow" id="versionPickerEyebrow">Versions</div>
+            <h2 id="versionPickerTitle" data-i18n="picker.title">Choose version</h2>
+          </div>
+          <button id="versionPickerClose" class="icon-button" type="button" aria-label="Close">×</button>
+        </header>
+        <div class="version-picker__body">
+          <input id="versionPickerFilter" class="text-input" type="text" autocomplete="off" data-i18n-placeholder="picker.search" placeholder="Search versions">
+          <div id="versionPickerInfo" class="form-help"></div>
+          <div id="versionPickerList" class="version-picker__list"></div>
+        </div>
+      </section>
+    </div>
+
+    
+    <div id="screenshotPreviewBackdrop" class="modal-backdrop hidden" aria-hidden="true">
+      <section class="modal-card screenshot-preview" role="dialog" aria-modal="true" aria-labelledby="screenshotPreviewTitle">
+        <header class="modal-card__header">
+          <div>
+            <div class="eyebrow" data-i18n="screenshots.preview">Screenshot preview</div>
+            <h2 id="screenshotPreviewTitle">—</h2>
+          </div>
+          <button id="screenshotPreviewClose" class="icon-button" type="button" aria-label="Close">×</button>
+        </header>
+        <div class="screenshot-preview__body">
+          <button id="screenshotPreviewPrev" class="screenshot-preview__nav screenshot-preview__nav--prev" type="button" aria-label="Previous screenshot">‹</button>
+          <img id="screenshotPreviewImage" alt="">
+          <button id="screenshotPreviewNext" class="screenshot-preview__nav screenshot-preview__nav--next" type="button" aria-label="Next screenshot">›</button>
+        </div>
+      </section>
+    </div>
+
+    <div id="toastHost" class="toast-host" aria-live="polite"></div>
+  </div>
+
+  <script src="scripts/i18n.js?v=0.6.66"></script>
+  <script src="scripts/state.js?v=0.6.66"></script>
+  <script src="scripts/api.js?v=0.6.66"></script>
+  <script src="scripts/app.js?v=0.6.66"></script>
+</body>
+</html>
