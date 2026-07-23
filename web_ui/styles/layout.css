@@ -1488,7 +1488,7 @@
 }
 
 
-/* v0.6.67: keep the instance window stable and avoid whole-window scroll jitter. */
+/* v0.6.68: keep the instance window stable and avoid whole-window scroll jitter. */
 .instance-window {
   max-height: min(860px, calc(100vh - 38px));
   overflow: hidden;
@@ -1548,7 +1548,7 @@
 }
 
 
-/* v0.6.67: fixed folder-preview scrolling. */
+/* v0.6.68: fixed folder-preview scrolling. */
 .instance-window__body {
   min-height: 0;
   flex: 1 1 auto;
@@ -1636,7 +1636,7 @@
 }
 
 
-/* v0.6.67: stronger file-list scroll containment. */
+/* v0.6.68: stronger file-list scroll containment. */
 .instance-window {
   height: min(860px, calc(100vh - 38px));
   max-height: calc(100vh - 38px);
@@ -1717,7 +1717,7 @@
 }
 
 
-/* v0.6.67: compact instance-window controls and fixed screenshot scrolling. */
+/* v0.6.68: compact instance-window controls and fixed screenshot scrolling. */
 .instance-window__panel[data-instance-window-panel="overview"].is-active {
   align-content: start;
 }
@@ -1864,7 +1864,7 @@
 }
 
 
-/* v0.6.67: compact cards, embedded settings pickers and folder-overlap fix. */
+/* v0.6.68: compact cards, embedded settings pickers and folder-overlap fix. */
 .instance-window__summary {
   gap: 8px;
   grid-auto-rows: minmax(70px, auto);
@@ -2003,7 +2003,7 @@
 }
 
 
-/* v0.6.67: folder subtab height, toolbar overlap and settings footer hotfix. */
+/* v0.6.68: folder subtab height, toolbar overlap and settings footer hotfix. */
 .instance-window__panel[data-instance-window-panel="folders"].is-active {
   display: grid;
   grid-template-rows: 40px 58px minmax(0, 1fr);
@@ -2189,7 +2189,7 @@
 }
 
 
-/* v0.6.67: logs subtab is a selectable console, not a folder file list. */
+/* v0.6.68: logs subtab is a selectable console, not a folder file list. */
 .instance-console-output {
   grid-area: files;
   min-height: 0;
@@ -2222,7 +2222,7 @@
 }
 
 
-/* v0.6.67: official instance update notice. */
+/* v0.6.68: official instance update notice. */
 .button--accent-soft {
   color: var(--accent-text);
   background: color-mix(in srgb, var(--accent) 72%, var(--button));
@@ -2275,7 +2275,7 @@
 }
 
 
-/* v0.6.67: Crafthead account avatars. */
+/* v0.6.68: Crafthead account avatars. */
 .account-avatar {
   overflow: hidden;
   padding: 0;
@@ -2296,7 +2296,7 @@
 }
 
 
-/* v0.6.67: global launch settings dialog. */
+/* v0.6.68: global launch settings dialog. */
 .launch-settings-dialog {
   width: min(760px, 100%);
 }
@@ -2335,7 +2335,7 @@
 }
 
 
-/* v0.6.67: update center modal. */
+/* v0.6.68: update center modal. */
 .update-center-dialog {
   width: min(780px, 100%);
 }
@@ -2443,7 +2443,7 @@
 }
 
 
-/* v0.6.67: align fields in the create/edit instance dialog. */
+/* v0.6.68: align fields in the create/edit instance dialog. */
 .instance-form--editor {
   gap: 14px 14px;
   align-items: start;
@@ -2537,7 +2537,7 @@
 }
 
 
-/* v0.6.67: align fields in the instance-window Settings tab. */
+/* v0.6.68: align fields in the instance-window Settings tab. */
 #instanceWindowSettingsForm.instance-form--embedded {
   gap: 14px 14px;
   align-items: start;
@@ -2626,7 +2626,7 @@
 }
 
 
-/* v0.6.67: instance icon pack and picker. */
+/* v0.6.68: instance icon pack and picker. */
 .instance-tile__icon--image {
   overflow: hidden;
   padding: 0;
@@ -2775,7 +2775,7 @@
 }
 
 
-/* v0.6.67: site-inspired depth, glass and gradient polish for launcher themes. */
+/* v0.6.68: site-inspired depth, glass and gradient polish for launcher themes. */
 .menu-bar {
   backdrop-filter: blur(16px);
 }
@@ -2874,7 +2874,7 @@ textarea,
 }
 
 
-/* v0.6.67: make StoneLight site-inspired Light/Dark visibly affect primary UI. */
+/* v0.6.68: make StoneLight site-inspired Light/Dark visibly affect primary UI. */
 html[data-theme="dark"] .app-shell,
 html[data-theme="light"] .app-shell {
   background:
@@ -2995,7 +2995,7 @@ html[data-theme="light"] .status-progress__fill {
 }
 
 
-/* v0.6.67: depth polish for Laconic, Laconic Light, Neon and Retro Future. */
+/* v0.6.68: depth polish for Laconic, Laconic Light, Neon and Retro Future. */
 html[data-theme="laconic"] .hero.card--strong,
 html[data-theme="laconic_light"] .hero.card--strong,
 html[data-theme="neon"] .hero.card--strong,
@@ -3175,7 +3175,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.67: Modrinth catalog stage 1. */
+/* v0.6.68: Modrinth catalog stage 1. */
 .catalog-panel {
   min-height: 100%;
   display: grid;
@@ -3383,7 +3383,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.67: keep normal folder rows compact when there are only a few files.
+/* v0.6.68: keep normal folder rows compact when there are only a few files.
    Applies to mods/resourcepacks/shaderpacks/config/saves only; screenshots/logs keep their own layouts. */
 #folderFileList[data-folder-key="mods"]:not(.screenshot-grid),
 #folderFileList[data-folder-key="resourcepacks"]:not(.screenshot-grid),
@@ -3425,7 +3425,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.67: make instance icons closer to Modrinth project icon scale. */
+/* v0.6.68: make instance icons closer to Modrinth project icon scale. */
 .instance-tile {
   min-height: 168px;
 }
@@ -3463,7 +3463,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.67: Modrinth result card height and clickable title polish. */
+/* v0.6.68: Modrinth result card height and clickable title polish. */
 .catalog-results {
   align-content: start;
   align-items: start;
@@ -3515,7 +3515,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.67: equalize Modrinth result cards without stretching rows to empty space.
+/* v0.6.68: equalize Modrinth result cards without stretching rows to empty space.
    Rows stay compact, but all cards inside a row keep the same visual height. */
 .catalog-results {
   align-content: start;
@@ -3549,7 +3549,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.67: Modrinth filter panel. */
+/* v0.6.68: Modrinth filter panel. */
 .catalog-filters {
   display: grid;
   gap: 12px;
@@ -3651,7 +3651,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.67: Modrinth version/snapshot filter polish. */
+/* v0.6.68: Modrinth version/snapshot filter polish. */
 .catalog-filters__actions {
   display: flex;
   flex-wrap: wrap;
@@ -3688,7 +3688,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.67: Modrinth search pagination. */
+/* v0.6.68: Modrinth search pagination. */
 .catalog-pagination {
   display: flex;
   justify-content: space-between;
@@ -3766,7 +3766,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.67: CurseForge catalog stage 1. */
+/* v0.6.68: CurseForge catalog stage 1. */
 .catalog-api-key {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 520px);
@@ -3812,7 +3812,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.67: Modrinth modpack update notice in instance window. */
+/* v0.6.68: Modrinth modpack update notice in instance window. */
 .modrinth-modpack-update {
   border-color: color-mix(in srgb, var(--accent) 28%, var(--line));
   background:
@@ -3821,7 +3821,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.67: refreshed top menu and About dialog. */
+/* v0.6.68: refreshed top menu and About dialog. */
 .about-dialog {
   width: min(860px, 100%);
 }
@@ -3896,10 +3896,10 @@ html[data-theme="laconic_light"] .tab.is-active {
   }
 }
 
-/* v0.6.67 about dialog hotfix: wider dialog and multi-line status cards. */
+/* v0.6.68 about dialog hotfix: wider dialog and multi-line status cards. */
 
 
-/* v0.6.67: compact hero without tagline. */
+/* v0.6.68: compact hero without tagline. */
 .hero__copy {
   align-self: center;
   display: grid;
@@ -3925,7 +3925,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.67: subtle update-available indicator. */
+/* v0.6.68: subtle update-available indicator. */
 [data-action="check_updates"],
 [data-command="check-updates"] {
   position: relative;

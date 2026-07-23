@@ -660,11 +660,58 @@ class LauncherCore:
         temp_destination.replace(destination)
         self.emit_log("Скачивание завершено.")
 
-    def official_manifest_path(self) -> Path:
+    def pack_manifest_path(self) -> Path:
+        return self.game_dir / ".stonelight_pack_manifest.json"
+
+    def legacy_official_manifest_path(self) -> Path:
         return self.game_dir / ".stonelight_official_manifest.json"
 
-    def official_manifest_data(self, archive_path: Path | None = None, mod_count: int | None = None) -> dict:
+    def official_manifest_path(self) -> Path:
+        # Backward-compatible alias for older code paths.
+        return self.pack_manifest_path()
+
+    def read_pack_manifest(self) -> dict:
+        for path in (self.pack_manifest_path(), self.legacy_official_manifest_path()):
+            if not path.exists():
+                continue
+
+            try:
+                return json.loads(path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                self.emit_log(f"Не удалось прочитать манифест сборки {path.name}: {exc}")
+
+        return {}
+
+    def count_installed_mod_jars(self) -> int:
+        mods_dir = self.game_dir / "mods"
+
+        if not mods_dir.exists():
+            return 0
+
+        try:
+            return len([
+                item for item in mods_dir.iterdir()
+                if item.is_file() and item.suffix.lower() == ".jar"
+            ])
+        except Exception:
+            return 0
+
+    def pack_manifest_data(
+        self,
+        archive_path: Path | None = None,
+        mod_count: int | None = None,
+        mode: str = "",
+    ) -> dict:
+        is_official = (
+            self.config.get("official")
+            or self.config.get("locked")
+            or self.config.get("instance_id") == "stonelight"
+        )
+
         data = {
+            "manifest_version": 2,
+            "pack_type": self.config.get("pack_type") or ("official_zip" if is_official else "custom_zip"),
+            "instance_id": self.config.get("instance_id", ""),
             "instance_name": self.config.get("instance_name", "StoneLight"),
             "minecraft_version": self.config.get("minecraft_version", ""),
             "loader": self.config.get("loader", ""),
@@ -673,35 +720,58 @@ class LauncherCore:
             "mods_zip_sha256": self.config.get("mods_zip_sha256", ""),
             "mods_release_repo": self.config.get("mods_release_repo", ""),
             "mods_release_tag": self.config.get("mods_release_tag", ""),
+            "install_mode": mode,
+            "installed_at": datetime.now(timezone.utc).isoformat(),
         }
+
         if archive_path:
-            data["last_archive"] = Path(archive_path).name
+            archive_path = Path(archive_path)
+            data["last_archive"] = archive_path.name
+
             try:
-                data["last_archive_sha256"] = self.sha256_file(Path(archive_path))
+                data["last_archive_sha256"] = self.sha256_file(archive_path)
             except Exception:
                 data["last_archive_sha256"] = ""
+
         if mod_count is not None:
             data["mod_count"] = int(mod_count)
+
         return data
 
-    def write_official_manifest(self, archive_path: Path | None = None, mod_count: int | None = None) -> None:
-        should_write = (
-            self.config.get("official")
-            or self.config.get("locked")
-            or self.config.get("instance_id") == "stonelight"
-            or self.config.get("install_modpack", False)
-        )
-        if not should_write:
+    def write_pack_manifest(
+        self,
+        archive_path: Path | None = None,
+        mod_count: int | None = None,
+        mode: str = "",
+    ) -> None:
+        if not self.config.get("install_modpack", False):
             return
+
         try:
-            manifest_path = self.official_manifest_path()
+            manifest_path = self.pack_manifest_path()
             manifest_path.write_text(
-                json.dumps(self.official_manifest_data(archive_path, mod_count), indent=2, ensure_ascii=False),
+                json.dumps(
+                    self.pack_manifest_data(archive_path, mod_count, mode),
+                    indent=2,
+                    ensure_ascii=False,
+                ),
                 encoding="utf-8",
             )
-            self.emit_log(f"Манифест официальной сборки обновлён: {manifest_path.name}")
+            self.emit_log(f"Манифест сборки обновлён: {manifest_path.name}")
         except Exception as exc:
-            self.emit_log(f"Не удалось записать манифест официальной сборки: {exc}")
+            self.emit_log(f"Не удалось записать манифест сборки: {exc}")
+
+    def official_manifest_data(self, archive_path: Path | None = None, mod_count: int | None = None) -> dict:
+        # Backward-compatible alias for older code paths.
+        return self.pack_manifest_data(archive_path, mod_count, mode="legacy")
+
+    def write_official_manifest(
+        self,
+        archive_path: Path | None = None,
+        mod_count: int | None = None,
+    ) -> None:
+        # Backward-compatible alias for older code paths.
+        self.write_pack_manifest(archive_path, mod_count, mode="legacy")
 
     def _github_release_api_url(self, repo: str, tag: str = "") -> str:
         repo = (repo or "").strip().strip("/")
@@ -899,76 +969,165 @@ class LauncherCore:
             + (f"\nПоследняя ошибка: {last_error}" if last_error else "")
         )
 
-    def extract_modpack_safely(self, archive_path: Path) -> int:
+    def extract_modpack_safely(self, archive_path: Path, clear_mods: bool = False) -> int:
         mods_dir = self.game_dir / "mods"
         temp_root = self.game_dir / "_mods_update_tmp"
         backup_dir = self.game_dir / "mods_backup_previous"
 
         if temp_root.exists():
             shutil.rmtree(temp_root)
+
         temp_root.mkdir(parents=True)
 
-        self.emit_status("Проверяю и распаковываю сборку...")
+        if clear_mods:
+            self.emit_status("Проверяю и переустанавливаю сборку модов...")
+        else:
+            self.emit_status("Проверяю и устанавливаю сборку модов без очистки пользовательских модов...")
+
         try:
             with zipfile.ZipFile(archive_path) as zf:
                 bad_file = zf.testzip()
+
                 if bad_file:
                     raise LauncherError(f"Архив модов повреждён: {bad_file}")
+
                 zf.extractall(temp_root)
 
             root_jars = list(temp_root.glob("*.jar"))
             nested_mods = temp_root / "mods"
+
             if not root_jars and nested_mods.exists() and list(nested_mods.glob("*.jar")):
                 source_dir = nested_mods
             else:
                 source_dir = temp_root
 
             jar_count = len(list(source_dir.glob("*.jar")))
+
             if jar_count == 0:
                 raise LauncherError("В архиве модов не найдено .jar-файлов.")
 
-            if backup_dir.exists():
-                shutil.rmtree(backup_dir)
-
-            if mods_dir.exists():
-                shutil.move(str(mods_dir), str(backup_dir))
-
             mods_dir.mkdir(parents=True, exist_ok=True)
+
+            if clear_mods:
+                if backup_dir.exists():
+                    shutil.rmtree(backup_dir)
+
+                if mods_dir.exists():
+                    shutil.move(str(mods_dir), str(backup_dir))
+
+                mods_dir.mkdir(parents=True, exist_ok=True)
 
             try:
                 for item in source_dir.iterdir():
                     target = mods_dir / item.name
+
+                    if target.exists():
+                        if target.is_dir():
+                            shutil.rmtree(target)
+                        else:
+                            target.unlink()
+
                     if item.is_dir():
                         shutil.copytree(item, target)
                     else:
                         shutil.copy2(item, target)
+
             except Exception:
-                if mods_dir.exists():
-                    shutil.rmtree(mods_dir)
-                if backup_dir.exists():
-                    shutil.move(str(backup_dir), str(mods_dir))
+                if clear_mods:
+                    if mods_dir.exists():
+                        shutil.rmtree(mods_dir)
+
+                    if backup_dir.exists():
+                        shutil.move(str(backup_dir), str(mods_dir))
+
                 raise
 
-            if not self.config.get("keep_mods_backup", True) and backup_dir.exists():
-                shutil.rmtree(backup_dir)
+            if clear_mods:
+                self.emit_log(
+                    f"Сборка модов переустановлена с очисткой папки mods. "
+                    f"Jar-файлов из архива: {jar_count}"
+                )
 
-            self.emit_log(f"Сборка модов установлена. Jar-файлов: {jar_count}")
+                if not self.config.get("keep_mods_backup", True) and backup_dir.exists():
+                    shutil.rmtree(backup_dir)
+            else:
+                self.emit_log(
+                    f"Сборка модов установлена поверх текущей папки mods. "
+                    f"Пользовательские моды с другими именами сохранены. "
+                    f"Jar-файлов из архива: {jar_count}"
+                )
+
             return jar_count
 
         finally:
             if temp_root.exists():
                 shutil.rmtree(temp_root)
 
-    def ensure_modpack(self, force_download: bool = False) -> int:
+    def ensure_modpack(self, mode: str = "launch", force_download: bool = False) -> int:
+        """
+        mode:
+        - launch: обычный запуск. Не трогает mods, если сборка уже установлена.
+        - install: первичная установка модпака.
+        - update: обновление / переустановка модпака.
+        - repair: принудительное восстановление модпака.
+        """
+        mode = (mode or "launch").lower().strip()
+
+        if mode not in {"launch", "install", "update", "repair"}:
+            mode = "launch"
+
+        mods_dir = self.game_dir / "mods"
+        mods_dir.mkdir(parents=True, exist_ok=True)
+
         if not self.config.get("install_modpack", True):
-            mods_dir = self.game_dir / "mods"
-            mods_dir.mkdir(parents=True, exist_ok=True)
-            self.emit_log("У этой пользовательской сборки нет официального модпака для автообновления.")
+            self.emit_log("У этой пользовательской сборки нет модпака для автоустановки.")
             return 0
 
-        archive = self.get_modpack_archive(force_download=force_download)
-        mod_count = self.extract_modpack_safely(archive)
-        self.write_official_manifest(archive, mod_count)
+        manifest = self.read_pack_manifest()
+        existing_mod_count = self.count_installed_mod_jars()
+
+        if mode == "launch" and not force_download:
+            if manifest:
+                self.emit_log(
+                    "Модпак уже установлен. Обычный запуск не изменяет папку mods."
+                )
+                return int(manifest.get("mod_count") or existing_mod_count or 0)
+
+            if existing_mod_count > 0:
+                self.emit_log(
+                    "Манифест сборки не найден, но в папке mods уже есть моды. "
+                    "Обычный запуск не будет их перезаписывать."
+                )
+                return existing_mod_count
+
+            self.emit_log(
+                "Модпак ещё не установлен: папка mods пуста, выполняю первичную установку."
+            )
+            mode = "install"
+
+        if force_download and mode == "launch":
+            mode = "update"
+
+        archive = self.get_modpack_archive(
+            force_download=force_download or mode in {"update", "repair"}
+        )
+
+        clear_mods = (
+            mode in {"update", "repair"}
+            and bool(self.config.get("clear_mods_before_update", True))
+        )
+
+        mod_count = self.extract_modpack_safely(
+            archive,
+            clear_mods=clear_mods,
+        )
+
+        self.write_pack_manifest(
+            archive,
+            mod_count,
+            mode=mode,
+        )
+
         return mod_count
 
     def is_legacy_forge_instance(self) -> bool:
@@ -2334,19 +2493,43 @@ class LauncherCore:
         java_executable = self.resolve_java_executable(java_executable)
         self.check_java_compatibility(java_executable)
         self.ensure_config_dirs()
-        self.ensure_modpack(force_download=force_download)
+
+        self.ensure_modpack(
+            mode="update",
+            force_download=force_download,
+        )
+
         self.ensure_server_list()
         version_id = self.install_minecraft_and_loader(java_executable)
         self.emit_status(f"Сборка обновлена/установлена. Версия запуска: {version_id}")
 
-    def run_full(self, username: str, ram_mb: int, java_executable: str, force_modpack_download: bool = False, account: dict | None = None):
+    def run_full(
+        self,
+        username: str,
+        ram_mb: int,
+        java_executable: str,
+        force_modpack_download: bool = False,
+        account: dict | None = None,
+    ):
         java_executable = self.resolve_java_executable(java_executable)
         self.check_java_compatibility(java_executable)
         self.ensure_config_dirs()
-        self.ensure_modpack(force_download=force_modpack_download)
+
+        self.ensure_modpack(
+            mode="update" if force_modpack_download else "launch",
+            force_download=force_modpack_download,
+        )
+
         self.ensure_server_list()
         version_id = self.install_minecraft_and_loader(java_executable)
-        self.launch_game(username, ram_mb, java_executable, version_id, account=account)
+
+        self.launch_game(
+            username,
+            ram_mb,
+            java_executable,
+            version_id,
+            account=account,
+        )
 
 
 def load_user_settings() -> dict:
@@ -2393,7 +2576,7 @@ QUILT_LOADER_META_URL = "https://meta.quiltmc.org/v3/versions/loader/{minecraft_
 NEOFORGE_MAVEN_METADATA_URL = "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml"
 
 HTTP_HEADERS = {
-    "User-Agent": "StoneLightLauncher/0.6.67 (+https://github.com/stonelightmc/StoneLight-Launcher)",
+    "User-Agent": "StoneLightLauncher/0.6.68 (+https://github.com/stonelightmc/StoneLight-Launcher)",
     "Accept": "application/json, text/xml, application/xml, text/plain, */*",
 }
 

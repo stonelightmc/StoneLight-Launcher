@@ -2752,7 +2752,7 @@ class LauncherWebAPI:
         return {
             "launcher": {
                 "name": self.config.get("launcher_name", "StoneLight Launcher"),
-                "version": self.config.get("launcher_version", "0.6.67"),
+                "version": self.config.get("launcher_version", "0.6.68"),
                 "github_url": self.config.get("github_url", "https://github.com/stonelightmc/StoneLight-Launcher"),
                 "bug_report_url": self.config.get("bug_report_url", "https://github.com/stonelightmc/StoneLight-Launcher/issues"),
                 "community_site_url": self.config.get("community_site_url", "https://stonelightmc.github.io"),
@@ -3098,8 +3098,30 @@ class LauncherWebAPI:
             })
         return rows
 
-    def _official_manifest_path_for_instance(self, instance: dict) -> Path:
+    def _pack_manifest_path_for_instance(self, instance: dict) -> Path:
+        return self._instance_game_dir(instance) / ".stonelight_pack_manifest.json"
+
+    def _legacy_official_manifest_path_for_instance(self, instance: dict) -> Path:
         return self._instance_game_dir(instance) / ".stonelight_official_manifest.json"
+
+    def _official_manifest_path_for_instance(self, instance: dict) -> Path:
+        # Backward-compatible alias. New installs use the generic pack manifest.
+        return self._pack_manifest_path_for_instance(instance)
+
+    def _read_pack_manifest_for_instance(self, instance: dict) -> tuple[dict, Path | None]:
+        for manifest_path in (
+            self._pack_manifest_path_for_instance(instance),
+            self._legacy_official_manifest_path_for_instance(instance),
+        ):
+            if not manifest_path.exists():
+                continue
+
+            try:
+                return json.loads(manifest_path.read_text(encoding="utf-8")), manifest_path
+            except Exception:
+                return {}, manifest_path
+
+        return {}, None
 
     def _official_expected_manifest(self, instance: dict) -> dict:
         return {
@@ -3120,13 +3142,8 @@ class LauncherWebAPI:
             return {"official": False, "needs_update": False, "changes": []}
 
         expected = self._official_expected_manifest(instance)
-        manifest_path = self._official_manifest_path_for_instance(instance)
-        installed = {}
-        if manifest_path.exists():
-            try:
-                installed = json.loads(manifest_path.read_text(encoding="utf-8"))
-            except Exception:
-                installed = {}
+        installed, manifest_path = self._read_pack_manifest_for_instance(instance)
+        manifest_exists = bool(manifest_path and manifest_path.exists())
 
         installed_flag = self._is_instance_installed(instance)
 
@@ -3142,7 +3159,7 @@ class LauncherWebAPI:
         # Old installs from versions before the manifest existed should not be
         # displayed as "unknown -> current" when the instance metadata already
         # matches config.json. Treat the current instance metadata as a backfill.
-        baseline = installed if manifest_path.exists() else {
+        baseline = installed if manifest_exists else {
             "minecraft_version": instance.get("minecraft_version", ""),
             "loader": instance.get("loader", ""),
             "loader_version": instance.get("loader_version", ""),
@@ -3165,7 +3182,7 @@ class LauncherWebAPI:
         return {
             "official": True,
             "installed": installed_flag,
-            "manifest_exists": manifest_path.exists(),
+            "manifest_exists": manifest_exists,
             "needs_update": needs_update,
             "changes": changes,
         }
@@ -4050,13 +4067,8 @@ class LauncherWebAPI:
     def _read_official_manifest_for_update_center(self, instance: dict) -> dict:
         if not instance:
             return {}
-        manifest_path = self._official_manifest_path_for_instance(instance)
-        if not manifest_path.exists():
-            return {}
-        try:
-            return json.loads(manifest_path.read_text(encoding="utf-8"))
-        except Exception:
-            return {}
+        manifest, _manifest_path = self._read_pack_manifest_for_instance(instance)
+        return manifest
 
     def _official_cache_asset_path_for_update_center(self, asset_name: str) -> Path | None:
         asset_name = str(asset_name or "").strip()
@@ -4083,6 +4095,9 @@ class LauncherWebAPI:
             manifest_path.parent.mkdir(parents=True, exist_ok=True)
 
             payload = {
+                "manifest_version": 2,
+                "pack_type": "official_zip",
+                "instance_id": instance.get("id", ""),
                 "instance_name": instance.get("name", "StoneLight"),
                 "minecraft_version": instance.get("minecraft_version") or self.config.get("minecraft_version", ""),
                 "loader": instance.get("loader") or self.config.get("loader", ""),

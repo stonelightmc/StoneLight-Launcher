@@ -1,6 +1,6 @@
 # Themes
 
-StoneLight Launcher v0.6.67 includes the first visual theme system.
+StoneLight Launcher v0.6.68 includes the first visual theme system.
 
 ## Themes
 
@@ -44,7 +44,7 @@ accent:     #ffb347 / #ff8c42
 The launcher uses `customtkinter` appearance mode plus tuple colors for light/dark theme-aware widgets.
 
 
-## v0.6.67 additional themes
+## v0.6.68 additional themes
 
 ### Laconic
 
@@ -91,7 +91,7 @@ danger:        #ff5c7a
 ```
 
 
-## v0.6.67 palette revision
+## v0.6.68 palette revision
 
 ### Laconic revised
 
@@ -127,7 +127,7 @@ danger:        #ff6b8a
 ```
 
 
-## v0.6.67 destructive button colors
+## v0.6.68 destructive button colors
 
 Each theme now has its own destructive/warning color pair:
 
