@@ -1739,24 +1739,187 @@ class LauncherCore:
         return patched
 
 
-    def install_minecraft_and_loader(self, java_executable: str) -> str:
+    def runtime_manifest_path(self) -> Path:
+        return self.game_dir / ".stonelight_runtime_manifest.json"
+
+    def read_runtime_manifest(self) -> dict:
+        path = self.runtime_manifest_path()
+        if not path.exists():
+            return {}
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            self.emit_log(f"Не удалось прочитать runtime-манифест: {exc}")
+            return {}
+
+    def runtime_signature(self) -> dict:
+        loader = (self.config.get("loader") or "vanilla").lower()
+        minecraft_version = str(self.config.get("minecraft_version") or "")
+        loader_version = self.config.get("fabric_loader_version", "") or self.config.get("loader_version", "") or ""
+        normalized_loader_version = normalize_loader_version_for_install(loader, minecraft_version, loader_version)
+
+        return {
+            "instance_id": str(self.config.get("instance_id", "") or ""),
+            "minecraft_version": minecraft_version,
+            "loader": loader,
+            "loader_version": str(normalized_loader_version or ""),
+        }
+
+    def runtime_manifest_matches(self, manifest: dict) -> bool:
+        if not manifest:
+            return False
+
+        expected = self.runtime_signature()
+        for key, expected_value in expected.items():
+            if str(manifest.get(key, "") or "") != str(expected_value or ""):
+                return False
+
+        return bool(manifest.get("version_id"))
+
+    def write_runtime_manifest(self, version_id: str, mode: str = "install") -> None:
+        try:
+            data = {
+                "manifest_version": 1,
+                "version_id": str(version_id or ""),
+                "install_mode": mode,
+                "installed_at": datetime.now(timezone.utc).isoformat(),
+            }
+            data.update(self.runtime_signature())
+            self.runtime_manifest_path().write_text(
+                json.dumps(data, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            self.emit_log(f"Runtime-манифест обновлён: {version_id}")
+        except Exception as exc:
+            self.emit_log(f"Не удалось записать runtime-манифест: {exc}")
+
+    def asset_index_available_for_version_chain(self, chain: list[tuple[str, dict]]) -> tuple[bool, str]:
+        asset_index_id = ""
+        for _vid, data in chain:
+            asset_index = data.get("assetIndex") if isinstance(data, dict) else None
+            if isinstance(asset_index, dict):
+                asset_index_id = str(asset_index.get("id") or asset_index.get("sha1") or "")
+
+        if not asset_index_id:
+            # Very old/custom versions may not use the modern asset index layout.
+            return True, ""
+
+        path = self.minecraft_dir / "assets" / "indexes" / f"{asset_index_id}.json"
+        if path.exists():
+            return True, asset_index_id
+
+        return False, asset_index_id
+
+    def required_libraries_available_for_version_chain(self, chain: list[tuple[str, dict]]) -> tuple[bool, str]:
+        for _vid, data in chain:
+            for lib in data.get("libraries") or []:
+                if not isinstance(lib, dict):
+                    continue
+
+                if not self.is_library_allowed_on_windows(lib):
+                    continue
+
+                artifact = None
+                downloads = lib.get("downloads") or {}
+                if isinstance(downloads, dict):
+                    artifact = downloads.get("artifact")
+
+                rel_path = ""
+                if isinstance(artifact, dict):
+                    rel_path = str(artifact.get("path") or "")
+
+                if not rel_path:
+                    rel_path = self.maven_artifact_path_from_name(str(lib.get("name") or "")) or ""
+
+                if not rel_path:
+                    continue
+
+                if not (self.minecraft_dir / "libraries" / rel_path).exists():
+                    return False, rel_path
+
+        return True, ""
+
+    def runtime_files_complete(self, version_id: str) -> tuple[bool, str]:
+        if not version_id:
+            return False, "version_id пустой"
+
+        version_json = self.version_json_path(version_id)
+        if not version_json.exists():
+            return False, f"нет version json: {version_id}"
+
+        chain = self.version_json_chain(version_id)
+        if not chain:
+            return False, f"цепочка version json пуста: {version_id}"
+
+        minecraft_version = str(self.config.get("minecraft_version") or "")
+        if minecraft_version:
+            vanilla_json = self.version_json_path(minecraft_version)
+            if not vanilla_json.exists():
+                return False, f"нет базового Minecraft json: {minecraft_version}"
+
+            vanilla_jar = self.vanilla_jar_path(minecraft_version)
+            if not vanilla_jar.exists():
+                return False, f"нет client jar: {minecraft_version}"
+
+        assets_ok, asset_index = self.asset_index_available_for_version_chain(chain)
+        if not assets_ok:
+            return False, f"нет asset index: {asset_index}"
+
+        libs_ok, missing_lib = self.required_libraries_available_for_version_chain(chain)
+        if not libs_ok:
+            return False, f"нет библиотеки: {missing_lib}"
+
+        return True, ""
+
+    def fast_launch_version_id(self) -> str | None:
+        if not self.config.get("runtime_fast_launch", True):
+            return None
+
+        manifest = self.read_runtime_manifest()
+        if not self.runtime_manifest_matches(manifest):
+            return None
+
+        version_id = str(manifest.get("version_id") or "")
+
+        if self.config.get("verify_runtime_on_launch", True):
+            complete, reason = self.runtime_files_complete(version_id)
+            if not complete:
+                self.emit_log(f"Быстрый запуск пропущен: {reason}. Выполняю проверку установки.")
+                return None
+
+        self.emit_log(f"Runtime уже установлен. Пропускаю повторную установку Minecraft/модлоадера: {version_id}")
+        self.emit_status(f"Minecraft runtime готов: {version_id}")
+        return version_id
+
+    def install_minecraft_and_loader(
+        self,
+        java_executable: str,
+        mode: str = "launch",
+        force_install: bool = False,
+    ) -> str:
         loader = (self.config.get("loader") or "vanilla").lower()
         minecraft_version = self.config["minecraft_version"]
         loader_version = self.config.get("fabric_loader_version", "") or ""
         loader_version = normalize_loader_version_for_install(loader, minecraft_version, loader_version)
 
+        if mode == "launch" and not force_install:
+            fast_version = self.fast_launch_version_id()
+            if fast_version:
+                return fast_version
+
         if loader == "vanilla":
-            return self.install_vanilla(minecraft_version)
+            version_id = self.install_vanilla(minecraft_version)
+        elif loader in ("fabric", "quilt", "neoforge"):
+            # Fabric/Quilt/NeoForge work better through the new unified mod_loader API.
+            version_id = self.install_unified_mod_loader(minecraft_version, loader, loader_version, java_executable)
+        elif loader == "forge":
+            # Forge still needs special handling because old Forge versions and installers are quirky.
+            version_id = self.install_forge(minecraft_version, loader_version, java_executable)
+        else:
+            raise LauncherError(f"Пока не поддерживается loader: {loader}")
 
-        # Fabric/Quilt/NeoForge work better through the new unified mod_loader API.
-        if loader in ("fabric", "quilt", "neoforge"):
-            return self.install_unified_mod_loader(minecraft_version, loader, loader_version, java_executable)
-
-        # Forge still needs special handling because old Forge versions and installers are quirky.
-        if loader == "forge":
-            return self.install_forge(minecraft_version, loader_version, java_executable)
-
-        raise LauncherError(f"Пока не поддерживается loader: {loader}")
+        self.write_runtime_manifest(version_id, mode=mode)
+        return version_id
 
     def _callback_dict(self):
         progress_state = {"max": 0}
@@ -2608,7 +2771,11 @@ class LauncherCore:
         )
 
         self.ensure_server_list()
-        version_id = self.install_minecraft_and_loader(java_executable)
+        version_id = self.install_minecraft_and_loader(
+            java_executable,
+            mode="update",
+            force_install=True,
+        )
         self.emit_status(f"Сборка обновлена/установлена. Версия запуска: {version_id}")
 
     def run_full(
@@ -2629,7 +2796,11 @@ class LauncherCore:
         )
 
         self.ensure_server_list()
-        version_id = self.install_minecraft_and_loader(java_executable)
+        version_id = self.install_minecraft_and_loader(
+            java_executable,
+            mode="update" if force_modpack_download else "launch",
+            force_install=force_modpack_download,
+        )
 
         self.launch_game(
             username,
@@ -2684,7 +2855,7 @@ QUILT_LOADER_META_URL = "https://meta.quiltmc.org/v3/versions/loader/{minecraft_
 NEOFORGE_MAVEN_METADATA_URL = "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml"
 
 HTTP_HEADERS = {
-    "User-Agent": "StoneLightLauncher/0.6.69 (+https://github.com/stonelightmc/StoneLight-Launcher)",
+    "User-Agent": "StoneLightLauncher/0.6.70 (+https://github.com/stonelightmc/StoneLight-Launcher)",
     "Accept": "application/json, text/xml, application/xml, text/plain, */*",
 }
 

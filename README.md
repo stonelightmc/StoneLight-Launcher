@@ -1,4 +1,4 @@
-# StoneLight Launcher v0.6.69
+# StoneLight Launcher v0.6.70
 
 Unofficial Minecraft launcher for the StoneLight community.
 
@@ -60,7 +60,7 @@ data/
 StoneLight Launcher is not affiliated with Microsoft, Mojang Studios, or Minecraft.
 
 
-## v0.6.69
+## v0.6.70
 
 Deeper localization pass:
 
@@ -70,7 +70,7 @@ Deeper localization pass:
 - more dynamic UI fragments translated
 
 
-## v0.6.69 — pywebview shell prototype
+## v0.6.70 — pywebview shell prototype
 
 `StoneLightLauncher.cmd` now launches the new HTML/CSS/JavaScript shell.
 

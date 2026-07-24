@@ -2752,7 +2752,7 @@ class LauncherWebAPI:
         return {
             "launcher": {
                 "name": self.config.get("launcher_name", "StoneLight Launcher"),
-                "version": self.config.get("launcher_version", "0.6.69"),
+                "version": self.config.get("launcher_version", "0.6.70"),
                 "github_url": self.config.get("github_url", "https://github.com/stonelightmc/StoneLight-Launcher"),
                 "bug_report_url": self.config.get("bug_report_url", "https://github.com/stonelightmc/StoneLight-Launcher/issues"),
                 "community_site_url": self.config.get("community_site_url", "https://stonelightmc.github.io"),

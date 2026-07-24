@@ -19,7 +19,7 @@ JavaScript is responsible only for presentation and user interaction. Python
 remains the source of truth for accounts, instance metadata, launching,
 installing, updates and filesystem access.
 
-## v0.6.69 scope
+## v0.6.70 scope
 
 Working in the first prototype:
 
@@ -51,7 +51,7 @@ document that has access to `window.pywebview.api`. Future integrations should
 use Python HTTP clients and render local launcher-owned UI.
 
 
-## v0.6.69 shell polish
+## v0.6.70 shell polish
 
 - launcher branding remains in the hero header instead of the menu bar
 - selected instance is secondary information below the launcher title
@@ -61,7 +61,7 @@ use Python HTTP clients and render local launcher-owned UI.
 - instance API reserves an optional `icon` metadata field for a later icon picker
 
 
-## v0.6.69 bridge/runtime hotfix
+## v0.6.70 bridge/runtime hotfix
 
 - desktop mode waits for `pywebviewready` before requesting state
 - mock instance data is available only in a normal browser preview
@@ -71,14 +71,14 @@ use Python HTTP clients and render local launcher-owned UI.
 - state inspection no longer constructs `LauncherCore` and therefore has no filesystem side effects
 
 
-## v0.6.69 local URL hotfix
+## v0.6.70 local URL hotfix
 
 Edge WebView may treat a query string appended to a local `file://` URL as part
 of the requested file path. The desktop marker now uses the URL fragment
 `#desktop=1`, which does not change the local file path.
 
 
-## v0.6.69 internal HTTP transport
+## v0.6.70 internal HTTP transport
 
 The shell now uses the relative `web_ui/index.html` entrypoint served by
 pywebview's built-in local HTTP server. Public bridge methods are explicitly
