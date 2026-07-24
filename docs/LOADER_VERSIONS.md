@@ -1,6 +1,6 @@
 # Loader version metadata
 
-v0.6.68 changes how loader versions are listed.
+v0.6.69 changes how loader versions are listed.
 
 The launcher now prefers official metadata sources:
 

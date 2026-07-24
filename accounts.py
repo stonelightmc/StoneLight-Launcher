@@ -60,6 +60,8 @@ def normalize_microsoft_account(acc: dict) -> dict | None:
         "uuid": uuid,
         "access_token": acc.get("access_token", ""),
         "refresh_token": acc.get("refresh_token", ""),
+        "xuid": acc.get("xuid") or acc.get("auth_xuid") or acc.get("authXuid") or "",
+        "client_id": acc.get("client_id") or acc.get("clientId") or acc.get("clientid") or "",
         "skins": acc.get("skins", []),
         "capes": acc.get("capes", []),
     }
@@ -245,6 +247,8 @@ def add_or_update_microsoft_account(login_response: dict) -> tuple[dict, str]:
         "uuid": uuid,
         "access_token": access_token,
         "refresh_token": refresh_token,
+        "xuid": login_response.get("xuid") or login_response.get("auth_xuid") or login_response.get("authXuid") or "",
+        "client_id": login_response.get("client_id") or login_response.get("clientId") or login_response.get("clientid") or "",
         "skins": login_response.get("skins", []),
         "capes": login_response.get("capes", []),
     }

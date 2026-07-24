@@ -1,6 +1,6 @@
 {
   "launcher_name": "StoneLight Launcher",
-  "launcher_version": "0.6.68",
+  "launcher_version": "0.6.69",
   "minecraft_version": "26.1.2",
   "loader": "fabric",
   "fabric_loader_version": "0.19.3",
@@ -172,7 +172,7 @@
   "web_theme_palette_preservation": true,
   "web_modrinth_integration_stage_1": true,
   "modrinth_api_base": "https://api.modrinth.com/v2",
-  "modrinth_user_agent": "StoneLightLauncher/0.6.68 (https://github.com/stonelightmc/StoneLight-Launcher)",
+  "modrinth_user_agent": "StoneLightLauncher/0.6.69 (https://github.com/stonelightmc/StoneLight-Launcher)",
   "web_modrinth_download_timeout_hotfix": true,
   "modrinth_download_timeout_seconds": 180,
   "modrinth_download_retries": 3,

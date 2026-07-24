@@ -2214,7 +2214,27 @@ class LauncherCore:
         )
 
     def offline_uuid(self, username: str) -> str:
-        return uuid.uuid3(uuid.NAMESPACE_DNS, "OfflinePlayer:" + username).hex
+        """
+        Minecraft-compatible offline UUID.
+
+        Equivalent to Java:
+        UUID.nameUUIDFromBytes(("OfflinePlayer:" + username).getBytes(StandardCharsets.UTF_8))
+
+        This intentionally does not use uuid.uuid3(uuid.NAMESPACE_DNS, ...),
+        because vanilla/Paper/Spigot offline-mode UUIDs are generated from the
+        raw UTF-8 bytes of "OfflinePlayer:<name>" without a namespace.
+        """
+        raw = ("OfflinePlayer:" + username).encode("utf-8")
+        digest = bytearray(hashlib.md5(raw).digest())
+        digest[6] = (digest[6] & 0x0F) | 0x30
+        digest[8] = (digest[8] & 0x3F) | 0x80
+        return uuid.UUID(bytes=bytes(digest)).hex
+
+    def offline_token(self, username: str) -> str:
+        return uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            "stonelight-offline-token:" + (username or "Player"),
+        ).hex
 
     def apply_window_mode_preference(self, window_mode: str):
         """
@@ -2336,6 +2356,19 @@ class LauncherCore:
             username = (account.get("username") or fallback_username or "").strip()
             uuid_value = (account.get("uuid") or "").replace("-", "").strip()
             access_token = account.get("access_token") or ""
+            client_id = (
+                account.get("client_id")
+                or account.get("clientId")
+                or account.get("clientid")
+                or self.config.get("microsoft_client_id")
+                or "0"
+            )
+            xuid = (
+                account.get("xuid")
+                or account.get("auth_xuid")
+                or account.get("authXuid")
+                or "0"
+            )
 
             if not username or not uuid_value or not access_token:
                 raise LauncherError("Лицензионный аккаунт неполный. Выполни Microsoft-вход заново.")
@@ -2344,14 +2377,81 @@ class LauncherCore:
                 "username": username,
                 "uuid": uuid_value,
                 "token": access_token,
+                "user_type": "msa",
+                "xuid": str(xuid),
+                "client_id": str(client_id),
+                "is_microsoft": True,
             }
 
         username = (account.get("username") or fallback_username or "Player").strip()
         return {
             "username": username,
             "uuid": self.offline_uuid(username),
-            "token": "0",
+            "token": self.offline_token(username),
+            "user_type": "mojang",
+            "xuid": "0",
+            "client_id": "0",
+            "is_microsoft": False,
         }
+
+    def patch_auth_command_args(self, command: list[str], auth_options: dict) -> list[str]:
+        """
+        Fix unresolved auth placeholders from modern Minecraft version JSONs.
+
+        minecraft-launcher-lib 8.0 can leave placeholders such as ${clientid}
+        and ${auth_xuid} in the final command if the option set does not contain
+        exactly the key variant expected by the version JSON. Passing those
+        literals to Minecraft makes licensed Microsoft launches look incomplete
+        to server-side skin/auth plugins, so we normalize them here.
+        """
+        patched = [str(part) for part in command]
+
+        default_user_type = "msa" if auth_options.get("is_microsoft") else "mojang"
+        user_type = str(auth_options.get("user_type") or default_user_type)
+        xuid = str(auth_options.get("xuid") or "0")
+        client_id = str(auth_options.get("client_id") or "0")
+
+        replacements = {
+            "${user_type}": user_type,
+            "${auth_xuid}": xuid,
+            "${xuid}": xuid,
+            "${clientid}": client_id,
+            "${client_id}": client_id,
+            "${auth_client_id}": client_id,
+        }
+
+        for index, part in enumerate(patched):
+            for placeholder, value in replacements.items():
+                if placeholder in part:
+                    part = part.replace(placeholder, value)
+            patched[index] = part
+
+        def set_or_add_arg(key: str, value: str):
+            if key in patched:
+                idx = patched.index(key)
+                if idx + 1 < len(patched):
+                    patched[idx + 1] = str(value)
+                else:
+                    patched.append(str(value))
+            else:
+                patched.extend([key, str(value)])
+
+        set_or_add_arg("--userType", user_type)
+        set_or_add_arg("--xuid", xuid)
+        set_or_add_arg("--clientId", client_id)
+
+        leftovers = [part for part in patched if "${" in part and "}" in part]
+        if leftovers:
+            self.emit_log("Launch auth patch: остались неразрешённые шаблоны: " + ", ".join(leftovers[:5]))
+        else:
+            self.emit_log(
+                "Launch auth patch: "
+                f"userType={user_type}, "
+                f"xuid={'set' if xuid != '0' else '0'}, "
+                f"clientId={'set' if client_id != '0' else '0'}"
+            )
+
+        return patched
 
 
     def launch_game(self, username: str, ram_mb: int, java_executable: str, version_id: str, account: dict | None = None):
@@ -2378,6 +2478,13 @@ class LauncherCore:
             "username": auth_options["username"],
             "uuid": auth_options["uuid"],
             "token": auth_options["token"],
+            "userType": auth_options["user_type"],
+            "user_type": auth_options["user_type"],
+            "xuid": auth_options["xuid"],
+            "auth_xuid": auth_options["xuid"],
+            "clientId": auth_options["client_id"],
+            "clientid": auth_options["client_id"],
+            "client_id": auth_options["client_id"],
             "executablePath": java_executable,
             "defaultExecutablePath": java_executable,
             "jvmArguments": [
@@ -2407,6 +2514,7 @@ class LauncherCore:
             str(self.minecraft_dir),
             options
         )
+        command = self.patch_auth_command_args(command, auth_options)
         command = self.patch_legacy_forge_classpath(command, version_id)
         command = self.patch_legacy_natives_path(command)
         self.write_debug_launch_command(command, version_id)
@@ -2576,7 +2684,7 @@ QUILT_LOADER_META_URL = "https://meta.quiltmc.org/v3/versions/loader/{minecraft_
 NEOFORGE_MAVEN_METADATA_URL = "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml"
 
 HTTP_HEADERS = {
-    "User-Agent": "StoneLightLauncher/0.6.68 (+https://github.com/stonelightmc/StoneLight-Launcher)",
+    "User-Agent": "StoneLightLauncher/0.6.69 (+https://github.com/stonelightmc/StoneLight-Launcher)",
     "Accept": "application/json, text/xml, application/xml, text/plain, */*",
 }
 

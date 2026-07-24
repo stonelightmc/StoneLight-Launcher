@@ -65,7 +65,7 @@ from updater import (
 )
 
 
-APP_TITLE = "StoneLight Launcher v0.6.68"
+APP_TITLE = "StoneLight Launcher v0.6.69"
 JAVA_PRESET_VALUES = ["auto", "global", "java8", "java16", "java17", "java21", "java25", "manual"]
 
 UI_FONT = "Segoe UI Variable"
@@ -231,7 +231,7 @@ def add_query_params(url: str, **params) -> str:
 def attach_button_hover_effect(button, normal_height: int = UI_BUTTON_HEIGHT, hover_delta: int = 0):
     """Layout-safe hover helper.
 
-    v0.6.68: no size changes on hover. Changing button height makes Tk grid recalculate
+    v0.6.69: no size changes on hover. Changing button height makes Tk grid recalculate
     rows and can move whole cards/neighbor blocks. CustomTkinter's built-in hover_color
     remains active, and we only set a hand cursor when supported.
     """
@@ -3248,7 +3248,7 @@ class StoneLightLauncherApp(ctk.CTk):
             text_color="#a9a9a9",
             anchor="w"
         )
-        # v0.6.68: hidden to keep the main screen compact; detailed info is in the instance window.
+        # v0.6.69: hidden to keep the main screen compact; detailed info is in the instance window.
         self.instance_info.grid_remove()
 
         account_frame = ctk.CTkFrame(dashboard, corner_radius=24, border_width=1, border_color=theme_pair("line"))
@@ -3324,7 +3324,7 @@ class StoneLightLauncherApp(ctk.CTk):
             wraplength=480,
             justify="left"
         )
-        # v0.6.68: hidden to keep the main screen compact; the restriction is enforced when adding offline accounts.
+        # v0.6.69: hidden to keep the main screen compact; the restriction is enforced when adding offline accounts.
         self.account_policy_label.grid_remove()
 
         self.actions_java_row = ctk.CTkFrame(self, fg_color="transparent", border_width=0)
@@ -3365,7 +3365,7 @@ class StoneLightLauncherApp(ctk.CTk):
         self.browse_java_button.grid(row=0, column=1, sticky="e")
 
         self.global_summary_label = ctk.CTkLabel(form, text="", text_color="#bdbdbd", anchor="w")
-        # v0.6.68: hidden to keep the Java card compact.
+        # v0.6.69: hidden to keep the Java card compact.
         self.global_summary_label.grid_remove()
 
         self.global_settings_button = ctk.CTkButton(
@@ -3459,7 +3459,7 @@ class StoneLightLauncherApp(ctk.CTk):
         self.status_java_chip.grid(row=0, column=3, padx=6, sticky="w")
         style_status_chip(self.status_java_chip)
 
-        # v0.6.68: watermark removed from the main status card; the logo remains in the header and splash screen.
+        # v0.6.69: watermark removed from the main status card; the logo remains in the header and splash screen.
 
         self.status_label = ctk.CTkLabel(status_frame, text=tr("Готов к запуску."), anchor="w", font=ui_font(13, "bold"))
         self.status_label.grid(row=1, column=0, padx=14, pady=(0, 2), sticky="ew")
@@ -3470,7 +3470,7 @@ class StoneLightLauncherApp(ctk.CTk):
 
         self.log_box = ctk.CTkTextbox(status_frame, height=96)
         self.log_box.grid(row=3, column=0, padx=14, pady=(0, 8), sticky="ew")
-        self.log_box.insert("end", tr_service("Добро пожаловать в StoneLight Launcher v0.6.68") + "\n")
+        self.log_box.insert("end", tr_service("Добро пожаловать в StoneLight Launcher v0.6.69") + "\n")
         self.log_box.configure(state="disabled")
         self.apply_danger_button_styles()
 
