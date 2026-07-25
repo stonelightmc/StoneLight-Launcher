@@ -1,7 +1,7 @@
 {
   "launcher_name": "StoneLight Launcher",
-  "launcher_version": "0.6.70",
-  "minecraft_version": "26.1.2",
+  "launcher_version": "0.6.70.1",
+  "minecraft_version": "26.2",
   "loader": "fabric",
   "fabric_loader_version": "0.19.3",
   "server_ip": "stonelight.apexmc.co",
