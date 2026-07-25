@@ -12,18 +12,34 @@ Permission is granted to download and use official releases of StoneLight Launch
 for personal, non-commercial use with the StoneLight project.
 
 You may not, without explicit written permission from the copyright holder:
-
 - copy, modify, adapt, or create derivative works based on this software;
 - redistribute, reupload, mirror, sell, rent, sublicense, or commercially exploit this software;
 - publish modified builds or unofficial versions of this software;
 - remove or alter copyright, license, branding, or attribution notices;
 - use the StoneLight name, logo, branding, Microsoft OAuth application data, update infrastructure,
-  or official modpack links in another launcher or project;
+  official modpack links, API endpoints, API keys, backend infrastructure, or service credentials
+  in another launcher or project;
 - reverse engineer, decompile, or disassemble executable builds, except where such restriction is
   prohibited by applicable law.
 
 Official releases may include third-party components and dependencies. Those components remain
 subject to their own respective licenses.
+
+StoneLight Launcher may allow users to search, view, install, update, or manage third-party
+mods, modpacks, resource packs, shader packs, libraries, metadata, or other content from
+external platforms and services. Such third-party content is not owned by StoneLight and remains
+subject to the licenses, terms, author permissions, distribution settings, and platform rules of
+its respective owners.
+
+This license does not grant any rights to third-party content beyond the rights granted by the
+original authors, rights holders, or platforms. StoneLight Launcher must not be used to bypass
+third-party service restrictions, author distribution settings, disabled third-party distribution,
+authentication requirements, API limits, or download restrictions.
+
+Use of third-party services and APIs, including but not limited to Minecraft/Microsoft services,
+Modrinth, CurseForge, Overwolf, GitHub, and other content or metadata providers, is subject to
+their respective terms, privacy policies, API terms, and service rules. See TERMS_OF_USE.md and
+THIRD_PARTY_NOTICES.md for additional information.
 
 Minecraft is a trademark of Mojang Studios. Microsoft is a trademark of Microsoft Corporation.
 StoneLight Launcher is an independent community launcher and is not affiliated with, endorsed by,
@@ -32,6 +48,8 @@ sponsored by, or approved by Mojang Studios or Microsoft.
 This software is provided "as is", without warranty of any kind, express or implied, including but
 not limited to the warranties of merchantability, fitness for a particular purpose, and
 non-infringement. In no event shall the copyright holder be liable for any claim, damages, data
-loss, account issues, service interruptions, or other liability arising from the use of this software.
+loss, account issues, service interruptions, unavailable third-party files, broken mods,
+incompatible modpacks, API outages, or other liability arising from the use of this software or
+third-party content.
 
 For permission requests, contact the StoneLight project administrators.
