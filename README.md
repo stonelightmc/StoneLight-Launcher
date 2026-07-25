@@ -27,13 +27,18 @@ Unofficial AI-coded Minecraft launcher with custom instances, account management
   - Ukrainian;
   - Kazakh.
 
-## License
+## License and third-party content
 
 StoneLight Launcher is distributed for personal, non-commercial use.
 
-This project is not affiliated with Microsoft, Mojang Studios, or Minecraft.
+This project is an independent community launcher and is not affiliated with, endorsed by, sponsored by,
+or approved by Microsoft, Mojang Studios, Minecraft, CurseForge, Overwolf, or Modrinth.
 
-See [LICENSE](LICENSE) for details.
+Third-party mods, modpacks, resource packs, shader packs, APIs, services and dependencies remain subject
+to their own licenses, terms and distribution settings.
+
+See [LICENSE](LICENSE), [TERMS_OF_USE.md](TERMS_OF_USE.md), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+and [SECURITY.md](SECURITY.md) for details.
 
 ---
 
@@ -66,10 +71,16 @@ See [LICENSE](LICENSE) for details.
   - українська;
   - казахська.
 
-## Ліцензія
+## Ліцензія та сторонній контент
 
 StoneLight Launcher розповсюджується для особистого некомерційного використання.
 
-Цей проєкт не пов’язаний з Microsoft, Mojang Studios або Minecraft.
+Цей проєкт є незалежним community-лаунчером і не пов’язаний з Microsoft, Mojang Studios, Minecraft,
+CurseForge, Overwolf або Modrinth, не схвалений ними, не спонсорується ними й не є їхнім офіційним
+продуктом.
 
-Деталі дивись у файлі [LICENSE](LICENSE).
+Сторонні моди, модпаки, ресурспаки, шейдери, API, сервіси та залежності залишаються під дією власних
+ліцензій, умов і налаштувань розповсюдження.
+
+Деталі дивись у [LICENSE](LICENSE), [TERMS_OF_USE.md](TERMS_OF_USE.md),
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) та [SECURITY.md](SECURITY.md).
