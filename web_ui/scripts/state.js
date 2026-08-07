@@ -1,5 +1,5 @@
 window.SLLState = {
-  launcher: { name: "StoneLight Launcher", version: "0.6.70" },
+  launcher: { name: "StoneLight Launcher", version: "0.6.71" },
   preferences: {
     theme: "dark",
     language: "en",

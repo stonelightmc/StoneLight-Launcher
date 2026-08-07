@@ -43,6 +43,8 @@ CONSOLE_LISTENERS: dict[str, list[Callable[[str], None]]] = {}
 CONSOLE_LOCK = threading.Lock()
 CONSOLE_HISTORY_LIMIT = 1200
 
+MOJANG_COMPONENT_DOWNLOAD_ERROR_MESSAGE = "Не удалось скачать компонент Minecraft с серверов Mojang. Проверьте интернет/антивирус/VPN и повторите установку."
+
 
 def normalize_console_key(path: Path | str) -> str:
     return str(Path(path).resolve()).casefold()
@@ -875,22 +877,41 @@ class LauncherCore:
             self.emit_log(f"Найден архив модов: {best_asset.get('name')} (score {best_score})")
         return discovered_url
 
+    def _official_modpack_fallback_url(self) -> str:
+        return (
+            self.config.get("official_modpack_fallback_url")
+            or self.config.get("mods_zip_url", "")
+            or ""
+        ).strip()
+
+    def _official_modpack_fallback_sha256(self) -> str:
+        return (
+            self.config.get("official_modpack_fallback_sha256")
+            or self.config.get("mods_zip_sha256", "")
+            or ""
+        ).strip()
+
     def resolve_modpack_download_url(self) -> str:
-        configured_url = self.config.get("mods_zip_url", "")
-        return configured_url or self.discover_modpack_asset_url()
+        # The official pack is discovered from GitHub Releases first. The
+        # configured URL is now only an explicit fallback for offline/debug cases.
+        if self.config.get("official_mods_auto_discovery", True):
+            discovered_url = self.discover_modpack_asset_url()
+            if discovered_url:
+                return discovered_url
+        return self._official_modpack_fallback_url()
 
     def _modpack_hash_for_url(self, attempt_url: str) -> str:
-        """Return configured SHA256 only for the explicitly configured ZIP URL.
+        """Return configured SHA256 only for the explicit fallback ZIP URL.
 
-        GitHub Releases fallback may find a different ZIP filename/version. In that
-        case the old hash from config.json belongs to the old URL and must not
-        block installation of the newly discovered asset.
+        GitHub Releases discovery may find a different ZIP filename/version. In
+        that case the fallback hash does not belong to the discovered asset and
+        must not block installation.
         """
-        expected_hash = self.config.get("mods_zip_sha256", "")
+        expected_hash = self._official_modpack_fallback_sha256()
         if not expected_hash:
             return ""
 
-        configured_url = (self.config.get("mods_zip_url", "") or "").strip()
+        configured_url = self._official_modpack_fallback_url()
         if not configured_url:
             return ""
 
@@ -898,8 +919,8 @@ class LauncherCore:
             return expected_hash
 
         self.emit_log(
-            "Найденный через GitHub Releases архив отличается от mods_zip_url; "
-            "старый SHA256 из config.json для него не применяется."
+            "Найденный через GitHub Releases архив отличается от configured fallback URL; "
+            "SHA256 из config.json для fallback не применяется."
         )
         return ""
 
@@ -1194,9 +1215,8 @@ class LauncherCore:
                 shutil.rmtree(version_dir, ignore_errors=True)
 
         self.emit_status(f"Повторно скачиваю clean vanilla Minecraft {minecraft_version}...")
-        minecraft_launcher_lib.install.install_minecraft_version(
+        self.install_minecraft_version_with_mojang_retry(
             minecraft_version,
-            str(self.minecraft_dir),
             callback=self._callback_dict()
         )
 
@@ -1941,12 +1961,91 @@ class LauncherCore:
             "setMax": set_max,
         }
 
+    def _mojang_component_timeout_seconds(self) -> int:
+        return max(60, int(self.config.get("mojang_component_download_timeout_seconds", 180) or 180))
+
+    def _mojang_component_retries(self) -> int:
+        return max(1, int(self.config.get("mojang_component_download_retries", 5) or 5))
+
+    def _is_mojang_component_download_error(self, exc: Exception) -> bool:
+        text = str(exc)
+        current = getattr(exc, "__cause__", None)
+        while current is not None:
+            text += "\n" + str(current)
+            current = getattr(current, "__cause__", None)
+
+        lowered = text.lower()
+        return (
+            "piston-data.mojang.com" in lowered
+            or "piston-meta.mojang.com" in lowered
+            or "/v1/objects/" in lowered
+            or "max retries exceeded with url" in lowered and "mojang" in lowered
+        )
+
+    def install_minecraft_version_with_mojang_retry(self, minecraft_version: str, callback: dict | None = None) -> None:
+        """Install vanilla Minecraft through minecraft-launcher-lib, with a
+        longer timeout and a launcher-level retry loop for Mojang CDN component
+        downloads. The library uses requests internally, so we temporarily wrap
+        requests' Session.request to apply the longer timeout only to Mojang CDN
+        hosts without changing CurseForge/Modrinth/backend behavior.
+        """
+        timeout = self._mojang_component_timeout_seconds()
+        retries = self._mojang_component_retries()
+        original_request = requests.sessions.Session.request
+
+        def request_with_mojang_timeout(session, method, url, **kwargs):
+            url_text = str(url or "")
+            if "piston-data.mojang.com" in url_text or "piston-meta.mojang.com" in url_text:
+                current_timeout = kwargs.get("timeout")
+                if current_timeout is None:
+                    kwargs["timeout"] = timeout
+                else:
+                    try:
+                        if isinstance(current_timeout, tuple):
+                            connect_timeout = max(float(current_timeout[0] or 0), float(timeout))
+                            read_timeout = max(float(current_timeout[1] or 0), float(timeout))
+                            kwargs["timeout"] = (connect_timeout, read_timeout)
+                        else:
+                            kwargs["timeout"] = max(float(current_timeout), float(timeout))
+                    except Exception:
+                        kwargs["timeout"] = timeout
+            return original_request(session, method, url, **kwargs)
+
+        requests.sessions.Session.request = request_with_mojang_timeout
+        try:
+            last_error: Exception | None = None
+            for attempt in range(1, retries + 1):
+                try:
+                    minecraft_launcher_lib.install.install_minecraft_version(
+                        minecraft_version,
+                        str(self.minecraft_dir),
+                        callback=callback or self._callback_dict()
+                    )
+                    return
+                except Exception as exc:
+                    last_error = exc
+                    if not self._is_mojang_component_download_error(exc):
+                        raise
+
+                    self.emit_log(
+                        f"Mojang component download failed on attempt {attempt}/{retries}: {exc}"
+                    )
+                    if attempt < retries:
+                        self.emit_status(
+                            f"Повторяю загрузку компонента Minecraft с серверов Mojang... {attempt + 1}/{retries}"
+                        )
+                        time.sleep(min(8.0, 1.5 * attempt))
+                        continue
+
+            raise LauncherError(MOJANG_COMPONENT_DOWNLOAD_ERROR_MESSAGE) from last_error
+        finally:
+            requests.sessions.Session.request = original_request
+
     def install_vanilla(self, minecraft_version: str) -> str:
         callback = self._callback_dict()
         self.emit_status(f"Устанавливаю/проверяю Minecraft {minecraft_version}...")
-        minecraft_launcher_lib.install.install_minecraft_version(
+        self.install_minecraft_version_with_mojang_retry(
             minecraft_version,
-            str(self.minecraft_dir),
             callback=callback
         )
         return minecraft_version
@@ -1954,9 +2053,8 @@ class LauncherCore:
     def install_unified_mod_loader(self, minecraft_version: str, loader: str, loader_version: str, java_executable: str) -> str:
         callback = self._callback_dict()
         self.emit_status(f"Устанавливаю/проверяю Minecraft {minecraft_version}...")
-        minecraft_launcher_lib.install.install_minecraft_version(
+        self.install_minecraft_version_with_mojang_retry(
             minecraft_version,
-            str(self.minecraft_dir),
             callback=callback
         )
 
@@ -2076,9 +2174,8 @@ class LauncherCore:
 
     def install_forge(self, minecraft_version: str, loader_version: str, java_executable: str) -> str:
         self.emit_status(f"Устанавливаю/проверяю Minecraft {minecraft_version}...")
-        minecraft_launcher_lib.install.install_minecraft_version(
+        self.install_minecraft_version_with_mojang_retry(
             minecraft_version,
-            str(self.minecraft_dir),
             callback=self._callback_dict()
         )
         self.ensure_clean_vanilla_for_legacy_forge()
@@ -2295,9 +2392,8 @@ class LauncherCore:
         self.ensure_launcher_profiles_json()
 
         # Установим vanilla-часть заранее, чтобы папка сборки была полноценной.
-        minecraft_launcher_lib.install.install_minecraft_version(
+        self.install_minecraft_version_with_mojang_retry(
             minecraft_version,
-            str(self.minecraft_dir),
             callback=self._callback_dict()
         )
 
@@ -2753,9 +2849,8 @@ class LauncherCore:
             shutil.move(str(version_dir), str(backup))
             self.emit_log(f"Папка версии перемещена в backup: {backup}")
 
-        minecraft_launcher_lib.install.install_minecraft_version(
+        self.install_minecraft_version_with_mojang_retry(
             minecraft_version,
-            str(self.minecraft_dir),
             callback=self._callback_dict()
         )
         self.emit_status("Repair сборки завершён.")
@@ -2855,7 +2950,7 @@ QUILT_LOADER_META_URL = "https://meta.quiltmc.org/v3/versions/loader/{minecraft_
 NEOFORGE_MAVEN_METADATA_URL = "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml"
 
 HTTP_HEADERS = {
-    "User-Agent": "StoneLightLauncher/0.6.70 (+https://github.com/stonelightmc/StoneLight-Launcher)",
+    "User-Agent": "StoneLightLauncher/0.6.71 (+https://github.com/stonelightmc/StoneLight-Launcher)",
     "Accept": "application/json, text/xml, application/xml, text/plain, */*",
 }
 

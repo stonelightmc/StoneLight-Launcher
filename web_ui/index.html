@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>StoneLight Launcher</title>
-  <link rel="stylesheet" href="styles/base.css?v=0.6.70">
-  <link rel="stylesheet" href="styles/themes.css?v=0.6.70">
-  <link rel="stylesheet" href="styles/layout.css?v=0.6.70">
-  <link rel="stylesheet" href="styles/animations.css?v=0.6.70">
+  <link rel="stylesheet" href="styles/base.css?v=0.6.71">
+  <link rel="stylesheet" href="styles/themes.css?v=0.6.71">
+  <link rel="stylesheet" href="styles/layout.css?v=0.6.71">
+  <link rel="stylesheet" href="styles/animations.css?v=0.6.71">
 </head>
 <body>
   <div id="app" class="app-shell">
@@ -59,7 +59,7 @@
       </nav>
 
       <div class="menu-bar__spacer"></div>
-      <span id="versionLabel" class="version-label">v0.6.70</span>
+      <span id="versionLabel" class="version-label">v0.6.71</span>
     </header>
 
     <section class="hero card card--strong" id="hero">
@@ -118,6 +118,7 @@
         <div class="tabs" role="tablist">
           <button class="tab is-active" data-tab="instances" role="tab" data-i18n="tabs.instances">Instances</button>
           <button class="tab" data-tab="modrinth" role="tab">Modrinth</button>
+          <button class="tab" data-tab="curseforge" role="tab">CurseForge</button>
         </div>
 
         <div class="tab-content is-active" data-tab-content="instances">
@@ -208,6 +209,81 @@
           </section>
         </div>
 
+        <div class="tab-content" data-tab-content="curseforge">
+          <section class="catalog-panel curseforge-panel">
+            <div class="catalog-hero">
+              <div>
+                <div class="placeholder__badge placeholder__badge--curseforge">CURSEFORGE</div>
+                <h2 data-i18n="curseforge.title">CurseForge</h2>
+                <p data-i18n="curseforge.text">Search and install CurseForge projects through the StoneLight backend.</p>
+              </div>
+              <div id="curseforgeSelectedInstance" class="catalog-selected-instance"></div>
+            </div>
+
+            <form id="curseforgeSearchForm" class="catalog-search catalog-search--curseforge">
+              <label class="form-field catalog-search__query">
+                <span data-i18n="curseforge.search">Search</span>
+                <input id="curseforgeQueryInput" class="text-input" type="search" autocomplete="off" placeholder="JEI, Sodium, JourneyMap...">
+              </label>
+
+              <label class="form-field">
+                <span data-i18n="curseforge.type">Type</span>
+                <select id="curseforgeTypeSelect" class="select">
+                  <option value="mod" data-i18n="curseforge.typeMod">Mods</option>
+                  <option value="resourcepack" data-i18n="curseforge.typeResourcepack">Resource packs</option>
+                  <option value="shader" data-i18n="curseforge.typeShader">Shaders</option>
+                  <option value="modpack" data-i18n="curseforge.typeModpack">Modpacks</option>
+                </select>
+              </label>
+
+              <label class="form-field">
+                <span data-i18n="curseforge.sort">Sort</span>
+                <select id="curseforgeSortSelect" class="select">
+                  <option value="popular" data-i18n="curseforge.sortPopularity">Popular</option>
+                  <option value="downloads" data-i18n="curseforge.sortDownloads">Downloads</option>
+                  <option value="updated" data-i18n="curseforge.sortUpdated">Updated</option>
+                  <option value="name" data-i18n="curseforge.sortName">Name</option>
+                  <option value="relevance" data-i18n="curseforge.sortRelevancy">Relevance</option>
+                </select>
+              </label>
+
+              <button id="curseforgeSearchButton" class="button button--primary catalog-search__button" type="submit" data-i18n="curseforge.searchButton">Search</button>
+
+            </form>
+
+            <section id="curseforgeFilters" class="catalog-filters catalog-filters--curseforge hidden" aria-label="CurseForge filters">
+              <div class="catalog-filters__head">
+                <div>
+                  <h3 data-i18n="curseforge.filtersTitle">Filters</h3>
+                  <p id="curseforgeFiltersHint" data-i18n="curseforge.filtersHint">Default filters follow the selected instance.</p>
+                </div>
+                <div class="catalog-filters__actions">
+                  <label class="catalog-toggle">
+                    <input id="curseforgeShowSnapshotsCheckbox" type="checkbox">
+                    <span data-i18n="curseforge.showSnapshots">Show all versions</span>
+                  </label>
+                  <label class="catalog-toggle" title="Show compatible projects that require manual download on CurseForge">
+                    <input id="curseforgeShowManualOnlyCheckbox" type="checkbox" checked>
+                    <span data-i18n="curseforge.showManualOnly">Show manual-only</span>
+                  </label>
+                  <button id="curseforgeResetFiltersButton" class="button button--compact" type="button" data-i18n="curseforge.resetFilters">Reset filters</button>
+                </div>
+              </div>
+              <div id="curseforgeFilterFields" class="catalog-filter-fields"></div>
+              <div id="curseforgeFilterGroups" class="catalog-filter-groups"></div>
+            </section>
+
+            <div id="curseforgeStatus" class="form-note hidden"></div>
+            <div id="curseforgeResults" class="catalog-results"></div>
+            <nav id="curseforgePagination" class="catalog-pagination hidden" aria-label="CurseForge pages"></nav>
+            <div id="curseforgeEmpty" class="empty-state catalog-empty hidden">
+              <div class="empty-state__icon">◇</div>
+              <h3 data-i18n="curseforge.emptyTitle">Nothing found</h3>
+              <p data-i18n="curseforge.emptyText">Try another query or content type.</p>
+            </div>
+          </section>
+        </div>
+
       </section>
 
       <aside class="right-rail">
@@ -271,6 +347,7 @@
       <button data-context-action="play" data-i18n="actions.play">Play</button>
       <button data-context-action="folder" data-i18n="instanceTools.folder">Instance folder</button>
       <button data-context-action="window" data-i18n="instanceTools.window">Instance window</button>
+      <button data-context-action="clone" data-i18n="instanceTools.clone">Clone instance</button>
       <div class="context-menu__separator"></div>
       <button data-context-action="icon" data-i18n="instanceTools.icon">Choose icon</button>
     </div>
@@ -459,13 +536,17 @@
             <div class="instance-window__summary" id="instanceWindowSummary"></div>
             <div id="officialUpdateNotice" class="official-update-notice hidden"></div>
             <div id="modrinthModpackUpdateNotice" class="official-update-notice modrinth-modpack-update hidden"></div>
+            <div id="curseforgeModpackUpdateNotice" class="official-update-notice curseforge-modpack-update hidden"></div>
             <div class="instance-window__actions instance-window__actions--main">
               <button class="button button--primary button--compact" data-instance-window-action="play" data-i18n="actions.play">Play</button>
               <button class="button button--accent-soft button--compact hidden" id="officialUpdateButton" data-instance-window-action="update" data-i18n="instanceWindow.updateOfficial">Update instance</button>
               <button class="button button--compact hidden" id="modrinthModpackCheckButton" data-instance-window-action="modrinth-modpack-check" data-i18n="modrinthModpack.check">Check modpack</button>
               <button class="button button--accent-soft button--compact hidden" id="modrinthModpackUpdateButton" data-instance-window-action="modrinth-modpack-update" data-i18n="modrinthModpack.update">Update modpack</button>
+              <button class="button button--compact hidden" id="curseforgeModpackCheckButton" data-instance-window-action="curseforge-modpack-check" data-i18n="curseforgeModpack.check">Check CurseForge pack</button>
+              <button class="button button--accent-soft button--compact hidden" id="curseforgeModpackUpdateButton" data-instance-window-action="curseforge-modpack-update" data-i18n="curseforgeModpack.update">Update CurseForge pack</button>
               <button class="button button--danger-soft button--compact" data-instance-window-action="stop" data-i18n="actions.stop">Stop</button>
               <button class="button button--compact" data-instance-window-action="folder" data-i18n="instanceTools.folder">Instance folder</button>
+              <button class="button button--compact hidden" id="curseforgeModpackReportButton" data-instance-window-action="curseforge-modpack-report" data-i18n="curseforgeModpack.report">Install report</button>
             </div>
             <div id="forgeToolsRow" class="forge-tools-row hidden">
               <button class="button button--compact" data-instance-window-action="forge-manual" data-i18n="forge.manual">Manual Forge Installer</button>
@@ -674,17 +755,17 @@
           <button id="launchSettingsClose" class="icon-button" type="button" aria-label="Close">×</button>
         </header>
 
-        <form id="launchSettingsForm" class="instance-form launch-settings-form">
+        <form id="launchSettingsForm" class="instance-form launch-settings-form" novalidate>
           <div class="form-section-title form-field--wide" data-i18n="launch.sectionMemory">Memory</div>
 
           <label class="form-field">
             <span data-i18n="launch.ramMin">Minimum RAM, MB</span>
-            <input id="globalRamMinInput" class="text-input" type="number" min="256" max="65536" step="128" autocomplete="off">
+            <input id="globalRamMinInput" class="text-input" type="number" min="256" max="65536" step="1" autocomplete="off">
           </label>
 
           <label class="form-field">
             <span data-i18n="launch.ramMax">Maximum RAM, MB</span>
-            <input id="globalRamMaxInput" class="text-input" type="number" min="1024" max="131072" step="128" autocomplete="off">
+            <input id="globalRamMaxInput" class="text-input" type="number" min="1024" max="131072" step="1" autocomplete="off">
           </label>
 
           <div class="form-section-title form-field--wide" data-i18n="launch.sectionWindow">Game window</div>
@@ -882,9 +963,9 @@
     <div id="toastHost" class="toast-host" aria-live="polite"></div>
   </div>
 
-  <script src="scripts/i18n.js?v=0.6.70"></script>
-  <script src="scripts/state.js?v=0.6.70"></script>
-  <script src="scripts/api.js?v=0.6.70"></script>
-  <script src="scripts/app.js?v=0.6.70"></script>
+  <script src="scripts/i18n.js?v=0.6.71-cf2"></script>
+  <script src="scripts/state.js?v=0.6.71"></script>
+  <script src="scripts/api.js?v=0.6.71"></script>
+  <script src="scripts/app.js?v=0.6.71-cf2"></script>
 </body>
 </html>

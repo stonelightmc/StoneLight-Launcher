@@ -42,6 +42,22 @@ def is_newer_version(latest: str, current: str) -> bool:
     return parse_version(latest) > parse_version(current)
 
 
+def official_modpack_fallback_url(config: dict) -> str:
+    return (
+        config.get("official_modpack_fallback_url")
+        or config.get("mods_zip_url", "")
+        or ""
+    )
+
+
+def official_modpack_fallback_sha256(config: dict) -> str:
+    return (
+        config.get("official_modpack_fallback_sha256")
+        or config.get("mods_zip_sha256", "")
+        or ""
+    )
+
+
 def load_config() -> dict:
     try:
         return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
@@ -167,7 +183,7 @@ def check_official_modpack_update(config: dict | None = None) -> dict:
             return {
                 "kind": "official_modpack",
                 "repo": repo,
-                "current_url": config.get("mods_zip_url", ""),
+                "current_url": official_modpack_fallback_url(config),
                 "current_minecraft_version": config.get("minecraft_version", ""),
                 "latest_minecraft_version": "",
                 "has_update": False,
@@ -182,7 +198,7 @@ def check_official_modpack_update(config: dict | None = None) -> dict:
     asset = find_asset(release, prefix=prefix, suffix=suffix)
     asset_name = asset.get("name", "") if asset else ""
     asset_url = asset.get("browser_download_url", "") if asset else ""
-    current_url = config.get("mods_zip_url", "")
+    current_url = official_modpack_fallback_url(config)
     latest_mc = infer_minecraft_version_from_modpack_name(asset_name)
 
     return {
@@ -232,8 +248,10 @@ def apply_official_modpack_update_to_config(info: dict, config: dict | None = No
     if not info.get("asset_url"):
         raise UpdateError("Не найден asset официальной сборки.")
 
-    config["mods_zip_url"] = info["asset_url"]
-    config["mods_zip_sha256"] = ""
+    config["official_modpack_fallback_url"] = info["asset_url"]
+    config["official_modpack_fallback_sha256"] = ""
+    config.pop("mods_zip_url", None)
+    config.pop("mods_zip_sha256", None)
     if info.get("latest_minecraft_version"):
         config["minecraft_version"] = info["latest_minecraft_version"]
 

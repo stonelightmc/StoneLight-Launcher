@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import base64
+import copy
 import os
 import shutil
 import socket
@@ -12,6 +13,7 @@ import time
 import threading
 import hashlib
 import traceback
+import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
@@ -91,6 +93,8 @@ TOGGLEABLE_FOLDER_SUFFIXES = {
 SCREENSHOT_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 
 MODRINTH_PROJECT_TYPES = {"mod", "resourcepack", "shader", "modpack"}
+MODRINTH_REQUIRED_DEPENDENCY_TYPE = "required"
+MODRINTH_MAX_DEPENDENCY_DEPTH = 6
 MODRINTH_INSTALL_FOLDERS = {
     "mod": "mods",
     "resourcepack": "resourcepacks",
@@ -144,6 +148,8 @@ CURSEFORGE_SORT_FIELDS = {
     "gameVersion": 8,
 }
 CURSEFORGE_PROJECT_TYPES = {"mod", "resourcepack", "shader", "modpack"}
+CURSEFORGE_REQUIRED_DEPENDENCY_RELATION_TYPE = 3
+CURSEFORGE_MAX_DEPENDENCY_DEPTH = 6
 
 INSTANCE_ICON_PACK = [
     {
@@ -1503,6 +1509,12 @@ class LauncherWebAPI:
         target.relative_to(game_dir.resolve())
         return target
 
+    def _curseforge_cache_path(self, project_id: str, file_id: str, filename: str) -> Path:
+        safe_project = slugify_instance_name(project_id or "project")
+        safe_file = slugify_instance_name(file_id or "file")
+        safe_name = Path(str(filename or "download")).name
+        return ROOT / "data" / "cache" / "curseforge" / safe_project / safe_file / safe_name
+
     def _modrinth_cache_path(self, project_id: str, version_id: str, filename: str) -> Path:
         safe_project = slugify_instance_name(project_id or "project")
         safe_version = slugify_instance_name(version_id or "version")
@@ -2214,9 +2226,477 @@ class LauncherWebAPI:
             "folder": folder_key,
             "filename": target.name,
             "url": file_info.get("url") or "",
+            "hashes": file_info.get("hashes") or {},
+            "dependencies": version.get("dependencies") or [],
             "installed_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         }
         path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    def _modrinth_file_hashes(self, file_info: dict) -> dict:
+        hashes = file_info.get("hashes") if isinstance(file_info, dict) else {}
+        return hashes if isinstance(hashes, dict) else {}
+
+    def _file_matches_modrinth_hashes(self, path: Path, file_info: dict) -> bool:
+        if not path.exists() or not path.is_file():
+            return False
+
+        hashes = self._modrinth_file_hashes(file_info)
+        if not hashes:
+            return False
+
+        data = None
+
+        expected_sha1 = str(hashes.get("sha1") or "").strip().lower()
+        if expected_sha1:
+            data = path.read_bytes()
+            if hashlib.sha1(data).hexdigest().lower() == expected_sha1:
+                return True
+
+        expected_sha512 = str(hashes.get("sha512") or "").strip().lower()
+        if expected_sha512:
+            if data is None:
+                data = path.read_bytes()
+            if hashlib.sha512(data).hexdigest().lower() == expected_sha512:
+                return True
+
+        return False
+
+    def _modrinth_source_for_project(self, instance: dict, project_id: str) -> dict:
+        path = self._modrinth_sources_path(instance)
+        try:
+            data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+            return (((data.get("modrinth") or {}).get("projects") or {}).get(str(project_id)) or {})
+        except Exception:
+            return {}
+
+    def _modrinth_recorded_file_exists(self, instance: dict, record: dict) -> bool:
+        folder_key = str(record.get("folder") or "").strip()
+        filename = str(record.get("filename") or "").strip()
+        if not folder_key or not filename:
+            return False
+
+        try:
+            folder = self._instance_subfolder(instance, folder_key)
+            target = self._safe_folder_file(folder, filename)
+            return target.exists() and target.is_file()
+        except Exception:
+            return False
+
+    def _modrinth_source_matches(self, instance: dict, project_id: str, version_id: str, folder_key: str, filename: str) -> bool:
+        item = self._modrinth_source_for_project(instance, project_id)
+        if not item:
+            return False
+
+        return (
+            str(item.get("project_id") or "") == str(project_id)
+            and str(item.get("version_id") or "") == str(version_id)
+            and str(item.get("folder") or "") == str(folder_key)
+            and str(item.get("filename") or "") == str(filename)
+        )
+
+    def _modrinth_dependency_key(self, dependency: dict) -> str:
+        version_id = str(dependency.get("version_id") or "").strip()
+        project_id = str(dependency.get("project_id") or "").strip()
+        if version_id:
+            return f"version:{version_id}"
+        if project_id:
+            return f"project:{project_id}"
+        return ""
+
+    def _modrinth_required_dependencies(self, version: dict) -> list[dict]:
+        result: list[dict] = []
+        for dependency in version.get("dependencies") or []:
+            if not isinstance(dependency, dict):
+                continue
+            if str(dependency.get("dependency_type") or "").strip().lower() != MODRINTH_REQUIRED_DEPENDENCY_TYPE:
+                continue
+            if not (dependency.get("version_id") or dependency.get("project_id")):
+                continue
+            result.append(dependency)
+        return result
+
+    def _modrinth_version_is_compatible(self, version: dict, project_type: str, instance: dict) -> bool:
+        mc_version = str(instance.get("minecraft_version") or "").strip()
+        loader = str(instance.get("loader") or "vanilla").strip().lower()
+
+        game_versions = [str(item) for item in (version.get("game_versions") or [])]
+        loaders = [str(item).lower() for item in (version.get("loaders") or [])]
+
+        if mc_version and game_versions and mc_version not in game_versions:
+            return False
+
+        if project_type in {"mod", "modpack"} and loader != "vanilla" and loaders and loader not in loaders:
+            return False
+
+        return True
+
+    def _modrinth_project_for_version(self, version: dict) -> dict:
+        project_id = str(version.get("project_id") or "").strip()
+        if not project_id:
+            raise ValueError("У версии Modrinth не указан project_id.")
+        project = self._modrinth_read_json(f"project/{urllib.parse.quote(project_id, safe='')}")
+        if not isinstance(project, dict):
+            raise ValueError("Не удалось прочитать проект Modrinth.")
+        return project
+
+    def _resolve_modrinth_version_and_file(
+        self,
+        instance: dict,
+        project_id: str,
+        project_type: str,
+        filters: dict,
+        requested_version_id: str = "",
+    ) -> tuple[dict, dict, dict]:
+        selected_mc = self._modrinth_filter_value(filters, "game_version", str(instance.get("minecraft_version") or "").strip())
+        selected_loader = self._modrinth_filter_value(filters, "loader", str(instance.get("loader") or "vanilla").strip().lower()).lower()
+        version_target = {**instance, "minecraft_version": selected_mc, "loader": selected_loader}
+
+        if requested_version_id:
+            version = self._modrinth_read_json(f"version/{urllib.parse.quote(requested_version_id, safe='')}")
+            if not isinstance(version, dict):
+                raise ValueError("Не удалось прочитать версию Modrinth.")
+            project = self._modrinth_project_for_version(version)
+            if project_type == "mod" and not self._modrinth_version_is_compatible(version, project_type, version_target):
+                self._append_startup_log(f"Modrinth dependency version {requested_version_id} does not fully match selected filters; using dependency-provided version anyway.")
+            file_info = self._choose_modrinth_file(version, project_type)
+            if not file_info:
+                raise ValueError("В версии Modrinth не найден подходящий файл.")
+            return project, version, file_info
+
+        project = self._modrinth_read_json(f"project/{urllib.parse.quote(project_id, safe='')}")
+        if not isinstance(project, dict):
+            raise ValueError("Не удалось прочитать проект Modrinth.")
+
+        versions = self._modrinth_versions_for_instance(project_id, project_type, version_target)
+        if not versions:
+            raise ValueError("Не найдена совместимая версия для выбранных фильтров.")
+
+        for version in versions:
+            file_info = self._choose_modrinth_file(version, project_type)
+            if file_info:
+                return project, version, file_info
+
+        raise ValueError("В совместимых версиях не найден подходящий файл.")
+
+    def _install_modrinth_required_dependencies(
+        self,
+        instance: dict,
+        project_id: str,
+        version: dict,
+        filters: dict,
+        dependency_stack: set[str],
+        depth: int,
+    ) -> tuple[list[dict], list[dict]]:
+        if depth >= MODRINTH_MAX_DEPENDENCY_DEPTH:
+            raise ValueError("Слишком глубокая цепочка зависимостей Modrinth.")
+
+        installed: list[dict] = []
+        already_installed: list[dict] = []
+
+        for dependency in self._modrinth_required_dependencies(version):
+            dependency_key = self._modrinth_dependency_key(dependency)
+            if not dependency_key:
+                continue
+            if dependency_key in dependency_stack:
+                self._append_startup_log(f"Modrinth dependency cycle skipped: {dependency_key}")
+                continue
+
+            dep_project_id = str(dependency.get("project_id") or "").strip()
+            dep_version_id = str(dependency.get("version_id") or "").strip()
+
+            self._emit("status", {
+                "busy": True,
+                "message": f"Устанавливаю зависимость Modrinth {dep_project_id or dep_version_id}...",
+                "action": "modrinth_install",
+                "progress": 0.05,
+            })
+
+            next_stack = set(dependency_stack)
+            next_stack.add(dependency_key)
+
+            result = self._install_modrinth_project_internal(
+                instance=instance,
+                project_id=dep_project_id,
+                project_type="mod",
+                filters=filters,
+                dependency_stack=next_stack,
+                depth=depth + 1,
+                install_dependencies=True,
+                requested_version_id=dep_version_id,
+            )
+
+            if not result.get("ok"):
+                raise ValueError(f"Не удалось установить обязательную зависимость Modrinth {dep_project_id or dep_version_id}: {result.get('error') or result}")
+
+            if result.get("already_installed"):
+                already_installed.append(result)
+            else:
+                installed.append(result)
+
+            for nested in result.get("dependencies_installed") or []:
+                if isinstance(nested, dict):
+                    installed.append(nested)
+            for nested in result.get("dependencies_already_installed") or []:
+                if isinstance(nested, dict):
+                    already_installed.append(nested)
+
+        return installed, already_installed
+
+    def _install_modrinth_project_internal(
+        self,
+        instance: dict,
+        project_id: str,
+        project_type: str,
+        filters: dict,
+        dependency_stack: set[str],
+        depth: int,
+        install_dependencies: bool,
+        requested_version_id: str = "",
+    ) -> dict:
+        if project_type not in MODRINTH_PROJECT_TYPES:
+            raise ValueError("Некорректный тип проекта Modrinth.")
+        if project_type == "modpack":
+            raise ValueError("Modrinth-модпаки обрабатываются отдельным установщиком.")
+
+        folder_key = MODRINTH_INSTALL_FOLDERS.get(project_type)
+        if not folder_key:
+            raise ValueError("Для этого типа проекта пока нет папки установки.")
+
+        project, selected_version, selected_file = self._resolve_modrinth_version_and_file(
+            instance=instance,
+            project_id=project_id,
+            project_type=project_type,
+            filters=filters,
+            requested_version_id=requested_version_id,
+        )
+
+        resolved_project_id = str(project.get("id") or project_id or selected_version.get("project_id") or "").strip()
+        version_id = str(selected_version.get("id") or requested_version_id or "").strip()
+        filename = Path(str(selected_file.get("filename") or "")).name
+        suffixes = MODRINTH_ALLOWED_SUFFIXES.get(project_type, ())
+        if suffixes and not filename.lower().endswith(suffixes):
+            raise ValueError("Файл имеет неподдерживаемый формат.")
+
+        folder = self._instance_subfolder(instance, folder_key)
+        folder.mkdir(parents=True, exist_ok=True)
+        target = self._safe_folder_file(folder, filename)
+
+        dependencies_installed: list[dict] = []
+        dependencies_already_installed: list[dict] = []
+
+        if target.exists():
+            same_hash = self._file_matches_modrinth_hashes(target, selected_file)
+            same_record = self._modrinth_source_matches(instance, resolved_project_id, version_id, folder_key, target.name)
+            if not (same_hash or same_record):
+                raise ValueError(
+                    f"Файл уже существует: {target.name}. "
+                    "Он не совпал с выбранным файлом Modrinth или не был установлен через лаунчер."
+                )
+
+            if install_dependencies and project_type == "mod":
+                dependencies_installed, dependencies_already_installed = self._install_modrinth_required_dependencies(
+                    instance=instance,
+                    project_id=resolved_project_id,
+                    version=selected_version,
+                    filters=filters,
+                    dependency_stack=dependency_stack,
+                    depth=depth,
+                )
+
+            return {
+                "ok": True,
+                "already_installed": True,
+                "message": "Проект Modrinth уже установлен.",
+                "project": {
+                    "title": project.get("title") or project.get("slug") or resolved_project_id,
+                    "project_id": resolved_project_id,
+                    "project_type": project_type,
+                },
+                "version": {
+                    "id": version_id,
+                    "number": selected_version.get("version_number") or "",
+                },
+                "filename": target.name,
+                "folder": folder_key,
+                "dependencies_installed": dependencies_installed,
+                "dependencies_already_installed": dependencies_already_installed,
+            }
+
+        if install_dependencies and project_type == "mod":
+            dependencies_installed, dependencies_already_installed = self._install_modrinth_required_dependencies(
+                instance=instance,
+                project_id=resolved_project_id,
+                version=selected_version,
+                filters=filters,
+                dependency_stack=dependency_stack,
+                depth=depth,
+            )
+
+        self._download_modrinth_file(selected_file, target)
+        self._record_modrinth_source(instance, project, selected_version, selected_file, folder_key, target)
+        self._append_startup_log(f"Modrinth installed: {project.get('title') or resolved_project_id} -> {folder_key}/{target.name}")
+
+        return {
+            "ok": True,
+            "already_installed": False,
+            "message": "Проект Modrinth установлен.",
+            "project": {
+                "title": project.get("title") or project.get("slug") or resolved_project_id,
+                "project_id": resolved_project_id,
+                "project_type": project_type,
+            },
+            "version": {
+                "id": version_id,
+                "number": selected_version.get("version_number") or "",
+            },
+            "filename": target.name,
+            "folder": folder_key,
+            "dependencies_installed": dependencies_installed,
+            "dependencies_already_installed": dependencies_already_installed,
+        }
+
+
+    def _modrinth_preview_item(self, instance: dict, project: dict, version: dict, file_info: dict, folder_key: str, project_type: str) -> dict:
+        resolved_project_id = str(project.get("id") or version.get("project_id") or "").strip()
+        version_id = str(version.get("id") or "").strip()
+        filename = Path(str(file_info.get("filename") or "")).name
+        target = self._safe_folder_file(self._instance_subfolder(instance, folder_key), filename)
+
+        already = False
+        conflict = False
+        if target.exists():
+            same_hash = self._file_matches_modrinth_hashes(target, file_info)
+            same_record = self._modrinth_source_matches(instance, resolved_project_id, version_id, folder_key, target.name)
+            already = bool(same_hash or same_record)
+            conflict = not already
+
+        return {
+            "source": "modrinth",
+            "project_id": resolved_project_id,
+            "project_type": project_type,
+            "title": project.get("title") or project.get("slug") or resolved_project_id,
+            "version_id": version_id,
+            "version_number": version.get("version_number") or "",
+            "filename": filename,
+            "folder": folder_key,
+            "already_installed": already,
+            "conflict": conflict,
+            "downloadable": bool(file_info.get("url")),
+        }
+
+    def _collect_modrinth_dependency_preview(
+        self,
+        instance: dict,
+        version: dict,
+        filters: dict,
+        dependency_stack: set[str],
+        depth: int,
+        seen: set[str],
+    ) -> list[dict]:
+        if depth >= MODRINTH_MAX_DEPENDENCY_DEPTH:
+            raise ValueError("Слишком глубокая цепочка зависимостей Modrinth.")
+
+        items: list[dict] = []
+        for dependency in self._modrinth_required_dependencies(version):
+            dependency_key = self._modrinth_dependency_key(dependency)
+            if not dependency_key or dependency_key in dependency_stack:
+                continue
+
+            dep_project_id = str(dependency.get("project_id") or "").strip()
+            dep_version_id = str(dependency.get("version_id") or "").strip()
+
+            project, dep_version, dep_file = self._resolve_modrinth_version_and_file(
+                instance=instance,
+                project_id=dep_project_id,
+                project_type="mod",
+                filters=filters,
+                requested_version_id=dep_version_id,
+            )
+            preview_item = self._modrinth_preview_item(instance, project, dep_version, dep_file, MODRINTH_INSTALL_FOLDERS.get("mod", "mods"), "mod")
+            unique_key = f"{preview_item.get('project_id')}:{preview_item.get('version_id')}:{preview_item.get('filename')}"
+            if unique_key not in seen:
+                seen.add(unique_key)
+                items.append(preview_item)
+
+            next_stack = set(dependency_stack)
+            next_stack.add(dependency_key)
+            items.extend(self._collect_modrinth_dependency_preview(
+                instance=instance,
+                version=dep_version,
+                filters=filters,
+                dependency_stack=next_stack,
+                depth=depth + 1,
+                seen=seen,
+            ))
+
+        return items
+
+    def preview_modrinth_install(self, payload: dict | None = None) -> dict:
+        payload = payload or {}
+        instance_id = str(payload.get("instance_id") or "").strip()
+        project_id = str(payload.get("project_id") or payload.get("slug") or "").strip()
+        project_type = str(payload.get("project_type") or "mod").strip().lower()
+        filters = payload.get("filters") if isinstance(payload.get("filters"), dict) else {}
+
+        try:
+            if not project_id:
+                return {"ok": False, "error": "Проект Modrinth не выбран."}
+            if project_type not in MODRINTH_PROJECT_TYPES:
+                return {"ok": False, "error": "Некорректный тип проекта Modrinth."}
+            if project_type == "modpack":
+                return {
+                    "ok": True,
+                    "source": "modrinth",
+                    "project_type": project_type,
+                    "requires_confirmation": False,
+                    "dependencies": [],
+                    "dependencies_to_install": [],
+                    "dependencies_already_installed": [],
+                    "message": "Modrinth-модпаки используют отдельный установщик.",
+                }
+
+            instance = self._instance_by_id_or_selected(instance_id) if instance_id else self._selected_instance()
+            if not instance:
+                return {"ok": False, "error": "Сборка не выбрана."}
+
+            project, selected_version, selected_file = self._resolve_modrinth_version_and_file(
+                instance=instance,
+                project_id=project_id,
+                project_type=project_type,
+                filters=filters,
+            )
+
+            folder_key = MODRINTH_INSTALL_FOLDERS.get(project_type, "mods")
+            main_item = self._modrinth_preview_item(instance, project, selected_version, selected_file, folder_key, project_type)
+
+            dependencies = []
+            if project_type == "mod":
+                dependencies = self._collect_modrinth_dependency_preview(
+                    instance=instance,
+                    version=selected_version,
+                    filters=filters,
+                    dependency_stack={f"project:{project.get('id') or project_id}"},
+                    depth=0,
+                    seen=set(),
+                )
+
+            dependencies_to_install = [item for item in dependencies if not item.get("already_installed") and not item.get("conflict")]
+            dependencies_already_installed = [item for item in dependencies if item.get("already_installed")]
+            conflicts = [item for item in dependencies if item.get("conflict")]
+
+            return {
+                "ok": True,
+                "source": "modrinth",
+                "project_type": project_type,
+                "main": main_item,
+                "dependencies": dependencies,
+                "dependencies_to_install": dependencies_to_install,
+                "dependencies_already_installed": dependencies_already_installed,
+                "conflicts": conflicts,
+                "requires_confirmation": bool(dependencies_to_install or conflicts),
+            }
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
 
     def install_modrinth_project(self, payload: dict | None = None) -> dict:
         payload = payload or {}
@@ -2224,6 +2704,7 @@ class LauncherWebAPI:
         project_id = str(payload.get("project_id") or payload.get("slug") or "").strip()
         project_type = str(payload.get("project_type") or "mod").strip().lower()
         filters = payload.get("filters") if isinstance(payload.get("filters"), dict) else {}
+        install_dependencies = bool(payload.get("install_dependencies", True))
 
         if not project_id:
             return {"ok": False, "error": "Проект Modrinth не выбран."}
@@ -2238,86 +2719,57 @@ class LauncherWebAPI:
                 self._emit("status", {"busy": False, "message": str(exc), "error": True, "progress": 0})
                 return {"ok": False, "error": str(exc)}
 
-        instance = self._instance_by_id_or_selected(instance_id) if instance_id else self._selected_instance()
-        if not instance:
-            return {"ok": False, "error": "Сборка не выбрана."}
-
-        loader = str(instance.get("loader") or "vanilla").lower()
-        if project_type == "mod" and loader == "vanilla":
-            return {"ok": False, "error": "Для установки модов нужна сборка с модлоадером."}
-
-        folder_key = MODRINTH_INSTALL_FOLDERS.get(project_type)
-        if not folder_key:
-            return {"ok": False, "error": "Для этого типа проекта пока нет папки установки."}
+        with self._operation_lock:
+            if self._busy:
+                return {"ok": False, "error": "Дождись завершения текущей операции."}
+            self._busy = True
+            self._busy_action = "modrinth_install"
 
         try:
-            project = self._modrinth_read_json(f"project/{urllib.parse.quote(project_id, safe="")}")
-            if not isinstance(project, dict):
-                raise ValueError("Не удалось прочитать проект Modrinth.")
+            instance = self._instance_by_id_or_selected(instance_id) if instance_id else self._selected_instance()
+            if not instance:
+                return {"ok": False, "error": "Сборка не выбрана."}
 
-            selected_mc = self._modrinth_filter_value(filters, "game_version", str(instance.get("minecraft_version") or "").strip())
-            selected_loader = self._modrinth_filter_value(filters, "loader", str(instance.get("loader") or "vanilla").strip().lower()).lower()
-            version_target = {**instance, "minecraft_version": selected_mc, "loader": selected_loader}
+            loader = str(instance.get("loader") or "vanilla").lower()
+            if project_type == "mod" and loader == "vanilla":
+                return {"ok": False, "error": "Для установки модов нужна сборка с модлоадером."}
 
-            versions = self._modrinth_versions_for_instance(project_id, project_type, version_target)
-            if not versions:
-                return {
-                    "ok": False,
-                    "error": "Не найдена совместимая версия для выбранных фильтров.",
-                }
+            self._emit("status", {
+                "busy": True,
+                "message": "Проверяю файлы Modrinth...",
+                "action": "modrinth_install",
+                "progress": 0,
+            })
 
-            selected_version = None
-            selected_file = None
-            for version in versions:
-                file_info = self._choose_modrinth_file(version, project_type)
-                if file_info:
-                    selected_version = version
-                    selected_file = file_info
-                    break
+            result = self._install_modrinth_project_internal(
+                instance=instance,
+                project_id=project_id,
+                project_type=project_type,
+                filters=filters,
+                dependency_stack={f"project:{project_id}"},
+                depth=0,
+                install_dependencies=install_dependencies,
+            )
 
-            if not selected_version or not selected_file:
-                return {"ok": False, "error": "В совместимых версиях не найден подходящий файл."}
+            message = "Проект Modrinth уже установлен." if result.get("already_installed") else "Проект Modrinth установлен."
+            dep_count = len(result.get("dependencies_installed") or [])
+            if dep_count:
+                message = f"{message} Установлено зависимостей: {dep_count}."
 
-            filename = Path(str(selected_file.get("filename") or "")).name
-            folder = self._instance_subfolder(instance, folder_key)
-            folder.mkdir(parents=True, exist_ok=True)
-            suffixes = MODRINTH_ALLOWED_SUFFIXES.get(project_type, ())
-            if suffixes and not filename.lower().endswith(suffixes):
-                return {"ok": False, "error": "Файл имеет неподдерживаемый формат."}
-
-            target = self._safe_folder_file(folder, filename)
-            self._emit("status", {"busy": True, "message": "Скачиваю проект Modrinth...", "progress": 0})
-            self._download_modrinth_file(selected_file, target)
-            self._record_modrinth_source(instance, project, selected_version, selected_file, folder_key, target)
-            self._append_startup_log(f"Modrinth installed: {project.get('title') or project_id} -> {folder_key}/{target.name}")
-            self._emit("status", {"busy": False, "message": "Проект Modrinth установлен.", "progress": 1})
-
-            response = {
-                "ok": True,
-                "message": "Проект Modrinth установлен.",
-                "project": {
-                    "title": project.get("title") or project.get("slug") or project_id,
-                    "project_id": project.get("id") or project_id,
-                    "project_type": project_type,
-                },
-                "version": {
-                    "id": selected_version.get("id") or "",
-                    "number": selected_version.get("version_number") or "",
-                },
-                "filename": target.name,
-                "folder": folder_key,
-            }
-
+            self._emit("status", {"busy": False, "message": message, "progress": 1})
 
             try:
-                response["folder_data"] = self.list_instance_folder(instance.get("id", ""), folder_key)
+                result["folder_data"] = self.list_instance_folder(instance.get("id", ""), result.get("folder") or MODRINTH_INSTALL_FOLDERS.get(project_type, "mods"))
             except Exception:
                 pass
 
-            return response
+            return result
+
         except Exception as exc:
             self._emit("status", {"busy": False, "message": str(exc), "error": True, "progress": 0})
             return {"ok": False, "error": str(exc)}
+        finally:
+            self._set_busy(False, "")
 
     def open_external_url(self, url: str) -> dict:
         url = str(url or "").strip()
@@ -2325,76 +2777,210 @@ class LauncherWebAPI:
         if parsed.scheme not in {"https", "http"} or not parsed.netloc:
             return {"ok": False, "error": "Некорректная ссылка."}
         try:
-            webbrowser.open(url)
+            webbrowser.open(url, new=2, autoraise=False)
             return {"ok": True, "url": url}
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
 
-    def _curseforge_api_key(self) -> str:
-        self.settings = load_user_settings()
-        return str(self.settings.get("curseforge_api_key") or "").strip()
+    def _curseforge_proxy_urls(self) -> list[str]:
+        raw = self.config.get("curseforge_proxy_urls")
+        if isinstance(raw, str):
+            urls = [raw]
+        elif isinstance(raw, (list, tuple)):
+            urls = list(raw)
+        else:
+            urls = []
+
+        fallback_single = self.config.get("curseforge_proxy_url")
+        if fallback_single:
+            urls.append(fallback_single)
+
+        clean = []
+        for item in urls:
+            url = str(item or "").strip().rstrip("/")
+            if not url:
+                continue
+            parsed = urllib.parse.urlparse(url)
+            if parsed.scheme not in {"https", "http"} or not parsed.netloc:
+                continue
+            if url not in clean:
+                clean.append(url)
+
+        if not clean:
+            clean = [
+                "https://stonelight-api.serveminecraft.net",
+                "https://stonelight-api.duckdns.org",
+            ]
+        return clean
 
     def get_curseforge_settings(self) -> dict:
-        key = self._curseforge_api_key()
+        urls = self._curseforge_proxy_urls()
         return {
             "ok": True,
-            "has_key": bool(key),
-            "masked_key": ("••••" + key[-4:]) if key else "",
-            "api_base": self.config.get("curseforge_api_base", "https://api.curseforge.com/v1"),
+            "enabled": True,
+            "api_key_required": False,
+            "api_key_location": "server-side backend",
+            "has_key": False,
+            "masked_key": "",
+            "proxy_urls": urls,
+            "primary_proxy_url": urls[0] if urls else "",
+            "fallback_count": max(0, len(urls) - 1),
+            "message": "CurseForge работает через StoneLight backend. API key в лаунчере не хранится.",
         }
 
     def save_curseforge_api_key(self, payload: dict | str | None = None) -> dict:
-        if isinstance(payload, dict):
-            api_key = str(payload.get("api_key") or "").strip()
-        else:
-            api_key = str(payload or "").strip()
-
+        # Kept for compatibility with older UI code. The client must not store a CurseForge API key.
         self.settings = load_user_settings()
-        if api_key:
-            self.settings["curseforge_api_key"] = api_key
-            message = "CurseForge API key сохранён."
-        else:
-            self.settings.pop("curseforge_api_key", None)
-            message = "CurseForge API key очищен."
-
-        save_user_settings(self.settings)
+        removed = bool(self.settings.pop("curseforge_api_key", None))
+        if removed:
+            save_user_settings(self.settings)
         return {
             "ok": True,
-            "message": message,
+            "message": "CurseForge API key хранится на сервере StoneLight backend. В лаунчере ключ не нужен.",
             "settings": self.get_curseforge_settings(),
         }
 
-    def _curseforge_api_url(self, path: str, query: dict | None = None) -> str:
-        base = str(self.config.get("curseforge_api_base") or "https://api.curseforge.com/v1").rstrip("/")
-        url = f"{base}/{str(path).lstrip('/')}"
+    def _curseforge_proxy_url(self, base_url: str, path: str, query: dict | None = None) -> str:
+        base = str(base_url or "").strip().rstrip("/")
+        clean_path = str(path or "").strip().lstrip("/")
+        url = f"{base}/api/v1/cf/{clean_path}"
         if query:
             clean = {key: value for key, value in query.items() if value not in (None, "")}
             if clean:
                 url += "?" + urllib.parse.urlencode(clean)
         return url
 
-    def _curseforge_read_json(self, path: str, query: dict | None = None) -> dict:
-        api_key = self._curseforge_api_key()
-        if not api_key:
-            raise ValueError("Для CurseForge нужен Core API key.")
-
-        url = self._curseforge_api_url(path, query)
+    def _curseforge_proxy_post_json(self, path: str, payload: dict | None = None, query: dict | None = None) -> dict:
+        urls = self._curseforge_proxy_urls()
+        timeout = int(self.config.get("curseforge_proxy_timeout_seconds", 20) or 20)
+        retries = max(1, int(self.config.get("curseforge_proxy_retries", 2) or 2))
+        body = json.dumps(payload or {}).encode("utf-8")
         headers = {
             "Accept": "application/json",
-            "x-api-key": api_key,
+            "Content-Type": "application/json",
             "User-Agent": str(self.config.get("curseforge_user_agent") or "StoneLightLauncher/0.6"),
         }
-        request = urllib.request.Request(url, headers=headers)
-        timeout = int(self.config.get("curseforge_api_timeout_seconds", 45) or 45)
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            return json.loads(response.read().decode("utf-8"))
+
+        last_error: Exception | None = None
+        attempted = []
+
+        for base_url in urls:
+            for attempt in range(1, retries + 1):
+                url = self._curseforge_proxy_url(base_url, path, query)
+                attempted.append(base_url)
+                try:
+                    request = urllib.request.Request(url, data=body, headers=headers, method="POST")
+                    with urllib.request.urlopen(request, timeout=timeout) as response:
+                        return json.loads(response.read().decode("utf-8"))
+                except (TimeoutError, socket.timeout) as exc:
+                    last_error = TimeoutError(f"CurseForge backend timeout: {base_url}")
+                    self._append_startup_log(f"CurseForge proxy POST timeout {base_url} attempt {attempt}/{retries}: {exc}")
+                except urllib.error.HTTPError as exc:
+                    detail = ""
+                    try:
+                        detail = exc.read().decode("utf-8", errors="replace").strip()
+                    except Exception:
+                        pass
+                    last_error = exc
+                    self._append_startup_log(f"CurseForge proxy POST HTTP {exc.code} {base_url} attempt {attempt}/{retries}: {detail or exc}")
+                    if exc.code in {400, 403, 404, 422}:
+                        raise ValueError(
+                            f"CurseForge backend returned HTTP {exc.code}."
+                            + (f" Details: {detail[:500]}" if detail else "")
+                        )
+                except Exception as exc:
+                    last_error = exc
+                    self._append_startup_log(f"CurseForge proxy POST failed {base_url} attempt {attempt}/{retries}: {exc}")
+
+                if attempt < retries:
+                    time.sleep(0.6 * attempt)
+
+        raise ValueError(
+            "CurseForge backend недоступен. Проверены адреса: "
+            + ", ".join(dict.fromkeys(attempted))
+            + (f". Последняя ошибка: {last_error}" if last_error else "")
+        )
+
+    def _curseforge_proxy_read_json(self, path: str, query: dict | None = None) -> dict:
+        urls = self._curseforge_proxy_urls()
+        timeout = int(self.config.get("curseforge_proxy_timeout_seconds", 20) or 20)
+        retries = max(1, int(self.config.get("curseforge_proxy_retries", 2) or 2))
+        headers = {
+            "Accept": "application/json",
+            "User-Agent": str(self.config.get("curseforge_user_agent") or "StoneLightLauncher/0.6"),
+        }
+
+        last_error: Exception | None = None
+        attempted = []
+
+        for base_url in urls:
+            for attempt in range(1, retries + 1):
+                url = self._curseforge_proxy_url(base_url, path, query)
+                attempted.append(base_url)
+                try:
+                    request = urllib.request.Request(url, headers=headers)
+                    with urllib.request.urlopen(request, timeout=timeout) as response:
+                        return json.loads(response.read().decode("utf-8"))
+                except (TimeoutError, socket.timeout) as exc:
+                    last_error = TimeoutError(f"CurseForge backend timeout: {base_url}")
+                    self._append_startup_log(f"CurseForge proxy timeout {base_url} attempt {attempt}/{retries}: {exc}")
+                except urllib.error.HTTPError as exc:
+                    body = ""
+                    try:
+                        body = exc.read().decode("utf-8", errors="replace").strip()
+                    except Exception:
+                        body = ""
+                    last_error = exc
+                    self._append_startup_log(f"CurseForge proxy HTTP {exc.code} {base_url} attempt {attempt}/{retries}: {body or exc}")
+                    if exc.code in {400, 403, 404, 422}:
+                        raise ValueError(
+                            f"CurseForge backend returned HTTP {exc.code}."
+                            + (f" Details: {body[:500]}" if body else "")
+                        )
+                except Exception as exc:
+                    last_error = exc
+                    self._append_startup_log(f"CurseForge proxy failed {base_url} attempt {attempt}/{retries}: {exc}")
+
+                if attempt < retries:
+                    time.sleep(0.6 * attempt)
+
+        raise ValueError(
+            "CurseForge backend недоступен. Проверены адреса: "
+            + ", ".join(dict.fromkeys(attempted))
+            + (f". Последняя ошибка: {last_error}" if last_error else "")
+        )
+
+    def _curseforge_api_url(self, path: str, query: dict | None = None) -> str:
+        # Legacy helper retained for compatibility. It now returns a backend proxy URL, not a direct API URL.
+        urls = self._curseforge_proxy_urls()
+        return self._curseforge_proxy_url(urls[0], path, query)
+
+    def _curseforge_read_json(self, path: str, query: dict | None = None) -> dict:
+        # Legacy helper retained for compatibility. Do not call CurseForge directly from the launcher.
+        return self._curseforge_proxy_read_json(path, query)
 
     def _curseforge_type_to_class_id(self, project_type: str) -> int:
         return int(CURSEFORGE_CLASS_IDS.get(str(project_type or "mod").lower(), 6))
 
+    def _curseforge_install_folder(self, project_type: str) -> str:
+        return {
+            "mod": "mods",
+            "resourcepack": "resourcepacks",
+            "shader": "shaderpacks",
+            "datapack": "datapacks",
+        }.get(str(project_type or "mod").lower(), "mods")
+
+    def _curseforge_allowed_suffixes(self, project_type: str) -> tuple[str, ...]:
+        return {
+            "mod": (".jar",),
+            "resourcepack": (".zip",),
+            "shader": (".zip",),
+            "modpack": (".zip",),
+        }.get(str(project_type or "mod").lower(), (".jar",))
+
     def _curseforge_project_url(self, project: dict, project_type: str) -> str:
         links = project.get("links") or {}
-        website = str(links.get("websiteUrl") or "").strip()
+        website = str(links.get("websiteUrl") or project.get("websiteUrl") or "").strip()
         if website:
             return website
         slug = str(project.get("slug") or project.get("name") or "").strip()
@@ -2409,13 +2995,29 @@ class LauncherWebAPI:
         return f"https://www.curseforge.com/minecraft/{path}/{urllib.parse.quote(slug, safe='')}"
 
     def _safe_curseforge_hit(self, project: dict, project_type: str) -> dict:
-        logo = project.get("logo") or {}
         authors = project.get("authors") or []
         categories = project.get("categories") or []
-        latest_files = project.get("latestFilesIndexes") or project.get("latestFiles") or []
-
+        compatible_file = None
+        for compatible_key in ("_curseforge_compatible_file", "compatibleFile", "compatible_file"):
+            candidate = project.get(compatible_key)
+            if isinstance(candidate, dict):
+                compatible_file = candidate
+                break
         game_versions = []
         loaders = []
+
+        if compatible_file:
+            for value in compatible_file.get("gameVersions") or []:
+                value_text = str(value or "").strip()
+                lower = value_text.lower()
+                if lower in {"fabric", "forge", "quilt", "neoforge"}:
+                    if lower not in loaders:
+                        loaders.append(lower)
+                elif value_text and value_text not in game_versions:
+                    game_versions.append(value_text)
+
+        # Proxy v0.2.0 returns compact objects. Raw CurseForge objects may also be handled here.
+        latest_files = project.get("latestFilesIndexes") or project.get("latestFiles") or []
         for item in latest_files[:8]:
             gv = item.get("gameVersion") if isinstance(item, dict) else ""
             if gv and gv not in game_versions:
@@ -2424,85 +3026,1939 @@ class LauncherWebAPI:
             if loader and str(loader) not in loaders:
                 loaders.append(str(loader))
 
+        category_names = [str(item.get("name") or "") for item in categories if isinstance(item, dict) and item.get("name")]
+        for name in category_names:
+            lower = name.strip().lower()
+            if lower in {"fabric", "forge", "quilt", "neoforge"} and lower not in loaders:
+                loaders.append(lower)
+
+        logo = project.get("logo") or {}
+        icon_url = project.get("logoUrl") or logo.get("thumbnailUrl") or logo.get("url") or ""
+
+        compatible = None
+        if compatible_file:
+            download_url = str(compatible_file.get("downloadUrl") or compatible_file.get("download_url") or "").strip()
+            compatible = {
+                "file_id": str(compatible_file.get("id") or compatible_file.get("fileId") or ""),
+                "file_name": compatible_file.get("fileName") or "",
+                "display_name": compatible_file.get("displayName") or "",
+                "file_date": compatible_file.get("fileDate") or "",
+                "file_length": int(compatible_file.get("fileLength") or 0),
+                "release_type": compatible_file.get("releaseType"),
+                "game_versions": compatible_file.get("gameVersions") or [],
+                "download_url": download_url,
+                "download_available": bool(download_url),
+            }
+
         return {
-            "project_id": str(project.get("id") or ""),
+            "project_id": str(project.get("id") or project.get("project_id") or ""),
             "slug": project.get("slug") or "",
-            "title": project.get("name") or project.get("slug") or "CurseForge project",
-            "description": project.get("summary") or "",
+            "title": project.get("name") or project.get("title") or project.get("slug") or "CurseForge project",
+            "description": project.get("summary") or project.get("description") or "",
             "project_type": project_type,
             "project_url": self._curseforge_project_url(project, project_type),
-            "icon_url": logo.get("thumbnailUrl") or logo.get("url") or "",
-            "downloads": int(project.get("downloadCount") or 0),
-            "date_modified": project.get("dateModified") or project.get("dateReleased") or "",
+            "icon_url": icon_url,
+            "downloads": int(project.get("downloadCount") or project.get("downloads") or 0),
+            "date_modified": project.get("dateModified") or project.get("dateReleased") or project.get("date_modified") or "",
             "authors": [str(item.get("name") or "") for item in authors if isinstance(item, dict) and item.get("name")][:4],
-            "categories": [str(item.get("name") or "") for item in categories if isinstance(item, dict) and item.get("name")][:6],
+            "categories": category_names[:6],
             "game_versions": game_versions[:6],
             "loaders": loaders[:4],
+            "compatible_file": compatible,
+        }
+
+    def _curseforge_text_key(self, value: str) -> str:
+        value = str(value or "").casefold().strip()
+        cleaned = []
+        last_space = False
+        for char in value:
+            if char.isalnum():
+                cleaned.append(char)
+                last_space = False
+            elif not last_space:
+                cleaned.append(" ")
+                last_space = True
+        return " ".join("".join(cleaned).split())
+
+    def _curseforge_rank_score(self, item: dict, query: str, strict_project_ids: set[str]) -> int:
+        q = self._curseforge_text_key(query)
+        title = self._curseforge_text_key(item.get("name") or item.get("title") or "")
+        slug = self._curseforge_text_key(item.get("slug") or "")
+        summary = self._curseforge_text_key(item.get("summary") or item.get("description") or "")
+        project_id = str(item.get("id") or item.get("project_id") or "")
+        downloads = int(item.get("downloadCount") or item.get("downloads") or 0)
+
+        score = 0
+
+        # CurseForge search can return projects that only mention the query in the description.
+        # Prioritize exact title/slug matches strongly, then starts-with/contains matches.
+        if q:
+            if title == q:
+                score += 120000
+            if slug == q:
+                score += 115000
+            if title.startswith(q):
+                score += 90000
+            if slug.startswith(q):
+                score += 85000
+            title_words = f" {title} "
+            slug_words = f" {slug} "
+            if f" {q} " in title_words:
+                score += 70000
+            if f" {q} " in slug_words:
+                score += 65000
+            if q in title:
+                score += 50000
+            if q in slug:
+                score += 45000
+            if q in summary:
+                score += 3000
+
+        # Compatibility-filtered results still matter, but should not outrank an exact title match.
+        if project_id in strict_project_ids:
+            score += 12000
+
+        # Popular projects should float up among similar textual matches.
+        if downloads > 0:
+            score += min(15000, downloads // 10000)
+
+        return score
+
+    def _curseforge_merge_ranked_results(
+        self,
+        broad_items: list[dict],
+        strict_items: list[dict],
+        query: str,
+        project_type: str,
+    ) -> list[dict]:
+        merged: dict[str, dict] = {}
+
+        for item in broad_items:
+            project_id = str(item.get("id") or item.get("project_id") or item.get("slug") or "")
+            if project_id:
+                merged[project_id] = item
+
+        strict_ids: set[str] = set()
+        for item in strict_items:
+            project_id = str(item.get("id") or item.get("project_id") or item.get("slug") or "")
+            if not project_id:
+                continue
+            strict_ids.add(project_id)
+            if project_id in merged:
+                merged[project_id].setdefault("_curseforge_strict_match", True)
+            else:
+                item["_curseforge_strict_match"] = True
+                merged[project_id] = item
+
+        ranked = list(merged.values())
+        ranked.sort(
+            key=lambda item: self._curseforge_rank_score(item, query, strict_ids),
+            reverse=True,
+        )
+        return ranked
+
+    def get_curseforge_categories(self, payload: dict | None = None) -> dict:
+        payload = payload or {}
+        project_type = str(payload.get("project_type") or "mod").strip().lower()
+        if project_type not in CURSEFORGE_PROJECT_TYPES:
+            project_type = "mod"
+
+        class_id = self._curseforge_type_to_class_id(project_type)
+        params = {
+            "projectType": project_type,
+            "classId": class_id,
+        }
+
+        try:
+            response = self._curseforge_proxy_read_json("categories", params)
+            return {
+                "ok": True,
+                "project_type": project_type,
+                "categories": response.get("results") or response.get("categories") or [],
+            }
+        except Exception as exc:
+            return {
+                "ok": False,
+                "error": str(exc),
+                "project_type": project_type,
+                "categories": [],
+            }
+
+    def get_curseforge_filter_options(self, payload: dict | None = None) -> dict:
+        payload = payload or {}
+        project_type = str(payload.get("project_type") or "mod").strip().lower()
+        instance_id = str(payload.get("instance_id") or "").strip()
+        include_snapshots = bool(payload.get("include_snapshots"))
+
+        if project_type not in CURSEFORGE_PROJECT_TYPES:
+            project_type = "mod"
+
+        instance = self._instance_by_id_or_selected(instance_id) if instance_id else self._selected_instance()
+        if not instance:
+            return {"ok": False, "error": "Сборка не выбрана."}
+
+        instance_mc = str(instance.get("minecraft_version") or "").strip()
+        instance_loader = str(instance.get("loader") or "vanilla").strip().lower()
+
+        category_response = self.get_curseforge_categories({"project_type": project_type})
+        category_choices = []
+        for category in category_response.get("categories") or []:
+            if not isinstance(category, dict):
+                continue
+            category_id = str(category.get("id") or "").strip()
+            if not category_id:
+                continue
+            category_choices.append({
+                "id": category_id,
+                "label": category.get("name") or category.get("slug") or category_id,
+                "slug": category.get("slug") or "",
+                "parentCategoryId": category.get("parentCategoryId"),
+                "displayIndex": category.get("displayIndex"),
+            })
+
+        sections = [
+            self._filter_section(
+                "game_version",
+                "Game version",
+                self._modrinth_game_version_choices(instance, include_snapshots),
+                "select",
+                instance_mc,
+            )
+        ]
+
+        if project_type in {"mod", "modpack"}:
+            loader_choices = [
+                {"id": "fabric", "label": "Fabric"},
+                {"id": "forge", "label": "Forge"},
+                {"id": "quilt", "label": "Quilt"},
+                {"id": "neoforge", "label": "NeoForge"},
+            ]
+            choice_ids = {item["id"] for item in loader_choices}
+            default_loader = instance_loader if instance_loader in choice_ids else "fabric"
+            sections.append(self._filter_section("loader", "Mod loader", loader_choices, "select", default_loader))
+
+        if category_choices:
+            sections.append(self._filter_section("category_ids", "Categories", category_choices, "chips", ""))
+
+        return {
+            "ok": True,
+            "project_type": project_type,
+            "instance": self._safe_instance(instance),
+            "sections": sections,
         }
 
     def search_curseforge(self, payload: dict | None = None) -> dict:
         payload = payload or {}
         query = str(payload.get("query") or "").strip()
         project_type = str(payload.get("project_type") or "mod").strip().lower()
-        index = str(payload.get("index") or "relevancy").strip()
+        sort_index = str(payload.get("index") or payload.get("sort") or "relevance").strip().lower()
+        show_manual_only = bool(payload.get("show_manual_only", True))
         instance_id = str(payload.get("instance_id") or "").strip()
+        filters = payload.get("filters") if isinstance(payload.get("filters"), dict) else {}
 
         if project_type not in CURSEFORGE_PROJECT_TYPES:
             project_type = "mod"
-        sort_field = CURSEFORGE_SORT_FIELDS.get(index, CURSEFORGE_SORT_FIELDS["relevancy"])
 
         try:
-            page_size = int(payload.get("page_size") or self.config.get("curseforge_page_size", 24) or 24)
+            page_size = int(payload.get("page_size") or payload.get("limit") or self.config.get("curseforge_page_size", 24) or 24)
         except (TypeError, ValueError):
             page_size = 24
         try:
             index_offset = int(payload.get("offset") or 0)
         except (TypeError, ValueError):
             index_offset = 0
+
         page_size = max(1, min(24, page_size))
         index_offset = max(0, index_offset)
 
         instance = self._instance_by_id_or_selected(instance_id) if instance_id else self._selected_instance()
-        game_version = str(payload.get("game_version") or (instance or {}).get("minecraft_version") or "").strip()
+        if not instance:
+            return {"ok": False, "error": "Сборка не выбрана.", "hits": []}
+
+        game_version = str(
+            filters.get("game_version")
+            or payload.get("game_version")
+            or (instance or {}).get("minecraft_version")
+            or ""
+        ).strip()
+        loader = str(filters.get("loader") or payload.get("loader") or (instance or {}).get("loader") or "").strip().lower()
+        category_ids_value = filters.get("category_ids") or payload.get("category_ids") or filters.get("category_id") or payload.get("category_id") or ""
+        if isinstance(category_ids_value, (list, tuple, set)):
+            category_ids = [str(item).strip() for item in category_ids_value if str(item).strip()]
+        else:
+            category_ids = [item.strip() for item in str(category_ids_value or "").split(",") if item.strip()]
+        if project_type not in {"mod", "modpack"} or loader == "vanilla":
+            loader = ""
+
+        class_id = self._curseforge_type_to_class_id(project_type)
 
         params = {
-            "gameId": int(self.config.get("curseforge_game_id", 432)),
-            "classId": self._curseforge_type_to_class_id(project_type),
-            "searchFilter": query,
-            "sortField": sort_field,
-            "sortOrder": "desc",
+            "q": query,
+            "classId": class_id,
+            "projectType": project_type,
             "pageSize": page_size,
             "index": index_offset,
+            "checkLimit": max(page_size, min(50, page_size * 2)),
+            "sort": sort_index,
+            # If manual-only cards are hidden, backend should only return files with direct downloadUrl.
+            "requireDownloadUrl": not show_manual_only,
         }
         if game_version:
             params["gameVersion"] = game_version
+        if loader:
+            params["loader"] = loader
+        if category_ids:
+            params["categoryIds"] = ",".join(category_ids)
 
         try:
-            response = self._curseforge_read_json("mods/search", params)
-            data = response.get("data") or []
+            response = self._curseforge_proxy_read_json("search-compatible", params)
+            results = response.get("results") or []
             pagination = response.get("pagination") or {}
-            total = int(pagination.get("totalCount") or len(data))
+            timing = response.get("timing") or {}
+
             return {
                 "ok": True,
                 "query": query,
                 "project_type": project_type,
-                "index": index,
+                "filters": filters,
                 "game_version": game_version,
+                "loader": loader,
+                "category_ids": category_ids,
                 "instance": self._safe_instance(instance) if instance else None,
-                "hits": [self._safe_curseforge_hit(item, project_type) for item in data],
-                "total_hits": total,
-                "offset": int(pagination.get("index") or index_offset),
-                "limit": int(pagination.get("pageSize") or page_size),
+                "hits": [self._safe_curseforge_hit(item, project_type) for item in results if isinstance(item, dict)],
+                "total_hits": int(pagination.get("totalCount") or len(results)),
+                "offset": index_offset,
+                "limit": page_size,
                 "page": (index_offset // page_size) + 1 if page_size else 1,
-                "total_pages": max(1, (total + page_size - 1) // page_size) if page_size else 1,
+                "total_pages": max(1, (int(pagination.get("totalCount") or len(results)) + page_size - 1) // page_size) if page_size else 1,
+                "search_mode": "backend_search_compatible",
+                "sort": sort_index,
+                "show_manual_only": show_manual_only,
+                "backend_timing": timing,
+                "cache": response.get("cache") or "",
             }
         except Exception as exc:
             return {
                 "ok": False,
                 "error": str(exc),
-                "missing_key": "API key" in str(exc) or "Core API key" in str(exc),
+                "missing_key": False,
                 "hits": [],
             }
+
+    def _curseforge_files_for_instance(self, project_id: str, project_type: str, instance: dict, filters: dict | None = None) -> list[dict]:
+        filters = filters or {}
+        mc_version = str(filters.get("game_version") or instance.get("minecraft_version") or "").strip()
+        loader = str(filters.get("loader") or instance.get("loader") or "vanilla").strip().lower()
+        if project_type not in {"mod", "modpack"} or loader == "vanilla":
+            loader = ""
+
+        query = {"pageSize": 12, "index": 0}
+        if mc_version:
+            query["gameVersion"] = mc_version
+        if loader:
+            query["loader"] = loader
+
+        response = self._curseforge_proxy_read_json(f"mod/{urllib.parse.quote(str(project_id), safe='')}/files", query)
+        files = response.get("results") or response.get("data") or []
+        return files if isinstance(files, list) else []
+
+    def _choose_curseforge_file(self, files: list[dict], project_type: str) -> dict | None:
+        allowed = self._curseforge_allowed_suffixes(project_type)
+        available = [item for item in files if item.get("isAvailable", True)]
+        ordered = available + [item for item in files if item not in available]
+        for item in ordered:
+            filename = str(item.get("fileName") or item.get("file_name") or "").strip()
+            if not filename:
+                continue
+            if allowed and not filename.lower().endswith(allowed):
+                continue
+            return item
+        return None
+
+    def _curseforge_download_url(self, project_id: str, file_id: str) -> dict:
+        response = self._curseforge_proxy_read_json(
+            f"mod/{urllib.parse.quote(str(project_id), safe='')}/file/{urllib.parse.quote(str(file_id), safe='')}/download-url"
+        )
+        if not response.get("available"):
+            reason = response.get("reason") or "CurseForge файл недоступен через API."
+            raise ValueError(str(reason))
+        download_url = str(response.get("downloadUrl") or "").strip()
+        if not download_url:
+            raise ValueError("CurseForge не вернул ссылку на скачивание файла.")
+        return response
+
+    def _download_curseforge_file(self, file_info: dict, download_url: str, target: Path) -> None:
+        if not download_url:
+            raise ValueError("У файла CurseForge нет ссылки для скачивания.")
+
+        headers = {
+            "User-Agent": str(self.config.get("curseforge_user_agent") or "StoneLightLauncher/0.6"),
+            "Accept": "*/*",
+        }
+        request = urllib.request.Request(download_url, headers=headers)
+
+        target.parent.mkdir(parents=True, exist_ok=True)
+        tmp = target.with_suffix(target.suffix + ".download")
+        timeout = int(self.config.get("curseforge_download_timeout_seconds", 180) or 180)
+        retries = max(1, int(self.config.get("curseforge_download_retries", 3) or 3))
+        chunk_size = max(64 * 1024, int(self.config.get("curseforge_download_chunk_kb", 512) or 512) * 1024)
+
+        last_error: Exception | None = None
+
+        for attempt in range(1, retries + 1):
+            try:
+                if tmp.exists():
+                    tmp.unlink()
+
+                attempt_suffix = f" ({attempt}/{retries})" if retries > 1 else ""
+                self._emit("status", {
+                    "busy": True,
+                    "message": f"Скачиваю проект CurseForge...{attempt_suffix}",
+                    "progress": 0,
+                })
+
+                with urllib.request.urlopen(request, timeout=timeout) as response, tmp.open("wb") as fh:
+                    total_raw = response.headers.get("Content-Length") or response.headers.get("content-length") or "0"
+                    try:
+                        total = int(total_raw)
+                    except ValueError:
+                        total = 0
+
+                    downloaded = 0
+                    last_progress_percent = -1
+                    while True:
+                        chunk = response.read(chunk_size)
+                        if not chunk:
+                            break
+                        fh.write(chunk)
+                        downloaded += len(chunk)
+                        if total > 0:
+                            progress = max(0.0, min(0.98, downloaded / total))
+                            percent = int(progress * 100)
+                            if percent >= last_progress_percent + 5 or percent == 98:
+                                last_progress_percent = percent
+                                self._emit("status", {
+                                    "busy": True,
+                                    "message": f"Скачиваю проект CurseForge... {percent}%",
+                                    "progress": progress,
+                                })
+
+                if not tmp.exists() or tmp.stat().st_size <= 0:
+                    raise ValueError("CurseForge скачал пустой файл.")
+
+                hashes = file_info.get("hashes") or []
+                for item in hashes:
+                    if not isinstance(item, dict):
+                        continue
+                    algo = int(item.get("algo") or 0)
+                    expected = str(item.get("value") or "").strip().lower()
+                    if not expected:
+                        continue
+                    if algo == 1:
+                        digest = hashlib.sha1(tmp.read_bytes()).hexdigest()
+                        if digest.lower() != expected:
+                            raise ValueError("SHA1 файла CurseForge не совпал.")
+                    elif algo == 2:
+                        digest = hashlib.md5(tmp.read_bytes()).hexdigest()
+                        if digest.lower() != expected:
+                            raise ValueError("MD5 файла CurseForge не совпал.")
+
+                if target.exists():
+                    target.unlink()
+                tmp.replace(target)
+                return
+
+            except (TimeoutError, socket.timeout) as exc:
+                last_error = TimeoutError("Превышено время ожидания загрузки файла CurseForge.")
+                self._append_startup_log(f"CurseForge download timeout on attempt {attempt}/{retries}: {exc}")
+            except Exception as exc:
+                last_error = exc
+                self._append_startup_log(f"CurseForge download failed on attempt {attempt}/{retries}: {exc}")
+            finally:
+                if tmp.exists():
+                    try:
+                        tmp.unlink()
+                    except Exception:
+                        pass
+
+            if attempt < retries:
+                time.sleep(1.2 * attempt)
+
+        raise ValueError(f"Не удалось скачать файл CurseForge после {retries} попыток. Последняя ошибка: {last_error}")
+
+    def _record_curseforge_source(self, instance: dict, project_id: str, project_type: str, file_info: dict, folder_key: str, target: Path, download_url: str) -> None:
+        path = self._modrinth_sources_path(instance)
+        try:
+            data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        except Exception:
+            data = {}
+
+        curseforge = data.setdefault("curseforge", {})
+        projects = curseforge.setdefault("projects", {})
+        file_id = str(file_info.get("id") or file_info.get("fileId") or "")
+        projects[str(project_id)] = {
+            "source": "curseforge",
+            "project_id": str(project_id),
+            "project_type": str(project_type),
+            "file_id": file_id,
+            "display_name": file_info.get("displayName") or "",
+            "filename": target.name,
+            "folder": folder_key,
+            "url": download_url,
+            "game_versions": file_info.get("gameVersions") or [],
+            "hashes": file_info.get("hashes") or [],
+            "installed_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    def _curseforge_source_matches(self, instance: dict, project_id: str, file_id: str, folder_key: str, filename: str) -> bool:
+        path = self._modrinth_sources_path(instance)
+        try:
+            data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+            item = (((data.get("curseforge") or {}).get("projects") or {}).get(str(project_id)) or {})
+        except Exception:
+            return False
+
+        return (
+            str(item.get("project_id") or "") == str(project_id)
+            and str(item.get("file_id") or "") == str(file_id)
+            and str(item.get("folder") or "") == str(folder_key)
+            and str(item.get("filename") or "") == str(filename)
+        )
+
+    def _file_matches_curseforge_hashes(self, path: Path, file_info: dict) -> bool:
+        if not path.exists() or not path.is_file():
+            return False
+
+        hashes = file_info.get("hashes") or []
+        if not hashes:
+            return False
+
+        data = None
+        for item in hashes:
+            if not isinstance(item, dict):
+                continue
+            algo = int(item.get("algo") or 0)
+            expected = str(item.get("value") or "").strip().lower()
+            if not expected:
+                continue
+
+            if data is None:
+                data = path.read_bytes()
+
+            if algo == 1:
+                digest = hashlib.sha1(data).hexdigest().lower()
+            elif algo == 2:
+                digest = hashlib.md5(data).hexdigest().lower()
+            else:
+                continue
+
+            if digest == expected:
+                return True
+
+        return False
+
+    def _curseforge_relation_type(self, dependency: dict) -> int:
+        try:
+            return int(dependency.get("relationType") or dependency.get("relation_type") or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    def _curseforge_required_dependency_ids(self, file_info: dict) -> list[str]:
+        result: list[str] = []
+        for dependency in file_info.get("dependencies") or []:
+            if not isinstance(dependency, dict):
+                continue
+
+            relation_type = self._curseforge_relation_type(dependency)
+            if relation_type != CURSEFORGE_REQUIRED_DEPENDENCY_RELATION_TYPE:
+                continue
+
+            mod_id = str(
+                dependency.get("modId")
+                or dependency.get("mod_id")
+                or dependency.get("projectId")
+                or dependency.get("projectID")
+                or ""
+            ).strip()
+
+            if mod_id and mod_id not in result:
+                result.append(mod_id)
+
+        return result
+
+    def _curseforge_source_for_project(self, instance: dict, project_id: str) -> dict:
+        path = self._modrinth_sources_path(instance)
+        try:
+            data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+            return (((data.get("curseforge") or {}).get("projects") or {}).get(str(project_id)) or {})
+        except Exception:
+            return {}
+
+    def _curseforge_recorded_file_exists(self, instance: dict, record: dict) -> bool:
+        folder_key = str(record.get("folder") or "").strip()
+        filename = str(record.get("filename") or "").strip()
+        if not folder_key or not filename:
+            return False
+
+        try:
+            folder = self._instance_subfolder(instance, folder_key)
+            target = self._safe_folder_file(folder, filename)
+            return target.exists() and target.is_file()
+        except Exception:
+            return False
+
+    def _install_curseforge_project_internal(
+        self,
+        instance: dict,
+        project_id: str,
+        project_type: str,
+        requested_file_id: str,
+        filters: dict,
+        dependency_stack: set[str],
+        depth: int,
+        install_dependencies: bool,
+    ) -> dict:
+        project_id = str(project_id or "").strip()
+        project_type = str(project_type or "mod").strip().lower()
+
+        if not project_id:
+            return {"ok": False, "error": "Не указан CurseForge project id."}
+        if project_type not in CURSEFORGE_PROJECT_TYPES:
+            project_type = "mod"
+        if project_type == "modpack":
+            return {"ok": False, "error": "Установка CurseForge-модпаков будет добавлена отдельным этапом."}
+
+        existing_record = self._curseforge_source_for_project(instance, project_id)
+        if existing_record and self._curseforge_recorded_file_exists(instance, existing_record):
+            return {
+                "ok": True,
+                "already_installed": True,
+                "project": {
+                    "project_id": project_id,
+                    "project_type": project_type,
+                },
+                "file": {
+                    "id": str(existing_record.get("file_id") or ""),
+                    "name": str(existing_record.get("filename") or ""),
+                },
+                "filename": str(existing_record.get("filename") or ""),
+                "folder": str(existing_record.get("folder") or self._curseforge_install_folder(project_type)),
+                "dependencies_installed": [],
+                "dependencies_already_installed": [],
+            }
+
+        files = self._curseforge_files_for_instance(project_id, project_type, instance, filters)
+        selected_file = None
+        if requested_file_id:
+            for item in files:
+                if str(item.get("id") or item.get("fileId") or "") == requested_file_id:
+                    selected_file = item
+                    break
+
+        if not selected_file:
+            selected_file = self._choose_curseforge_file(files, project_type)
+
+        if not selected_file:
+            raise ValueError(f"Не найден совместимый файл CurseForge для projectId {project_id}.")
+
+        file_id = str(selected_file.get("id") or selected_file.get("fileId") or "").strip()
+        if not file_id:
+            raise ValueError(f"У выбранного файла CurseForge projectId {project_id} нет file id.")
+
+        file_info = selected_file
+        download_url = str(selected_file.get("downloadUrl") or selected_file.get("download_url") or "").strip()
+
+        if not download_url:
+            download_response = self._curseforge_download_url(project_id, file_id)
+            backend_file = download_response.get("file") or {}
+            if isinstance(backend_file, dict) and backend_file:
+                merged_file = dict(selected_file)
+                merged_file.update(backend_file)
+                file_info = merged_file
+            download_url = str(
+                download_response.get("downloadUrl")
+                or download_response.get("download_url")
+                or file_info.get("downloadUrl")
+                or file_info.get("download_url")
+                or ""
+            ).strip()
+
+        if not download_url:
+            raise ValueError(
+                "CurseForge не вернул ссылку на скачивание файла. "
+                "Возможно, автор проекта отключил сторонние загрузки через API."
+            )
+
+        return self._install_curseforge_resolved_file(
+            instance=instance,
+            project_id=project_id,
+            project_type=project_type,
+            file_id=file_id,
+            file_info=file_info,
+            download_url=download_url,
+            filters=filters,
+            dependency_stack=dependency_stack,
+            depth=depth,
+            install_dependencies=install_dependencies,
+        )
+
+    def _install_curseforge_required_dependencies(
+        self,
+        instance: dict,
+        project_id: str,
+        file_info: dict,
+        filters: dict,
+        dependency_stack: set[str],
+        depth: int,
+    ) -> tuple[list[dict], list[dict]]:
+        if depth >= CURSEFORGE_MAX_DEPENDENCY_DEPTH:
+            raise ValueError("Слишком глубокая цепочка зависимостей CurseForge.")
+
+        installed: list[dict] = []
+        already_installed: list[dict] = []
+
+        dependency_ids = self._curseforge_required_dependency_ids(file_info)
+        for dependency_id in dependency_ids:
+            dependency_id = str(dependency_id or "").strip()
+            if not dependency_id or dependency_id == str(project_id):
+                continue
+
+            if dependency_id in dependency_stack:
+                self._append_startup_log(f"CurseForge dependency cycle skipped: {dependency_id}")
+                continue
+
+            self._emit("status", {
+                "busy": True,
+                "message": f"Устанавливаю зависимость CurseForge {dependency_id}...",
+                "action": "curseforge_install",
+                "progress": 0.05,
+            })
+
+            next_stack = set(dependency_stack)
+            next_stack.add(dependency_id)
+
+            result = self._install_curseforge_project_internal(
+                instance=instance,
+                project_id=dependency_id,
+                project_type="mod",
+                requested_file_id="",
+                filters=filters,
+                dependency_stack=next_stack,
+                depth=depth + 1,
+                install_dependencies=True,
+            )
+
+            if not result.get("ok"):
+                raise ValueError(f"Не удалось установить обязательную зависимость CurseForge {dependency_id}: {result.get('error') or result}")
+
+            if result.get("already_installed"):
+                already_installed.append(result)
+            else:
+                installed.append(result)
+
+            # Bubble nested dependency summaries up to the top-level result.
+            for nested in result.get("dependencies_installed") or []:
+                if isinstance(nested, dict):
+                    installed.append(nested)
+            for nested in result.get("dependencies_already_installed") or []:
+                if isinstance(nested, dict):
+                    already_installed.append(nested)
+
+        return installed, already_installed
+
+    def _install_curseforge_resolved_file(
+        self,
+        instance: dict,
+        project_id: str,
+        project_type: str,
+        file_id: str,
+        file_info: dict,
+        download_url: str,
+        filters: dict,
+        dependency_stack: set[str],
+        depth: int,
+        install_dependencies: bool,
+    ) -> dict:
+        project_id = str(project_id or "").strip()
+        project_type = str(project_type or "mod").strip().lower()
+        file_id = str(file_id or "").strip()
+
+        dependencies_installed: list[dict] = []
+        dependencies_already_installed: list[dict] = []
+
+        if install_dependencies and project_type == "mod":
+            dependencies_installed, dependencies_already_installed = self._install_curseforge_required_dependencies(
+                instance=instance,
+                project_id=project_id,
+                file_info=file_info,
+                filters=filters,
+                dependency_stack=dependency_stack,
+                depth=depth,
+            )
+
+        filename = Path(str(file_info.get("fileName") or file_info.get("file_name") or "download")).name
+        allowed = self._curseforge_allowed_suffixes(project_type)
+        if allowed and not filename.lower().endswith(allowed):
+            raise ValueError("Файл CurseForge имеет неподдерживаемый тип для выбранного раздела.")
+
+        folder_key = self._curseforge_install_folder(project_type)
+        target_dir = self._instance_subfolder(instance, folder_key)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target = self._safe_folder_file(target_dir, filename)
+
+        if target.exists():
+            same_hash = self._file_matches_curseforge_hashes(target, file_info)
+            same_record = self._curseforge_source_matches(instance, project_id, file_id, folder_key, target.name)
+            if same_hash or same_record:
+                return {
+                    "ok": True,
+                    "already_installed": True,
+                    "message": "Проект CurseForge уже установлен.",
+                    "project": {
+                        "project_id": project_id,
+                        "project_type": project_type,
+                    },
+                    "file": {
+                        "id": file_id,
+                        "name": filename,
+                    },
+                    "filename": target.name,
+                    "folder": folder_key,
+                    "dependencies_installed": dependencies_installed,
+                    "dependencies_already_installed": dependencies_already_installed,
+                }
+
+            raise ValueError(
+                f"Файл уже существует: {target.name}. "
+                "Он не совпал с выбранным файлом CurseForge или не был установлен через лаунчер."
+            )
+
+        self._download_curseforge_file(file_info, download_url, target)
+        self._record_curseforge_source(instance, project_id, project_type, file_info, folder_key, target, download_url)
+        self._append_startup_log(f"CurseForge installed: {project_id}/{file_id} -> {folder_key}/{target.name}")
+
+        return {
+            "ok": True,
+            "already_installed": False,
+            "message": "Проект CurseForge установлен.",
+            "project": {
+                "project_id": project_id,
+                "project_type": project_type,
+            },
+            "file": {
+                "id": file_id,
+                "name": filename,
+            },
+            "filename": target.name,
+            "folder": folder_key,
+            "dependencies_installed": dependencies_installed,
+            "dependencies_already_installed": dependencies_already_installed,
+        }
+
+    def get_curseforge_project_files(self, payload: dict | None = None) -> dict:
+        payload = payload or {}
+        project_id = str(payload.get("project_id") or payload.get("mod_id") or "").strip()
+        project_type = str(payload.get("project_type") or "mod").strip().lower()
+        instance_id = str(payload.get("instance_id") or "").strip()
+        filters = payload.get("filters") if isinstance(payload.get("filters"), dict) else {}
+
+        if not project_id:
+            return {"ok": False, "error": "Не указан CurseForge project id.", "files": []}
+        if project_type not in CURSEFORGE_PROJECT_TYPES:
+            project_type = "mod"
+
+        instance = self._instance_by_id_or_selected(instance_id) if instance_id else self._selected_instance()
+        if not instance:
+            return {"ok": False, "error": "Сборка не выбрана.", "files": []}
+
+        try:
+            files = self._curseforge_files_for_instance(project_id, project_type, instance, filters)
+            return {
+                "ok": True,
+                "project_id": project_id,
+                "project_type": project_type,
+                "instance": self._safe_instance(instance),
+                "files": files,
+            }
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "files": []}
+
+    def get_curseforge_download_url(self, payload: dict | None = None) -> dict:
+        payload = payload or {}
+        project_id = str(payload.get("project_id") or payload.get("mod_id") or "").strip()
+        file_id = str(payload.get("file_id") or "").strip()
+        if not project_id or not file_id:
+            return {"ok": False, "error": "Нужны project_id и file_id."}
+        try:
+            response = self._curseforge_download_url(project_id, file_id)
+            return {"ok": True, **response}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+
+    def _curseforge_project_title(self, project_id: str) -> str:
+        try:
+            response = self._curseforge_proxy_read_json(f"mod/{urllib.parse.quote(str(project_id), safe='')}")
+            project = response.get("result") or response.get("data") or response
+            if isinstance(project, dict):
+                return str(project.get("name") or project.get("title") or project.get("slug") or project_id)
+        except Exception:
+            pass
+        return str(project_id)
+
+    def _curseforge_preview_item(self, instance: dict, project_id: str, project_type: str, file_info: dict) -> dict:
+        project_id = str(project_id or "").strip()
+        file_id = str(file_info.get("id") or file_info.get("fileId") or "").strip()
+        filename = Path(str(file_info.get("fileName") or file_info.get("file_name") or "download")).name
+        folder_key = self._curseforge_install_folder(project_type)
+        target = self._safe_folder_file(self._instance_subfolder(instance, folder_key), filename)
+
+        already = False
+        conflict = False
+        if target.exists():
+            same_hash = self._file_matches_curseforge_hashes(target, file_info)
+            same_record = self._curseforge_source_matches(instance, project_id, file_id, folder_key, target.name)
+            already = bool(same_hash or same_record)
+            conflict = not already
+
+        download_url = str(file_info.get("downloadUrl") or file_info.get("download_url") or "").strip()
+
+        return {
+            "source": "curseforge",
+            "project_id": project_id,
+            "project_type": project_type,
+            "title": self._curseforge_project_title(project_id),
+            "file_id": file_id,
+            "version_number": file_info.get("displayName") or "",
+            "filename": filename,
+            "folder": folder_key,
+            "already_installed": already,
+            "conflict": conflict,
+            "downloadable": bool(download_url),
+        }
+
+    def _collect_curseforge_dependency_preview(
+        self,
+        instance: dict,
+        project_id: str,
+        file_info: dict,
+        filters: dict,
+        dependency_stack: set[str],
+        depth: int,
+        seen: set[str],
+    ) -> list[dict]:
+        if depth >= CURSEFORGE_MAX_DEPENDENCY_DEPTH:
+            raise ValueError("Слишком глубокая цепочка зависимостей CurseForge.")
+
+        items: list[dict] = []
+        for dependency_id in self._curseforge_required_dependency_ids(file_info):
+            dependency_id = str(dependency_id or "").strip()
+            if not dependency_id or dependency_id == str(project_id) or dependency_id in dependency_stack:
+                continue
+
+            files = self._curseforge_files_for_instance(dependency_id, "mod", instance, filters)
+            selected_file = self._choose_curseforge_file(files, "mod")
+            if not selected_file:
+                raise ValueError(f"Не найден совместимый файл CurseForge для обязательной зависимости {dependency_id}.")
+
+            preview_item = self._curseforge_preview_item(instance, dependency_id, "mod", selected_file)
+            unique_key = f"{preview_item.get('project_id')}:{preview_item.get('file_id')}:{preview_item.get('filename')}"
+            if unique_key not in seen:
+                seen.add(unique_key)
+                items.append(preview_item)
+
+            next_stack = set(dependency_stack)
+            next_stack.add(dependency_id)
+            items.extend(self._collect_curseforge_dependency_preview(
+                instance=instance,
+                project_id=dependency_id,
+                file_info=selected_file,
+                filters=filters,
+                dependency_stack=next_stack,
+                depth=depth + 1,
+                seen=seen,
+            ))
+
+        return items
+
+    def _read_curseforge_modpack_manifest(self, archive_path: Path) -> dict:
+        try:
+            with zipfile.ZipFile(archive_path) as archive:
+                names = set(archive.namelist())
+                manifest_name = "manifest.json"
+                if manifest_name not in names:
+                    for candidate in archive.namelist():
+                        if candidate.lower().endswith("/manifest.json"):
+                            manifest_name = candidate
+                            break
+                    else:
+                        raise ValueError("В CurseForge-модпаке не найден manifest.json.")
+
+                with archive.open(manifest_name) as fh:
+                    data = json.loads(fh.read().decode("utf-8-sig"))
+
+                if not isinstance(data, dict):
+                    raise ValueError("Некорректный manifest.json CurseForge-модпака.")
+
+                overrides_dir = str(data.get("overrides") or "overrides").strip().strip("/") or "overrides"
+                override_prefix = overrides_dir + "/"
+                overrides = [
+                    name for name in archive.namelist()
+                    if name.startswith(override_prefix) and not name.endswith("/")
+                ]
+                data["_stonelight_overrides"] = overrides
+                return data
+        except zipfile.BadZipFile as exc:
+            raise ValueError("Файл CurseForge-модпака повреждён или не является zip-архивом.") from exc
+
+    def _curseforge_loader_from_manifest(self, manifest: dict) -> tuple[str, str]:
+        minecraft = manifest.get("minecraft") if isinstance(manifest.get("minecraft"), dict) else {}
+        modloaders = minecraft.get("modLoaders") if isinstance(minecraft.get("modLoaders"), list) else []
+        selected = None
+
+        for item in modloaders:
+            if isinstance(item, dict) and item.get("primary"):
+                selected = item
+                break
+        if not selected and modloaders:
+            selected = next((item for item in modloaders if isinstance(item, dict)), None)
+
+        raw_id = str((selected or {}).get("id") or "").strip()
+        if not raw_id:
+            return "vanilla", ""
+
+        lowered = raw_id.lower()
+        if lowered.startswith("fabric-"):
+            return "fabric", raw_id.split("-", 1)[1]
+        if lowered.startswith("forge-"):
+            return "forge", raw_id.split("-", 1)[1]
+        if lowered.startswith("quilt-"):
+            return "quilt", raw_id.split("-", 1)[1]
+        if lowered.startswith("neoforge-"):
+            return "neoforge", raw_id.split("-", 1)[1]
+        return lowered.split("-", 1)[0], raw_id.split("-", 1)[1] if "-" in raw_id else ""
+
+    def _curseforge_manifest_files_payload(self, manifest: dict) -> list[dict]:
+        result: list[dict] = []
+        for item in manifest.get("files") or []:
+            if not isinstance(item, dict):
+                continue
+            try:
+                project_id = int(item.get("projectID") or item.get("projectId") or item.get("project_id"))
+                file_id = int(item.get("fileID") or item.get("fileId") or item.get("file_id"))
+            except Exception:
+                continue
+            result.append({
+                "projectID": project_id,
+                "fileID": file_id,
+                "required": bool(item.get("required", True)),
+            })
+        return result
+
+    def _curseforge_modpack_file(self, project_id: str, project_type: str, instance: dict, filters: dict, requested_file_id: str = "") -> dict:
+        files = self._curseforge_files_for_instance(project_id, project_type, instance, filters)
+        selected_file = None
+        if requested_file_id:
+            for item in files:
+                if str(item.get("id") or item.get("fileId") or "") == str(requested_file_id):
+                    selected_file = item
+                    break
+
+        if not selected_file:
+            selected_file = self._choose_curseforge_file(files, project_type)
+
+        if not selected_file:
+            raise ValueError("Не найден совместимый файл CurseForge-модпака для выбранной сборки.")
+
+        return selected_file
+
+    def _download_curseforge_modpack_to_cache(self, project_id: str, file_info: dict) -> Path:
+        file_id = str(file_info.get("id") or file_info.get("fileId") or "").strip()
+        filename = Path(str(file_info.get("fileName") or file_info.get("file_name") or f"{project_id}.zip")).name
+        target = self._curseforge_cache_path(project_id, file_id or "file", filename)
+
+        if target.exists() and target.stat().st_size > 0:
+            return target
+
+        download_url = str(file_info.get("downloadUrl") or file_info.get("download_url") or "").strip()
+        resolved_file_info = file_info
+
+        if not download_url:
+            response = self._curseforge_download_url(project_id, file_id)
+            resolved_file_info = response.get("file") or file_info
+            download_url = str(response.get("downloadUrl") or "").strip()
+
+        if not download_url:
+            raise ValueError("CurseForge не вернул ссылку на скачивание файла модпака.")
+
+        self._download_curseforge_file(resolved_file_info, download_url, target)
+        self._emit("status", {
+            "busy": True,
+            "message": "Проверяю архив CurseForge-модпака...",
+            "progress": 0.99,
+        })
+        return target
+
+    def _curseforge_project_type_from_class_id(self, class_id: object, fallback: str = "mod") -> str:
+        try:
+            value = int(class_id or 0)
+        except (TypeError, ValueError):
+            return fallback
+
+        return {
+            6: "mod",
+            12: "resourcepack",
+            4471: "modpack",
+            6552: "shader",
+            # CurseForge may expose Data Packs as a separate Minecraft class in
+            # some API responses. Keep this defensive mapping so ZIP datapacks do
+            # not end up in mods/.
+            6945: "datapack",
+        }.get(value, fallback)
+
+    def _curseforge_project_type_from_url(self, url: str, fallback: str = "") -> str:
+        url = str(url or "").lower()
+        if "/minecraft/texture-packs/" in url:
+            return "resourcepack"
+        if "/minecraft/shaders/" in url:
+            return "shader"
+        if "/minecraft/data-packs/" in url or "/minecraft/datapacks/" in url:
+            return "datapack"
+        if "/minecraft/modpacks/" in url:
+            return "modpack"
+        if "/minecraft/mc-mods/" in url:
+            return "mod"
+        return fallback
+
+    def _curseforge_project_type_from_categories(self, categories: object, fallback: str = "") -> str:
+        if not isinstance(categories, list):
+            return fallback
+
+        for category in categories:
+            if not isinstance(category, dict):
+                continue
+            url_type = self._curseforge_project_type_from_url(category.get("url") or "", "")
+            if url_type:
+                return url_type
+
+            slug = str(category.get("slug") or category.get("name") or "").lower()
+            if slug in {"shaders", "shader"}:
+                return "shader"
+            if slug in {"resource-packs", "texture-packs", "resourcepacks", "texturepacks"}:
+                return "resourcepack"
+            if slug in {"data-packs", "datapacks", "datapack"}:
+                return "datapack"
+
+        return fallback
+
+    def _curseforge_manual_project_info(self, project_id: str, project_type: str = "mod") -> dict:
+        project_id = str(project_id or "").strip()
+        fallback_type = str(project_type or "mod").strip().lower() or "mod"
+        fallback = {
+            "project_id": project_id,
+            "title": f"Project {project_id}" if project_id else "CurseForge project",
+            "url": f"https://www.curseforge.com/minecraft/search?search={urllib.parse.quote(project_id)}" if project_id else "https://www.curseforge.com/minecraft",
+            "slug": "",
+            "project_type": fallback_type,
+            "class_id": 0,
+            "icon_url": "",
+        }
+
+        if not project_id:
+            return fallback
+
+        try:
+            response = self._curseforge_proxy_read_json(f"mod/{urllib.parse.quote(project_id, safe='')}")
+            project = response.get("result") or response.get("data") or response
+            if isinstance(project, dict):
+                class_id = project.get("classId") or project.get("class_id") or project.get("classID")
+                links = project.get("links") if isinstance(project.get("links"), dict) else {}
+                website = str(links.get("websiteUrl") or project.get("websiteUrl") or "").strip()
+
+                explicit_type = str(project.get("project_type") or "").strip().lower()
+                url_type = self._curseforge_project_type_from_url(website, "")
+                category_type = self._curseforge_project_type_from_categories(project.get("categories"), "")
+                class_type = self._curseforge_project_type_from_class_id(class_id, "")
+
+                resolved_type = explicit_type or url_type or category_type or class_type or fallback_type
+
+                title = str(project.get("name") or project.get("title") or project.get("slug") or fallback["title"])
+                logo = project.get("logo") if isinstance(project.get("logo"), dict) else {}
+                icon_url = str(
+                    project.get("logoUrl")
+                    or project.get("icon_url")
+                    or logo.get("url")
+                    or ""
+                ).strip()
+
+                return {
+                    "project_id": project_id,
+                    "title": title,
+                    "url": self._curseforge_project_url(project, resolved_type),
+                    "slug": str(project.get("slug") or ""),
+                    "project_type": resolved_type,
+                    "class_id": int(class_id or 0) if str(class_id or "").isdigit() else 0,
+                    "icon_url": icon_url,
+                }
+        except Exception as exc:
+            self._append_startup_log(f"CurseForge manual project info failed for {project_id}: {exc}")
+
+        return fallback
+
+    def _curseforge_manual_project_url(self, project_id: str, project_type: str = "mod") -> str:
+        try:
+            response = self._curseforge_proxy_read_json(f"mod/{urllib.parse.quote(str(project_id), safe='')}")
+            project = response.get("result") or response.get("data") or response
+            if isinstance(project, dict):
+                return self._curseforge_project_url(project, str(project.get("project_type") or project_type or "mod"))
+        except Exception:
+            pass
+        return f"https://www.curseforge.com/minecraft/search?search={urllib.parse.quote(str(project_id))}"
+
+    def _update_instance_from_curseforge_modpack(
+        self,
+        target: dict,
+        project_info: dict,
+        selected_file: dict,
+        manifest: dict,
+    ) -> dict:
+        minecraft = manifest.get("minecraft") if isinstance(manifest.get("minecraft"), dict) else {}
+        minecraft_version = str(minecraft.get("version") or "").strip()
+        if not minecraft_version:
+            raise ValueError("В CurseForge-модпаке не указана версия Minecraft.")
+
+        loader, loader_version = self._curseforge_loader_from_manifest(manifest)
+        if not loader:
+            loader = "vanilla"
+
+        source = {
+            "type": "curseforge_modpack",
+            "project_id": project_info.get("project_id") or "",
+            "slug": project_info.get("slug") or "",
+            "title": project_info.get("title") or target.get("name", ""),
+            "file_id": str(selected_file.get("id") or selected_file.get("fileId") or ""),
+            "file_name": selected_file.get("fileName") or "",
+            "display_name": selected_file.get("displayName") or "",
+            "minecraft_version": minecraft_version,
+            "loader": loader,
+            "loader_version": loader_version,
+            "installed_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        }
+
+        target.update({
+            "minecraft_version": minecraft_version,
+            "version_type": "release",
+            "loader": loader,
+            "loader_version": loader_version,
+            "install_modpack": False,
+            "modpack_url": "",
+            "modpack_sha256": "",
+            "source": source,
+        })
+
+        icon_url = str(project_info.get("icon_url") or "").strip()
+        if icon_url:
+            target["icon"] = icon_url
+            target["icon_pack_id"] = "curseforge_modpack"
+        else:
+            target["icon"] = self._instance_icon_url({"loader": loader, "name": target.get("name", ""), "official": False})
+            target["icon_pack_id"] = loader if loader in {"fabric", "forge", "quilt", "neoforge"} else "modded"
+
+        return target
+
+    def _extract_curseforge_overrides(self, archive_path: Path, manifest: dict, game_dir: Path) -> dict:
+        copied = 0
+        copied_paths: list[str] = []
+        overrides_dir = str(manifest.get("overrides") or "overrides").strip().strip("/") or "overrides"
+        prefix = overrides_dir + "/"
+
+        with zipfile.ZipFile(archive_path) as zf:
+            for info in zf.infolist():
+                name = info.filename.replace("\\", "/")
+                if info.is_dir() or not name.startswith(prefix):
+                    continue
+
+                relative = name[len(prefix):].strip("/")
+                if not relative:
+                    continue
+
+                target = self._safe_relative_game_path(game_dir, relative)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with zf.open(info) as src, target.open("wb") as dst:
+                    shutil.copyfileobj(src, dst)
+                copied += 1
+                copied_paths.append(relative)
+
+        return {
+            "overrides": copied,
+            "override_files": copied_paths,
+        }
+
+    def _curseforge_hash_summary(self, file_info: dict) -> dict:
+        result = {"sha1": "", "md5": ""}
+        for item in file_info.get("hashes") or []:
+            if not isinstance(item, dict):
+                continue
+            try:
+                algo = int(item.get("algo") or 0)
+            except (TypeError, ValueError):
+                continue
+            value = str(item.get("value") or "").strip().lower()
+            if algo == 1:
+                result["sha1"] = value
+            elif algo == 2:
+                result["md5"] = value
+        return result
+
+    def _curseforge_modpack_folder_for_file(self, plan_item: dict, project_cache: dict[str, dict]) -> tuple[str, str]:
+        project_id = str(plan_item.get("projectID") or plan_item.get("projectId") or plan_item.get("project_id") or "").strip()
+        file_info = plan_item.get("file") if isinstance(plan_item.get("file"), dict) else {}
+        filename = str(file_info.get("fileName") or file_info.get("file_name") or "").lower()
+
+        # JAR files are mods/libraries in CurseForge manifests.
+        if filename.endswith(".jar"):
+            return "mods", "mod"
+
+        project_type = ""
+        if project_id:
+            info = project_cache.get(project_id)
+            if not info:
+                info = self._curseforge_manual_project_info(project_id, "mod")
+                project_cache[project_id] = info
+            project_type = str(info.get("project_type") or "").lower()
+
+        if project_type in {"resourcepack", "shader", "datapack"}:
+            return self._curseforge_install_folder(project_type), project_type
+
+        # ZIP files should not go to mods/. If project type inference failed,
+        # resourcepacks/ is safer than breaking the mod loader with ZIP files.
+        if filename.endswith(".zip"):
+            return "resourcepacks", "resourcepack"
+
+        return "mods", "mod"
+
+    def _curseforge_modpack_manual_items(self, unavailable: list[dict], project_cache: dict[str, dict]) -> list[dict]:
+        manual_items: list[dict] = []
+        for item in unavailable:
+            project_id_raw = str(item.get("projectID") or item.get("projectId") or item.get("project_id") or "")
+            file_id_raw = str(item.get("fileID") or item.get("fileId") or item.get("file_id") or "")
+            project_info = project_cache.get(project_id_raw)
+            if not project_info:
+                project_info = self._curseforge_manual_project_info(project_id_raw, "mod")
+                project_cache[project_id_raw] = project_info
+
+            manual_items.append({
+                "project_id": project_id_raw,
+                "file_id": file_id_raw,
+                "title": project_info.get("title") or f"Project {project_id_raw}",
+                "slug": project_info.get("slug") or "",
+                "required": bool(item.get("required", True)),
+                "reason": item.get("reason") or "No downloadUrl returned by CurseForge API",
+                "project_url": project_info.get("url") or self._curseforge_manual_project_url(project_id_raw, "mod"),
+                "folder": self._curseforge_install_folder(str(project_info.get("project_type") or "mod")),
+            })
+        return manual_items
+
+    def _install_curseforge_modpack_files(self, instance: dict, install_plan: list[dict]) -> dict:
+        game_dir = self._instance_game_dir(instance)
+        game_dir.mkdir(parents=True, exist_ok=True)
+
+        installed = 0
+        skipped_existing = 0
+        conflicts: list[dict] = []
+        managed_files: list[dict] = []
+        project_cache: dict[str, dict] = {}
+
+        total = len(install_plan)
+
+        for idx, item in enumerate(install_plan, start=1):
+            file_info = item.get("file") if isinstance(item.get("file"), dict) else {}
+            project_id = str(item.get("projectID") or item.get("projectId") or item.get("project_id") or file_info.get("modId") or "").strip()
+            file_id = str(item.get("fileID") or item.get("fileId") or item.get("file_id") or file_info.get("id") or file_info.get("fileId") or "").strip()
+            filename = Path(str(file_info.get("fileName") or file_info.get("file_name") or f"{project_id}-{file_id}.jar")).name
+            folder_key, project_type = self._curseforge_modpack_folder_for_file(item, project_cache)
+
+            if not filename or filename in {".", ".."}:
+                conflicts.append({
+                    "project_id": project_id,
+                    "file_id": file_id,
+                    "title": project_cache.get(project_id, {}).get("title") or f"Project {project_id}",
+                    "filename": filename,
+                    "folder": folder_key,
+                    "reason": "Некорректное имя файла.",
+                })
+                continue
+
+            folder = self._instance_subfolder(instance, folder_key)
+            folder.mkdir(parents=True, exist_ok=True)
+            target = self._safe_folder_file(folder, filename)
+
+            hashes = self._curseforge_hash_summary(file_info)
+            managed_entry = {
+                "path": f"{folder_key}/{filename}",
+                "folder": folder_key,
+                "filename": filename,
+                "project_id": project_id,
+                "file_id": file_id,
+                "project_type": project_type,
+                "sha1": hashes.get("sha1") or "",
+                "md5": hashes.get("md5") or "",
+            }
+
+            if target.exists():
+                if self._file_matches_curseforge_hashes(target, file_info):
+                    skipped_existing += 1
+                    managed_files.append(managed_entry)
+                    continue
+
+                info = project_cache.get(project_id) or self._curseforge_manual_project_info(project_id, project_type)
+                project_cache[project_id] = info
+                conflicts.append({
+                    "project_id": project_id,
+                    "file_id": file_id,
+                    "title": info.get("title") or f"Project {project_id}",
+                    "filename": filename,
+                    "folder": folder_key,
+                    "reason": "Файл уже существует и не совпадает с manifest CurseForge.",
+                    "project_url": info.get("url") or self._curseforge_manual_project_url(project_id, project_type),
+                })
+                continue
+
+            download_url = str(item.get("downloadUrl") or file_info.get("downloadUrl") or file_info.get("download_url") or "").strip()
+            if not download_url:
+                info = project_cache.get(project_id) or self._curseforge_manual_project_info(project_id, project_type)
+                project_cache[project_id] = info
+                conflicts.append({
+                    "project_id": project_id,
+                    "file_id": file_id,
+                    "title": info.get("title") or f"Project {project_id}",
+                    "filename": filename,
+                    "folder": folder_key,
+                    "reason": "No downloadUrl returned by CurseForge API",
+                    "project_url": info.get("url") or self._curseforge_manual_project_url(project_id, project_type),
+                })
+                continue
+
+            self._emit("status", {
+                "busy": True,
+                "message": f"Скачиваю файлы CurseForge-модпака... {idx}/{total}",
+                "progress": 0,
+            })
+            self._download_curseforge_file(file_info, download_url, target)
+            installed += 1
+            managed_files.append(managed_entry)
+
+        return {
+            "installed_files": installed,
+            "skipped_existing": skipped_existing,
+            "conflicts": conflicts,
+            "managed_files": managed_files,
+        }
+
+    def _record_curseforge_modpack_source(
+        self,
+        instance: dict,
+        project_info: dict,
+        selected_file: dict,
+        manifest: dict,
+        install_result: dict,
+        resolved: dict,
+    ) -> None:
+        path = self._modrinth_sources_path(instance)
+        try:
+            data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        except Exception:
+            data = {}
+
+        minecraft = manifest.get("minecraft") if isinstance(manifest.get("minecraft"), dict) else {}
+        loader, loader_version = self._curseforge_loader_from_manifest(manifest)
+
+        data["modpack"] = {
+            "source": "curseforge",
+            "project_id": project_info.get("project_id") or "",
+            "slug": project_info.get("slug") or "",
+            "title": project_info.get("title") or instance.get("name", ""),
+            "project_type": "modpack",
+            "file_id": str(selected_file.get("id") or selected_file.get("fileId") or ""),
+            "file_name": selected_file.get("fileName") or "",
+            "display_name": selected_file.get("displayName") or "",
+            "minecraft_version": minecraft.get("version") or instance.get("minecraft_version") or "",
+            "loader": loader,
+            "loader_version": loader_version,
+            "installed_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "installed_files": int(install_result.get("installed_files") or 0),
+            "skipped_existing": int(install_result.get("skipped_existing") or 0),
+            "manual_required": len(install_result.get("manual_items") or []),
+            "overrides": int(install_result.get("overrides") or 0),
+            "managed_files": install_result.get("managed_files") or [],
+            "manual_items": install_result.get("manual_items") or [],
+            "smart_prune": install_result.get("smart_prune") or {},
+            "resolve_counts": resolved.get("counts") if isinstance(resolved.get("counts"), dict) else {},
+        }
+
+        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    def install_curseforge_modpack_project(self, payload: dict | None = None) -> dict:
+        payload = payload or {}
+        project_id = str(payload.get("project_id") or payload.get("mod_id") or "").strip()
+        instance_id = str(payload.get("instance_id") or "").strip()
+        requested_file_id = str(payload.get("file_id") or payload.get("fileId") or "").strip()
+        filters = payload.get("filters") if isinstance(payload.get("filters"), dict) else {}
+
+        with self._operation_lock:
+            if self._busy:
+                return {"ok": False, "error": "Дождись завершения текущей операции."}
+            self._busy = True
+            self._busy_action = "curseforge_modpack_install"
+
+        try:
+            if not project_id:
+                return {"ok": False, "error": "Не указан CurseForge project id."}
+
+            data = self._load_instances_optional()
+            target = next((item for item in data.get("instances", []) if item.get("id") == instance_id), None)
+            if not target:
+                return {"ok": False, "error": "Сборка не выбрана."}
+            if target.get("locked") or target.get("official"):
+                return {"ok": False, "error": "CurseForge-модпак нельзя установить поверх официальной сборки."}
+
+            project_info = self._curseforge_manual_project_info(project_id, "modpack")
+
+            selected_file = self._curseforge_modpack_file(project_id, "modpack", target, filters, requested_file_id)
+            archive_path = self._download_curseforge_modpack_to_cache(project_id, selected_file)
+
+            self._emit("status", {
+                "busy": True,
+                "message": "Читаю manifest CurseForge-модпака...",
+                "progress": 0.02,
+            })
+            manifest = self._read_curseforge_modpack_manifest(archive_path)
+            manifest_files = self._curseforge_manifest_files_payload(manifest)
+
+            resolved = {"installPlan": [], "unavailable": [], "counts": {"requested": len(manifest_files), "resolved": 0, "unavailable": 0}}
+            if manifest_files:
+                self._emit("status", {
+                    "busy": True,
+                    "message": f"Проверяю доступность файлов модпака... 0/{len(manifest_files)}",
+                    "progress": 0.05,
+                })
+                resolved = self._curseforge_proxy_post_json("resolve-manifest", {"files": manifest_files})
+                counts = resolved.get("counts") if isinstance(resolved.get("counts"), dict) else {}
+                done = int(counts.get("resolved") or 0) + int(counts.get("unavailable") or 0)
+                self._emit("status", {
+                    "busy": True,
+                    "message": f"Проверяю доступность файлов модпака... {done}/{len(manifest_files)}",
+                    "progress": 0.08,
+                })
+
+            install_plan = resolved.get("installPlan") if isinstance(resolved.get("installPlan"), list) else []
+            unavailable = resolved.get("unavailable") if isinstance(resolved.get("unavailable"), list) else []
+            project_cache: dict[str, dict] = {}
+            manual_items = self._curseforge_modpack_manual_items(unavailable, project_cache)
+
+            target = self._update_instance_from_curseforge_modpack(target, project_info, selected_file, manifest)
+            normalized = normalize_instance(target, self.config)
+            if not normalized:
+                raise ValueError("Не удалось обновить выбранную сборку под CurseForge-модпак.")
+            normalized["source"] = target.get("source", {})
+            normalized["icon"] = target.get("icon", "")
+            normalized["icon_pack_id"] = target.get("icon_pack_id", "")
+
+            for idx, item in enumerate(data.get("instances", [])):
+                if item.get("id") == instance_id:
+                    data["instances"][idx] = normalized
+                    break
+
+            data["selected_instance_id"] = normalized["id"]
+            self._save_instances_optional(data)
+
+            self._selected_instance_id = normalized["id"]
+            self.settings = load_user_settings()
+            self.settings["selected_instance_id"] = normalized["id"]
+            save_user_settings(self.settings)
+
+            self._emit("status", {
+                "busy": True,
+                "message": "Устанавливаю CurseForge-модпак в выбранную сборку...",
+                "progress": 0.1,
+            })
+            core = self._make_core(normalized)
+            core.update_only(self._java_argument(normalized), force_download=False)
+
+            game_dir = self._instance_game_dir(normalized)
+            self._emit("status", {
+                "busy": True,
+                "message": "Копирую overrides CurseForge-модпака...",
+                "progress": 0.15,
+            })
+            overrides_result = self._extract_curseforge_overrides(archive_path, manifest, game_dir)
+
+            files_result = self._install_curseforge_modpack_files(normalized, install_plan)
+            self._emit("status", {
+                "busy": True,
+                "message": "Удаляю устаревшие файлы CurseForge-модпака...",
+                "progress": 0.98,
+            })
+            prune_result = self._prune_removed_curseforge_modpack_files(normalized, files_result.get("managed_files") or [])
+            files_result["smart_prune"] = prune_result
+            conflict_items = []
+            for item in files_result.get("conflicts") or []:
+                conflict_items.append({
+                    "project_id": str(item.get("project_id") or ""),
+                    "file_id": str(item.get("file_id") or ""),
+                    "title": item.get("title") or f"Project {item.get('project_id') or ''}",
+                    "reason": item.get("reason") or "Conflict",
+                    "project_url": item.get("project_url") or self._curseforge_manual_project_url(item.get("project_id") or "", "mod"),
+                    "folder": item.get("folder") or "mods",
+                    "filename": item.get("filename") or "",
+                })
+
+            manual_items.extend(conflict_items)
+
+            install_result = {
+                **files_result,
+                **overrides_result,
+                "manual_items": manual_items,
+                "manual_required": len(manual_items),
+                "partial": bool(manual_items),
+            }
+
+            self._record_curseforge_modpack_source(normalized, project_info, selected_file, manifest, install_result, resolved)
+
+            self._append_startup_log(
+                f"CurseForge modpack installed into instance: {normalized.get('name')} "
+                f"({install_result.get('installed_files', 0)} files, "
+                f"{install_result.get('manual_required', 0)} manual)"
+            )
+
+            message = (
+                "CurseForge-модпак установлен частично: требуется ручная установка файлов."
+                if manual_items
+                else "CurseForge-модпак установлен в выбранную сборку."
+            )
+            self._emit("status", {
+                "busy": False,
+                "message": message,
+                "progress": 1,
+            })
+
+            minecraft = manifest.get("minecraft") if isinstance(manifest.get("minecraft"), dict) else {}
+            loader, loader_version = self._curseforge_loader_from_manifest(manifest)
+
+            return {
+                "ok": True,
+                "message": message,
+                "partial": bool(manual_items),
+                "target_instance_id": normalized.get("id", ""),
+                "state": self.get_app_state(),
+                "project": {
+                    "title": project_info.get("title") or project_id,
+                    "project_id": project_info.get("project_id") or project_id,
+                    "project_type": "modpack",
+                    "icon_url": project_info.get("icon_url") or "",
+                    "url": project_info.get("url") or "",
+                },
+                "file": {
+                    "id": str(selected_file.get("id") or selected_file.get("fileId") or ""),
+                    "name": selected_file.get("fileName") or "",
+                    "display_name": selected_file.get("displayName") or "",
+                },
+                "pack": {
+                    "name": manifest.get("name") or project_info.get("title") or "CurseForge modpack",
+                    "version": manifest.get("version") or "",
+                    "author": manifest.get("author") or "",
+                    "minecraft_version": minecraft.get("version") or normalized.get("minecraft_version") or "",
+                    "loader": loader,
+                    "loader_version": loader_version,
+                },
+                "counts": {
+                    "manifest_files": len(manifest_files),
+                    "available": len(install_plan),
+                    "installed": int(install_result.get("installed_files") or 0),
+                    "skipped_existing": int(install_result.get("skipped_existing") or 0),
+                    "manual_required": len(manual_items),
+                    "overrides_files": int(overrides_result.get("overrides") or 0),
+                    "pruned": int((files_result.get("smart_prune") or {}).get("deleted_files") or 0),
+                },
+                "manual_items": manual_items,
+                "managed_files": install_result.get("managed_files") or [],
+                "overrides_preview": (overrides_result.get("override_files") or [])[:30],
+            }
+
+        except Exception as exc:
+            self._emit("status", {"busy": False, "message": str(exc), "error": True, "progress": 0})
+            return {"ok": False, "error": str(exc)}
+        finally:
+            self._set_busy(False, "")
+
+    def preview_curseforge_modpack_install(self, payload: dict | None = None) -> dict:
+        payload = payload or {}
+        project_id = str(payload.get("project_id") or payload.get("mod_id") or "").strip()
+        instance_id = str(payload.get("instance_id") or "").strip()
+        requested_file_id = str(payload.get("file_id") or payload.get("fileId") or "").strip()
+        filters = payload.get("filters") if isinstance(payload.get("filters"), dict) else {}
+
+        try:
+            if not project_id:
+                return {"ok": False, "error": "Не указан CurseForge project id."}
+
+            instance = self._instance_by_id_or_selected(instance_id) if instance_id else self._selected_instance()
+            if not instance:
+                return {"ok": False, "error": "Сборка не выбрана."}
+            if instance.get("locked") or instance.get("official"):
+                return {"ok": False, "error": "CurseForge-модпак нельзя установить поверх официальной сборки."}
+
+            selected_file = self._curseforge_modpack_file(project_id, "modpack", instance, filters, requested_file_id)
+            archive_path = self._download_curseforge_modpack_to_cache(project_id, selected_file)
+            self._emit("status", {
+                "busy": True,
+                "message": "Читаю manifest CurseForge-модпака...",
+                "progress": 0.99,
+            })
+            manifest = self._read_curseforge_modpack_manifest(archive_path)
+
+            minecraft = manifest.get("minecraft") if isinstance(manifest.get("minecraft"), dict) else {}
+            pack_mc = str(minecraft.get("version") or filters.get("game_version") or instance.get("minecraft_version") or "").strip()
+            loader, loader_version = self._curseforge_loader_from_manifest(manifest)
+            manifest_files = self._curseforge_manifest_files_payload(manifest)
+
+            resolved = {"installPlan": [], "unavailable": []}
+            if manifest_files:
+                self._emit("status", {
+                    "busy": True,
+                    "message": f"Проверяю доступность файлов модпака... 0/{len(manifest_files)}",
+                    "progress": 0.99,
+                })
+                resolved = self._curseforge_proxy_post_json("resolve-manifest", {"files": manifest_files})
+                resolved_counts = resolved.get("counts") if isinstance(resolved.get("counts"), dict) else {}
+                resolved_done = int(resolved_counts.get("resolved") or 0) + int(resolved_counts.get("unavailable") or 0)
+                self._emit("status", {
+                    "busy": True,
+                    "message": f"Проверяю доступность файлов модпака... {resolved_done}/{len(manifest_files)}",
+                    "progress": 0.99,
+                })
+
+            available = resolved.get("installPlan") if isinstance(resolved.get("installPlan"), list) else []
+            unavailable = resolved.get("unavailable") if isinstance(resolved.get("unavailable"), list) else []
+
+            manual_items = []
+            for item in unavailable[:50]:
+                project_id_raw = str(item.get("projectID") or item.get("projectId") or item.get("project_id") or "")
+                file_id_raw = str(item.get("fileID") or item.get("fileId") or item.get("file_id") or "")
+                project_info = self._curseforge_manual_project_info(project_id_raw, "mod")
+                manual_items.append({
+                    "project_id": project_id_raw,
+                    "file_id": file_id_raw,
+                    "title": project_info.get("title") or f"Project {project_id_raw}",
+                    "slug": project_info.get("slug") or "",
+                    "required": bool(item.get("required", True)),
+                    "reason": item.get("reason") or "No downloadUrl returned by CurseForge API",
+                    "project_url": project_info.get("url") or self._curseforge_manual_project_url(project_id_raw, "mod"),
+                })
+
+            overrides = manifest.get("_stonelight_overrides") or []
+            target_mc = str(instance.get("minecraft_version") or "").strip()
+            target_loader = str(instance.get("loader") or "vanilla").strip().lower()
+            will_reconfigure = bool(pack_mc and pack_mc != target_mc) or bool(loader and loader != target_loader)
+
+            self._emit("status", {
+                "busy": False,
+                "message": "Предпросмотр CurseForge-модпака готов.",
+                "progress": 1,
+            })
+
+            return {
+                "ok": True,
+                "source": "curseforge",
+                "mode": "preflight_only",
+                "requires_confirmation": False,
+                "project": {
+                    "project_id": project_id,
+                    "title": self._curseforge_project_title(project_id),
+                    "project_type": "modpack",
+                },
+                "file": {
+                    "id": str(selected_file.get("id") or selected_file.get("fileId") or ""),
+                    "name": selected_file.get("fileName") or "",
+                    "display_name": selected_file.get("displayName") or "",
+                },
+                "target_instance": self._safe_instance(instance),
+                "pack": {
+                    "name": manifest.get("name") or self._curseforge_project_title(project_id),
+                    "version": manifest.get("version") or "",
+                    "author": manifest.get("author") or "",
+                    "minecraft_version": pack_mc,
+                    "loader": loader,
+                    "loader_version": loader_version,
+                    "will_reconfigure_instance": will_reconfigure,
+                },
+                "counts": {
+                    "manifest_files": len(manifest_files),
+                    "available": len(available),
+                    "manual_required": len(unavailable),
+                    "overrides_files": len(overrides),
+                    "manual_items_shown": len(manual_items),
+                },
+                "manual_items": manual_items,
+                "overrides_preview": overrides[:30],
+                "cache_path": str(archive_path),
+                "message": "Предпросмотр CurseForge-модпака готов.",
+            }
+        except Exception as exc:
+            self._emit("status", {
+                "busy": False,
+                "message": str(exc),
+                "error": True,
+                "progress": 0,
+            })
+            return {"ok": False, "error": str(exc)}
+
+    def preview_curseforge_install(self, payload: dict | None = None) -> dict:
+        payload = payload or {}
+        project_id = str(payload.get("project_id") or payload.get("mod_id") or "").strip()
+        project_type = str(payload.get("project_type") or "mod").strip().lower()
+        instance_id = str(payload.get("instance_id") or "").strip()
+        requested_file_id = str(payload.get("file_id") or payload.get("fileId") or "").strip()
+        filters = payload.get("filters") if isinstance(payload.get("filters"), dict) else {}
+
+        try:
+            if not project_id:
+                return {"ok": False, "error": "Не указан CurseForge project id."}
+            if project_type not in CURSEFORGE_PROJECT_TYPES:
+                project_type = "mod"
+            if project_type == "modpack":
+                return {
+                    "ok": True,
+                    "source": "curseforge",
+                    "project_type": project_type,
+                    "requires_confirmation": False,
+                    "dependencies": [],
+                    "dependencies_to_install": [],
+                    "dependencies_already_installed": [],
+                    "message": "Установка CurseForge-модпаков будет добавлена отдельным этапом.",
+                }
+
+            instance = self._instance_by_id_or_selected(instance_id) if instance_id else self._selected_instance()
+            if not instance:
+                return {"ok": False, "error": "Сборка не выбрана."}
+
+            files = self._curseforge_files_for_instance(project_id, project_type, instance, filters)
+            selected_file = None
+            if requested_file_id:
+                for item in files:
+                    if str(item.get("id") or item.get("fileId") or "") == requested_file_id:
+                        selected_file = item
+                        break
+            if not selected_file:
+                selected_file = self._choose_curseforge_file(files, project_type)
+            if not selected_file:
+                raise ValueError("Не найден совместимый файл CurseForge для выбранной сборки.")
+
+            main_item = self._curseforge_preview_item(instance, project_id, project_type, selected_file)
+
+            dependencies = []
+            if project_type == "mod":
+                dependencies = self._collect_curseforge_dependency_preview(
+                    instance=instance,
+                    project_id=project_id,
+                    file_info=selected_file,
+                    filters=filters,
+                    dependency_stack={project_id},
+                    depth=0,
+                    seen=set(),
+                )
+
+            dependencies_to_install = [item for item in dependencies if not item.get("already_installed") and not item.get("conflict")]
+            dependencies_already_installed = [item for item in dependencies if item.get("already_installed")]
+            conflicts = [item for item in dependencies if item.get("conflict")]
+
+            return {
+                "ok": True,
+                "source": "curseforge",
+                "project_type": project_type,
+                "main": main_item,
+                "dependencies": dependencies,
+                "dependencies_to_install": dependencies_to_install,
+                "dependencies_already_installed": dependencies_already_installed,
+                "conflicts": conflicts,
+                "requires_confirmation": bool(dependencies_to_install or conflicts),
+            }
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def install_curseforge_project(self, payload: dict | None = None) -> dict:
+        payload = payload or {}
+        project_id = str(payload.get("project_id") or payload.get("mod_id") or "").strip()
+        project_type = str(payload.get("project_type") or "mod").strip().lower()
+        instance_id = str(payload.get("instance_id") or "").strip()
+        requested_file_id = str(payload.get("file_id") or payload.get("fileId") or "").strip()
+        filters = payload.get("filters") if isinstance(payload.get("filters"), dict) else {}
+        install_dependencies = bool(payload.get("install_dependencies", True))
+
+        with self._operation_lock:
+            if self._busy:
+                return {"ok": False, "error": "Дождись завершения текущей операции."}
+            self._busy = True
+            self._busy_action = "curseforge_install"
+
+        try:
+            if not project_id:
+                return {"ok": False, "error": "Не указан CurseForge project id."}
+            if project_type not in CURSEFORGE_PROJECT_TYPES:
+                project_type = "mod"
+            if project_type == "modpack":
+                return {"ok": False, "error": "Установка CurseForge-модпаков будет добавлена отдельным этапом."}
+
+            instance = self._instance_by_id_or_selected(instance_id) if instance_id else self._selected_instance()
+            if not instance:
+                return {"ok": False, "error": "Сборка не выбрана."}
+
+            if project_type == "mod" and str(instance.get("loader") or "vanilla").lower() == "vanilla":
+                return {"ok": False, "error": "Моды CurseForge нельзя установить в vanilla-сборку без модлоадера."}
+
+            self._emit("status", {
+                "busy": True,
+                "message": "Проверяю файлы CurseForge...",
+                "action": "curseforge_install",
+                "progress": 0,
+            })
+
+            dependency_stack = {project_id}
+            result = self._install_curseforge_project_internal(
+                instance=instance,
+                project_id=project_id,
+                project_type=project_type,
+                requested_file_id=requested_file_id,
+                filters=filters,
+                dependency_stack=dependency_stack,
+                depth=0,
+                install_dependencies=install_dependencies,
+            )
+
+            message = "Проект CurseForge уже установлен." if result.get("already_installed") else "Проект CurseForge установлен."
+            dep_count = len(result.get("dependencies_installed") or [])
+            if dep_count:
+                message = f"{message} Установлено зависимостей: {dep_count}."
+
+            self._emit("status", {
+                "busy": False,
+                "message": message,
+                "progress": 1,
+            })
+
+            try:
+                result["folder_data"] = self.list_instance_folder(instance.get("id", ""), result.get("folder") or self._curseforge_install_folder(project_type))
+            except Exception:
+                pass
+
+            return result
+
+        except Exception as exc:
+            self._emit("status", {"busy": False, "message": str(exc), "error": True, "progress": 0})
+            return {"ok": False, "error": str(exc)}
+        finally:
+            self._set_busy(False, "")
 
     def get_instance_icon_pack(self, instance_id: str = "") -> dict:
         instance = self._raw_instance_by_id(instance_id) if instance_id else self._selected_instance()
@@ -2674,7 +5130,7 @@ class LauncherWebAPI:
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
 
-    def delete_instance(self, instance_id: str, delete_files: bool = False) -> dict:
+    def delete_instance(self, instance_id: str, delete_files: bool = True) -> dict:
         if self._busy:
             return {"ok": False, "error": "Дождись завершения текущей операции."}
 
@@ -2687,6 +5143,66 @@ class LauncherWebAPI:
             return {"ok": False, "error": "Сборка не найдена."}
         if self._instance_is_running(target):
             return {"ok": False, "error": "Сначала останови запущенную сборку."}
+
+        target_is_official = bool(target.get("official") or target.get("id") == "stonelight")
+        if target.get("locked") and not target_is_official:
+            return {"ok": False, "error": "Защищённую пользовательскую сборку нельзя удалить."}
+
+        removed_path = ""
+        skipped_missing = False
+
+        if delete_files:
+            game_dir_text = target.get("game_directory") or ""
+            if not game_dir_text:
+                return {"ok": False, "error": "У сборки не указан путь к папке."}
+
+            game_dir = self._absolute_path(game_dir_text)
+            allowed_root = (ROOT / "data" / "instances").resolve()
+            legacy_official_game_dir = (ROOT / "data" / ".minecraft").resolve()
+
+            # Normal user/official instances live in data/instances/<id>/.minecraft,
+            # so deleting the whole <id> folder is correct. Very old official builds
+            # may still point directly to data/.minecraft; in that case delete only
+            # that .minecraft folder, never the whole data/ directory.
+            if target_is_official and game_dir.resolve() == legacy_official_game_dir:
+                instance_root = game_dir.resolve()
+                special_official_root = True
+            else:
+                instance_root = (game_dir.parent if game_dir.name == ".minecraft" else game_dir).resolve()
+                special_official_root = False
+
+            if special_official_root:
+                pass
+            else:
+                try:
+                    relative_to_instances = instance_root.relative_to(allowed_root)
+                except ValueError:
+                    return {
+                        "ok": False,
+                        "error": "Папка сборки находится вне data/instances и не была удалена.",
+                    }
+
+                if not relative_to_instances.parts or instance_root == allowed_root:
+                    return {
+                        "ok": False,
+                        "error": "Некорректный путь папки сборки. Удаление отменено.",
+                    }
+
+            if instance_root.exists():
+                try:
+                    if instance_root.is_symlink():
+                        instance_root.unlink()
+                    else:
+                        shutil.rmtree(instance_root, ignore_errors=False)
+                    removed_path = str(instance_root)
+                except Exception as exc:
+                    return {
+                        "ok": False,
+                        "error": f"Не удалось удалить папку сборки с диска: {exc}",
+                    }
+            else:
+                skipped_missing = True
+                removed_path = str(instance_root)
 
         data["instances"] = [
             item for item in data.get("instances", [])
@@ -2702,28 +5218,204 @@ class LauncherWebAPI:
         self.settings["selected_instance_id"] = self._selected_instance_id
         save_user_settings(self.settings)
 
-        removed_path = ""
-        if delete_files:
-            game_dir = self._absolute_path(target.get("game_directory") or "")
-            instance_root = game_dir.parent if game_dir.name == ".minecraft" else game_dir
-            allowed_root = (ROOT / "data" / "instances").resolve()
-            try:
-                instance_root.relative_to(allowed_root)
-            except ValueError:
-                return {
-                    "ok": False,
-                    "error": "Папка сборки находится вне data/instances и не была удалена.",
-                }
-            if instance_root.exists():
-                shutil.rmtree(instance_root, ignore_errors=False)
-                removed_path = str(instance_root)
-
-        self._append_startup_log(f"Instance deleted: {instance_id}")
+        self._append_startup_log(
+            f"Instance deleted: {instance_id}"
+            + (f"; files removed: {removed_path}" if removed_path and not skipped_missing else "")
+            + ("; folder was already missing" if skipped_missing else "")
+        )
         return {
             "ok": True,
             "removed_path": removed_path,
+            "files_deleted": bool(removed_path and not skipped_missing),
+            "files_missing": skipped_missing,
             "state": self.get_app_state(),
         }
+
+    def _clone_instance_suffix(self) -> str:
+        language = str((load_user_settings() or {}).get("language") or self.config.get("language") or "en").lower()
+        return {
+            "uk": "копія",
+            "kk": "көшірме",
+            "en": "copy",
+        }.get(language, "copy")
+
+    def _clone_instance_name(self, data: dict, source_name: str) -> str:
+        existing_names = {
+            str(item.get("name") or "").strip().casefold()
+            for item in data.get("instances", [])
+        }
+
+        def fit_name(base: str, suffix: str) -> str:
+            max_len = 32
+            room = max(1, max_len - len(suffix))
+            return (base[:room].rstrip() + suffix).strip()
+
+        base = str(source_name or "Instance").strip() or "Instance"
+        copy_word = self._clone_instance_suffix()
+        name = fit_name(base, f" - {copy_word}")
+        if name.casefold() not in existing_names:
+            return name
+
+        counter = 2
+        while True:
+            suffix = f" - {copy_word} {counter}"
+            name = fit_name(base, suffix)
+            if name.casefold() not in existing_names:
+                return name
+            counter += 1
+
+    def _copy_instance_game_directory_without_worlds(self, source_game_dir: Path, target_game_dir: Path) -> dict:
+        source_game_dir = source_game_dir.resolve()
+        target_game_dir = target_game_dir.resolve()
+
+        if not source_game_dir.exists():
+            raise ValueError("Папка исходной сборки не найдена.")
+        if not source_game_dir.is_dir():
+            raise ValueError("Путь исходной сборки не является папкой.")
+        if target_game_dir.exists():
+            raise ValueError("Папка новой сборки уже существует.")
+
+        allowed_root = (ROOT / "data" / "instances").resolve()
+        try:
+            target_game_dir.relative_to(allowed_root)
+        except ValueError:
+            raise ValueError("Папка новой сборки должна находиться внутри data/instances.")
+
+        excluded_roots = {"saves", "screenshots", "logs"}
+        excluded_relative_prefixes = {
+            "saves",
+            ".minecraft/saves",
+            "screenshots",
+            ".minecraft/screenshots",
+            "logs",
+            ".minecraft/logs",
+        }
+
+        copied_files = 0
+        copied_dirs = 0
+        skipped_world_entries = 0
+
+        def ignore_func(src: str, names: list[str]) -> set[str]:
+            nonlocal skipped_world_entries
+            src_path = Path(src).resolve()
+            try:
+                rel = src_path.relative_to(source_game_dir).as_posix()
+            except ValueError:
+                rel = ""
+
+            ignored: set[str] = set()
+            for name in names:
+                candidate = f"{rel}/{name}".strip("/")
+                normalized = candidate.replace("\\", "/")
+                if name in excluded_roots and rel in {"", ".minecraft"}:
+                    ignored.add(name)
+                    skipped_world_entries += 1
+                    continue
+                if normalized in excluded_relative_prefixes or normalized.startswith("saves/") or normalized.startswith(".minecraft/saves/"):
+                    ignored.add(name)
+                    skipped_world_entries += 1
+            return ignored
+
+        shutil.copytree(source_game_dir, target_game_dir, ignore=ignore_func)
+
+        for path in target_game_dir.rglob("*"):
+            if path.is_dir():
+                copied_dirs += 1
+            elif path.is_file():
+                copied_files += 1
+
+        return {
+            "copied_files": copied_files,
+            "copied_dirs": copied_dirs,
+            "skipped_world_entries": skipped_world_entries,
+        }
+
+    def clone_instance(self, instance_id: str = "") -> dict:
+        if self._busy:
+            return {"ok": False, "error": "Дождись завершения текущей операции."}
+
+        data = self._load_instances_optional()
+        source = next(
+            (item for item in data.get("instances", []) if item.get("id") == instance_id),
+            None,
+        )
+        if not source:
+            return {"ok": False, "error": "Сборка не найдена."}
+        if self._instance_is_running(source):
+            return {"ok": False, "error": "Сначала останови запущенную сборку."}
+
+        try:
+            clone_name = self._clone_instance_name(data, source.get("name") or "Instance")
+            clone_slug = slugify_instance_name(clone_name)
+            clone_id = clone_slug
+            existing_ids = {str(item.get("id") or "") for item in data.get("instances", [])}
+            suffix = 2
+            while clone_id in existing_ids:
+                clone_id = f"{clone_slug}_{suffix}"
+                suffix += 1
+
+            source_game_dir = self._absolute_path(source.get("game_directory") or "")
+            target_game_dir = (ROOT / "data" / "instances" / clone_id / ".minecraft").resolve()
+
+            copy_result = self._copy_instance_game_directory_without_worlds(source_game_dir, target_game_dir)
+
+            cloned = copy.deepcopy(source)
+            cloned.update({
+                "id": clone_id,
+                "name": clone_name,
+                "official": False,
+                "locked": False,
+                "game_directory": f"data/instances/{clone_id}/.minecraft",
+                "installation_requested": False,
+            })
+
+            # Keep loader/runtime/source metadata so a cloned modpack remains
+            # updateable, but never keep official protection flags.
+            normalized = normalize_instance(cloned, self.config)
+            if not normalized:
+                raise ValueError("Не удалось создать запись клонированной сборки.")
+
+            # normalize_instance may drop custom nested source/icon fields for unusual
+            # cases, so restore selected safe optional metadata.
+            for key in ("source", "icon", "icon_pack_id"):
+                if key in cloned:
+                    normalized[key] = cloned[key]
+
+            data["instances"].append(normalized)
+            data["selected_instance_id"] = normalized["id"]
+            self._save_instances_optional(data)
+
+            self._selected_instance_id = normalized["id"]
+            self.settings = load_user_settings()
+            self.settings["selected_instance_id"] = normalized["id"]
+            save_user_settings(self.settings)
+
+            self._append_startup_log(
+                f"Instance cloned: {source.get('id')} -> {normalized.get('id')} "
+                f"({copy_result.get('copied_files', 0)} files, worlds/screenshots/logs skipped)"
+            )
+
+            return {
+                "ok": True,
+                "message": "Сборка клонирована.",
+                "cloned_instance_id": normalized["id"],
+                "cloned_instance_name": normalized["name"],
+                "copy": copy_result,
+                "state": self.get_app_state(),
+            }
+        except Exception as exc:
+            # Remove half-created folder if metadata was not written.
+            try:
+                if 'target_game_dir' in locals():
+                    target_root = target_game_dir.parent if target_game_dir.name == ".minecraft" else target_game_dir
+                    allowed_root = (ROOT / "data" / "instances").resolve()
+                    target_root = target_root.resolve()
+                    if target_root.exists() and target_root != allowed_root:
+                        target_root.relative_to(allowed_root)
+                        shutil.rmtree(target_root, ignore_errors=True)
+            except Exception:
+                pass
+            return {"ok": False, "error": str(exc)}
 
     def _selected_account(self) -> dict | None:
         accounts = load_accounts()
@@ -2752,7 +5444,7 @@ class LauncherWebAPI:
         return {
             "launcher": {
                 "name": self.config.get("launcher_name", "StoneLight Launcher"),
-                "version": self.config.get("launcher_version", "0.6.70"),
+                "version": self.config.get("launcher_version", "0.6.71"),
                 "github_url": self.config.get("github_url", "https://github.com/stonelightmc/StoneLight-Launcher"),
                 "bug_report_url": self.config.get("bug_report_url", "https://github.com/stonelightmc/StoneLight-Launcher/issues"),
                 "community_site_url": self.config.get("community_site_url", "https://stonelightmc.github.io"),
@@ -3131,8 +5823,8 @@ class LauncherWebAPI:
             # Archive/checksum are kept for technical manifest/debug use, but
             # they are not user-facing update indicators because GitHub Release
             # fallback can legitimately install a different ZIP filename/hash.
-            "mods_zip_url": instance.get("modpack_url", ""),
-            "mods_zip_sha256": instance.get("modpack_sha256", ""),
+            "official_modpack_fallback_url": instance.get("modpack_url", ""),
+            "official_modpack_fallback_sha256": instance.get("modpack_sha256", ""),
             "mods_release_repo": self.config.get("mods_release_repo", ""),
             "mods_release_tag": self.config.get("mods_release_tag", ""),
         }
@@ -3187,6 +5879,272 @@ class LauncherWebAPI:
             "changes": changes,
         }
 
+
+    def _curseforge_modpack_source_info(self, instance: dict) -> dict:
+        source = instance.get("source", {}) if isinstance(instance.get("source", {}), dict) else {}
+        sources_data = self._read_modrinth_sources_data(instance)
+        modpack_data = sources_data.get("modpack") if isinstance(sources_data.get("modpack"), dict) else {}
+
+        if source.get("type") != "curseforge_modpack" and modpack_data.get("source") != "curseforge":
+            return {
+                "supported": False,
+                "source": {},
+                "message": "У этой сборки нет связи с CurseForge-модпаком.",
+            }
+
+        project_id = str(source.get("project_id") or modpack_data.get("project_id") or "").strip()
+        current_file_id = str(source.get("file_id") or modpack_data.get("file_id") or "").strip()
+        managed_files = modpack_data.get("managed_files") if isinstance(modpack_data.get("managed_files"), list) else []
+        manual_items = modpack_data.get("manual_items") if isinstance(modpack_data.get("manual_items"), list) else []
+
+        return {
+            "supported": True,
+            "checked": False,
+            "needs_update": False,
+            "source": source or modpack_data,
+            "project_id": project_id,
+            "slug": source.get("slug") or modpack_data.get("slug") or "",
+            "title": source.get("title") or modpack_data.get("title") or "CurseForge modpack",
+            "current_file_id": current_file_id,
+            "current_file_name": source.get("file_name") or modpack_data.get("file_name") or "",
+            "current_display_name": source.get("display_name") or modpack_data.get("display_name") or "",
+            "minecraft_version": source.get("minecraft_version") or instance.get("minecraft_version") or "",
+            "loader": source.get("loader") or instance.get("loader") or "",
+            "loader_version": source.get("loader_version") or instance.get("loader_version") or "",
+            "smart_prune_available": len(managed_files) > 0,
+            "managed_files": len(managed_files),
+            "manual_required": len(manual_items),
+            "message": "Сборка установлена из CurseForge-модпака.",
+        }
+
+    def _find_latest_curseforge_modpack_file(self, instance: dict) -> tuple[dict, dict]:
+        info = self._curseforge_modpack_source_info(instance)
+        project_id = str(info.get("project_id") or "").strip()
+        if not project_id:
+            raise ValueError("В сборке не сохранён ID проекта CurseForge-модпака.")
+
+        project_info = self._curseforge_manual_project_info(project_id, "modpack")
+        filters = {
+            "game_version": instance.get("minecraft_version") or info.get("minecraft_version") or "",
+            "loader": instance.get("loader") or info.get("loader") or "",
+        }
+        files = self._curseforge_files_for_instance(project_id, "modpack", instance, filters)
+        selected_file = self._choose_curseforge_file(files, "modpack")
+        if not selected_file:
+            raise ValueError("Не найдена совместимая версия CurseForge-модпака.")
+        return project_info, selected_file
+
+    def check_curseforge_modpack_update(self, instance_id: str = "") -> dict:
+        instance = self._instance_by_id_or_selected(instance_id)
+        if not instance:
+            return {"ok": False, "error": "Сборка не выбрана."}
+
+        info = self._curseforge_modpack_source_info(instance)
+        if not info.get("supported"):
+            return {"ok": True, **info}
+
+        try:
+            project_info, latest_file = self._find_latest_curseforge_modpack_file(instance)
+            current_id = str(info.get("current_file_id") or "")
+            latest_id = str(latest_file.get("id") or latest_file.get("fileId") or "")
+            needs_update = bool(latest_id and latest_id != current_id)
+
+            info.update({
+                "ok": True,
+                "checked": True,
+                "needs_update": needs_update,
+                "project_id": project_info.get("project_id") or info.get("project_id") or "",
+                "slug": project_info.get("slug") or info.get("slug") or "",
+                "title": project_info.get("title") or info.get("title") or "CurseForge modpack",
+                "latest_file_id": latest_id,
+                "latest_file_name": latest_file.get("fileName") or "",
+                "latest_display_name": latest_file.get("displayName") or latest_file.get("fileName") or "",
+                "message": "Доступно обновление CurseForge-модпака." if needs_update else "CurseForge-модпак уже актуален.",
+            })
+            return info
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), **info}
+
+    def _prune_removed_curseforge_modpack_files(self, instance: dict, new_managed_files: list[dict]) -> dict:
+        """Delete files removed from the new CurseForge manifest only when we can
+        prove they were installed by the previous CurseForge modpack version and
+        were not modified by the user. Overrides are intentionally not pruned.
+        """
+        data = self._read_modrinth_sources_data(instance)
+        old_modpack = data.get("modpack") if isinstance(data.get("modpack"), dict) else {}
+        old_entries = old_modpack.get("managed_files") if isinstance(old_modpack, dict) else []
+        if not isinstance(old_entries, list) or not old_entries:
+            return {
+                "deleted_files": 0,
+                "skipped_modified": 0,
+                "skipped_missing": 0,
+                "skipped_untracked": 0,
+                "deleted": [],
+            }
+
+        new_paths = {str(item.get("path") or "").replace("\\", "/").strip("/") for item in (new_managed_files or []) if item.get("path")}
+        game_dir = self._instance_game_dir(instance)
+        deleted: list[str] = []
+        skipped_modified = 0
+        skipped_missing = 0
+        skipped_untracked = 0
+
+        for item in old_entries:
+            if not isinstance(item, dict):
+                continue
+            relative_path = str(item.get("path") or "").replace("\\", "/").strip("/")
+            if not relative_path or relative_path in new_paths:
+                continue
+
+            expected_sha1 = str(item.get("sha1") or "").strip().lower()
+            expected_md5 = str(item.get("md5") or "").strip().lower()
+            if not expected_sha1 and not expected_md5:
+                skipped_untracked += 1
+                continue
+
+            try:
+                target = self._safe_relative_game_path(game_dir, relative_path)
+            except Exception:
+                skipped_untracked += 1
+                continue
+
+            if not target.exists():
+                skipped_missing += 1
+                continue
+            if not target.is_file():
+                skipped_untracked += 1
+                continue
+
+            try:
+                data_bytes = target.read_bytes()
+                matches = False
+                if expected_sha1:
+                    matches = hashlib.sha1(data_bytes).hexdigest().lower() == expected_sha1
+                if not matches and expected_md5:
+                    matches = hashlib.md5(data_bytes).hexdigest().lower() == expected_md5
+            except Exception:
+                skipped_modified += 1
+                continue
+
+            if not matches:
+                skipped_modified += 1
+                continue
+
+            try:
+                target.unlink()
+                deleted.append(relative_path)
+            except Exception:
+                skipped_modified += 1
+
+        if deleted:
+            self._append_startup_log(
+                "CurseForge smart prune removed files: " + ", ".join(deleted[:20])
+                + ("..." if len(deleted) > 20 else "")
+            )
+
+        return {
+            "deleted_files": len(deleted),
+            "skipped_modified": skipped_modified,
+            "skipped_missing": skipped_missing,
+            "skipped_untracked": skipped_untracked,
+            "deleted": deleted[:50],
+        }
+
+    def apply_curseforge_modpack_update(self, instance_id: str = "") -> dict:
+        instance = self._instance_by_id_or_selected(instance_id)
+        if not instance:
+            return {"ok": False, "error": "Сборка не выбрана."}
+
+        info = self.check_curseforge_modpack_update(instance.get("id", ""))
+        if not info.get("ok"):
+            return info
+        if not info.get("supported"):
+            return {"ok": False, "error": "У этой сборки нет связи с CurseForge-модпаком."}
+        if not info.get("needs_update"):
+            return {
+                "ok": True,
+                "message": "CurseForge-модпак уже актуален.",
+                "update": info,
+                "state": self.get_app_state(),
+            }
+
+        project_id = info.get("project_id") or (instance.get("source", {}) or {}).get("project_id") or ""
+        result = self.install_curseforge_modpack_project({
+            "instance_id": instance.get("id", ""),
+            "project_id": project_id,
+            "file_id": info.get("latest_file_id") or "",
+            "project_type": "modpack",
+            "filters": {
+                "game_version": instance.get("minecraft_version") or "",
+                "loader": instance.get("loader") or "",
+            },
+        })
+        if result.get("ok"):
+            result["message"] = "CurseForge-модпак обновлён."
+            target_id = result.get("target_instance_id") or instance.get("id", "")
+            result["update"] = self.check_curseforge_modpack_update(target_id)
+        return result
+
+    def _curseforge_modpack_install_report(self, instance: dict) -> dict:
+        try:
+            path = self._modrinth_sources_path(instance)
+            data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        except Exception:
+            data = {}
+
+        modpack = data.get("modpack") if isinstance(data.get("modpack"), dict) else {}
+        if modpack.get("source") != "curseforge":
+            return {"supported": False}
+
+        manual_items = modpack.get("manual_items") if isinstance(modpack.get("manual_items"), list) else []
+        managed_files = modpack.get("managed_files") if isinstance(modpack.get("managed_files"), list) else []
+        resolve_counts = modpack.get("resolve_counts") if isinstance(modpack.get("resolve_counts"), dict) else {}
+
+        return {
+            "supported": True,
+            "partial": bool(manual_items),
+            "target_instance_id": instance.get("id", ""),
+            "message": (
+                "CurseForge-модпак установлен частично: требуется ручная установка файлов."
+                if manual_items else
+                "CurseForge-модпак установлен в выбранную сборку."
+            ),
+            "project": {
+                "title": modpack.get("title") or instance.get("name", ""),
+                "project_id": modpack.get("project_id") or "",
+                "project_type": "modpack",
+                "url": "",
+            },
+            "file": {
+                "id": modpack.get("file_id") or "",
+                "name": modpack.get("file_name") or "",
+                "display_name": modpack.get("display_name") or "",
+            },
+            "pack": {
+                "name": modpack.get("title") or instance.get("name", ""),
+                "minecraft_version": modpack.get("minecraft_version") or instance.get("minecraft_version") or "",
+                "loader": modpack.get("loader") or instance.get("loader") or "vanilla",
+                "loader_version": modpack.get("loader_version") or instance.get("loader_version") or "",
+            },
+            "counts": {
+                "manifest_files": int(resolve_counts.get("requested") or len(managed_files) + len(manual_items)),
+                "available": int(resolve_counts.get("resolved") or len(managed_files)),
+                "installed": int(modpack.get("installed_files") or 0),
+                "skipped_existing": int(modpack.get("skipped_existing") or 0),
+                "manual_required": int(modpack.get("manual_required") or len(manual_items)),
+                "overrides_files": int(modpack.get("overrides") or 0),
+            },
+            "manual_items": manual_items,
+            "managed_files": managed_files,
+        }
+
+    def get_curseforge_modpack_install_report(self, instance_id: str = "") -> dict:
+        instance = self._instance_by_id_or_selected(instance_id)
+        if not instance:
+            return {"ok": False, "error": "Сборка не выбрана."}
+        report = self._curseforge_modpack_install_report(instance)
+        return {"ok": True, "report": report}
+
     def get_instance_window_data(self, instance_id: str = "") -> dict:
         instance = self._instance_by_id_or_selected(instance_id)
         if not instance:
@@ -3218,6 +6176,8 @@ class LauncherWebAPI:
             "instance": self._safe_instance(instance),
             "official_update": self._official_update_status(instance),
             "modrinth_modpack_update": self._modrinth_modpack_source_info(instance),
+            "curseforge_modpack_install_report": self._curseforge_modpack_install_report(instance),
+            "curseforge_modpack_update": self._curseforge_modpack_source_info(instance),
             "folders": folders,
             "folder_files": {
                 key: self.list_instance_folder(instance.get("id", ""), key).get("files", [])
@@ -4102,8 +7062,8 @@ class LauncherWebAPI:
                 "minecraft_version": instance.get("minecraft_version") or self.config.get("minecraft_version", ""),
                 "loader": instance.get("loader") or self.config.get("loader", ""),
                 "loader_version": instance.get("loader_version") or self.config.get("fabric_loader_version", ""),
-                "mods_zip_url": self.config.get("mods_zip_url", ""),
-                "mods_zip_sha256": self.config.get("mods_zip_sha256", ""),
+                "official_modpack_fallback_url": self.config.get("official_modpack_fallback_url") or self.config.get("mods_zip_url", ""),
+                "official_modpack_fallback_sha256": self.config.get("official_modpack_fallback_sha256") or self.config.get("mods_zip_sha256", ""),
                 "mods_release_repo": self.config.get("mods_release_repo", ""),
                 "mods_release_tag": self.config.get("mods_release_tag", ""),
                 "last_archive": archive_path.name,
@@ -4137,7 +7097,7 @@ class LauncherWebAPI:
                 "has_update": False,
                 "message": "Сборка не установлена",
                 "repo": self.config.get("official_modpack_update_repo", "stonelightmc/stonelightmc.github.io"),
-                "current_url": self.config.get("mods_zip_url", ""),
+                "current_url": self.config.get("official_modpack_fallback_url") or self.config.get("mods_zip_url", ""),
                 "current_minecraft_version": self.config.get("minecraft_version", ""),
                 "latest_minecraft_version": "",
                 "release_name": "",
@@ -4252,6 +7212,11 @@ class LauncherWebAPI:
         except Exception as exc:
             self._emit("log", {"message": f"Не удалось обновить Microsoft-сессию: {exc}"})
             return account
+
+    def _set_busy(self, busy: bool, action: str = "") -> None:
+        with self._operation_lock:
+            self._busy = bool(busy)
+            self._busy_action = str(action or "") if busy else ""
 
     def _start_operation(self, action: str, instance: dict) -> dict:
         if action == "stop":

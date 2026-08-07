@@ -31,6 +31,16 @@
     modrinthFilterOptions: null,
     modrinthFilterKey: "",
     modrinthFilterLoading: false,
+    curseforgeResults: [],
+    curseforgeLastTotal: 0,
+    curseforgeCurrentPage: 1,
+    curseforgeTotalPages: 1,
+    curseforgePageSize: 24,
+    curseforgeSearched: false,
+    curseforgeFilterOptions: null,
+    curseforgeFilterKey: "",
+    curseforgeRenderedFilterKey: "",
+    curseforgeFilterLoading: false,
     applyingGraphicsProfile: false,
     graphicsProfiles: {
       unchanged: {
@@ -129,10 +139,11 @@
       this.renderJava();
       this.renderOfficialCta();
       this.renderModrinth();
+      this.renderCurseForge();
       this.renderStatus(window.SLLState.status || {});
       this.updateActionStates();
       this.renderUpdateIndicator();
-      $("#versionLabel").textContent = `v${window.SLLState.launcher?.version || "0.6.70"}`;
+      $("#versionLabel").textContent = `v${window.SLLState.launcher?.version || "0.6.71"}`;
     },
 
     renderMenuControls() {
@@ -340,6 +351,9 @@
       if (tabName === "modrinth") {
         this.renderModrinth();
       }
+      if (tabName === "curseforge") {
+        this.renderCurseForge();
+      }
     },
 
     bindStaticEvents() {
@@ -503,6 +517,35 @@
       $("#modrinthSortSelect")?.addEventListener("change", () => {
         if (this.modrinthSearched) this.searchModrinth(null, 1);
       });
+
+      $("#curseforgeSearchForm")?.addEventListener("submit", event => this.searchCurseForge(event, 1));
+      $("#curseforgeTypeSelect")?.addEventListener("change", () => {
+        this.curseforgeCurrentPage = 1;
+        this.curseforgeTotalPages = 1;
+        this.curseforgeFilterOptions = null;
+        this.curseforgeFilterKey = "";
+        this.curseforgeRenderedFilterKey = "";
+        this.loadCurseForgeFilters();
+        if (this.curseforgeSearched) {
+          this.searchCurseForge(null, 1);
+        } else {
+          this.renderCurseForge();
+        }
+      });
+      $("#curseforgeSortSelect")?.addEventListener("change", () => {
+        if (this.curseforgeSearched) this.searchCurseForge(null, 1);
+      });
+      $("#curseforgeShowManualOnlyCheckbox")?.addEventListener("change", () => {
+        if (this.curseforgeSearched) this.searchCurseForge(null, 1);
+      });
+      $("#curseforgeShowSnapshotsCheckbox")?.addEventListener("change", () => {
+        this.curseforgeFilterOptions = null;
+        this.curseforgeFilterKey = "";
+        this.curseforgeRenderedFilterKey = "";
+        this.loadCurseForgeFilters();
+        if (this.curseforgeSearched) this.searchCurseForge(null, 1);
+      });
+      $("#curseforgeResetFiltersButton")?.addEventListener("click", () => this.resetCurseForgeFilters());
 
       $("#launchSettingsForm")?.addEventListener("submit", event => this.submitLaunchSettings(event));
       $("#launchSettingsReset")?.addEventListener("click", () => this.resetLaunchSettingsForm());
@@ -1517,6 +1560,408 @@
       }
     },
 
+
+    instanceToolText(key) {
+      const value = this.t(key);
+      if (value && value !== key) return value;
+
+      const lang = window.SLLState?.preferences?.language || "en";
+      const fallback = {
+        en: {
+          "instanceTools.clone": "Clone instance",
+          "instanceTools.cloned": "Instance cloned.",
+          "instanceTools.clonedNamed": "Instance cloned: {name}"
+        },
+        uk: {
+          "instanceTools.clone": "Клонувати збірку",
+          "instanceTools.cloned": "Збірку клоновано.",
+          "instanceTools.clonedNamed": "Збірку клоновано: {name}"
+        },
+        kk: {
+          "instanceTools.clone": "Жинақты клондау",
+          "instanceTools.cloned": "Жинақ клондалды.",
+          "instanceTools.clonedNamed": "Жинақ клондалды: {name}"
+        }
+      };
+
+      return fallback[lang]?.[key] || fallback.uk?.[key] || fallback.en?.[key] || key;
+    },
+
+    deleteInstanceText(key) {
+      const value = this.t(key);
+      if (value && value !== key) return value;
+
+      const lang = window.SLLState?.preferences?.language || "en";
+      const fallback = {
+        en: {
+          "instanceDelete.eyebrow": "Delete instance",
+          "instanceDelete.title": "Delete this instance?",
+          "instanceDelete.subtitle": "The launcher entry and the instance folder on disk will be deleted. The official instance can be reinstalled later.",
+          "instanceDelete.warning": "This action cannot be undone. Worlds, mods, resource packs, shaders, screenshots and settings inside this instance folder will be removed.",
+          "instanceDelete.instance": "Instance",
+          "instanceDelete.folder": "Folder",
+          "instanceDelete.cancel": "Cancel",
+          "instanceDelete.confirm": "Delete instance",
+          "instanceDelete.deleted": "Instance deleted. Folder removed from disk.",
+          "instanceDelete.deletedMissing": "Instance deleted. Its folder was already missing."
+        },
+        uk: {
+          "instanceDelete.eyebrow": "Видалення збірки",
+          "instanceDelete.title": "Видалити цю збірку?",
+          "instanceDelete.subtitle": "Запис у лаунчері та папку збірки на диску буде видалено. Офіційну збірку можна буде встановити знову.",
+          "instanceDelete.warning": "Цю дію не можна скасувати. Світи, моди, ресурспаки, шейдери, скріншоти й налаштування всередині папки збірки буде видалено.",
+          "instanceDelete.instance": "Збірка",
+          "instanceDelete.folder": "Папка",
+          "instanceDelete.cancel": "Скасувати",
+          "instanceDelete.confirm": "Видалити збірку",
+          "instanceDelete.deleted": "Збірку видалено. Папку прибрано з диска.",
+          "instanceDelete.deletedMissing": "Збірку видалено. Її папка вже була відсутня."
+        },
+        kk: {
+          "instanceDelete.eyebrow": "Жинақты жою",
+          "instanceDelete.title": "Бұл жинақты жою керек пе?",
+          "instanceDelete.subtitle": "Лаунчердегі жазба және дискідегі жинақ қалтасы жойылады. Ресми жинақты кейін қайта орнатуға болады.",
+          "instanceDelete.warning": "Бұл әрекетті қайтару мүмкін емес. Осы жинақ қалтасындағы әлемдер, модтар, ресурспактар, шейдерлер, скриншоттар және баптаулар жойылады.",
+          "instanceDelete.instance": "Жинақ",
+          "instanceDelete.folder": "Қалта",
+          "instanceDelete.cancel": "Бас тарту",
+          "instanceDelete.confirm": "Жинақты жою",
+          "instanceDelete.deleted": "Жинақ жойылды. Қалта дискіден өшірілді.",
+          "instanceDelete.deletedMissing": "Жинақ жойылды. Оның қалтасы бұрыннан жоқ еді."
+        }
+      };
+      return fallback[lang]?.[key] || fallback.uk?.[key] || fallback.en?.[key] || key;
+    },
+
+    ensureDeleteInstanceDialogDom() {
+      if ($("#deleteInstanceBackdrop")) return;
+
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML = `
+        <div id="deleteInstanceBackdrop" class="modal-backdrop hidden" aria-hidden="true">
+          <section id="deleteInstanceDialog" class="modal-card delete-instance-dialog" role="dialog" aria-modal="true" aria-labelledby="deleteInstanceTitle">
+            <header class="modal-card__header">
+              <div>
+                <div class="eyebrow delete-instance__eyebrow" id="deleteInstanceEyebrow"></div>
+                <h2 id="deleteInstanceTitle"></h2>
+                <p id="deleteInstanceSubtitle" class="modal-subtitle"></p>
+              </div>
+              <button id="deleteInstanceClose" class="icon-button" type="button" aria-label="Close">×</button>
+            </header>
+
+            <div class="delete-instance__body">
+              <div id="deleteInstanceWarning" class="delete-instance__warning"></div>
+              <div class="delete-instance__details">
+                <div>
+                  <span id="deleteInstanceNameLabel"></span>
+                  <strong id="deleteInstanceName"></strong>
+                </div>
+                <div>
+                  <span id="deleteInstancePathLabel"></span>
+                  <code id="deleteInstancePath"></code>
+                </div>
+              </div>
+            </div>
+
+            <footer class="dependency-preview__actions">
+              <button id="deleteInstanceCancel" class="button" type="button"></button>
+              <button id="deleteInstanceConfirm" class="button button--danger" type="button"></button>
+            </footer>
+          </section>
+        </div>
+      `.trim();
+
+      document.body.appendChild(wrapper.firstElementChild);
+    },
+
+    instanceById(instanceId) {
+      return (window.SLLState?.instances || []).find(item => item.id === instanceId) || null;
+    },
+
+    confirmDeleteInstance(instanceId) {
+      this.ensureDeleteInstanceDialogDom();
+
+      return new Promise(resolve => {
+        const instance = this.instanceById(instanceId) || {};
+        const backdrop = $("#deleteInstanceBackdrop");
+        const title = $("#deleteInstanceTitle");
+        const subtitle = $("#deleteInstanceSubtitle");
+        const eyebrow = $("#deleteInstanceEyebrow");
+        const warning = $("#deleteInstanceWarning");
+        const nameLabel = $("#deleteInstanceNameLabel");
+        const pathLabel = $("#deleteInstancePathLabel");
+        const nameValue = $("#deleteInstanceName");
+        const pathValue = $("#deleteInstancePath");
+        const close = $("#deleteInstanceClose");
+        const cancel = $("#deleteInstanceCancel");
+        const confirm = $("#deleteInstanceConfirm");
+
+        if (!backdrop || !confirm || !cancel || !close) {
+          resolve(false);
+          return;
+        }
+
+        if (eyebrow) eyebrow.textContent = this.deleteInstanceText("instanceDelete.eyebrow");
+        if (title) title.textContent = this.deleteInstanceText("instanceDelete.title");
+        if (subtitle) subtitle.textContent = this.deleteInstanceText("instanceDelete.subtitle");
+        if (warning) warning.textContent = this.deleteInstanceText("instanceDelete.warning");
+        if (nameLabel) nameLabel.textContent = this.deleteInstanceText("instanceDelete.instance");
+        if (pathLabel) pathLabel.textContent = this.deleteInstanceText("instanceDelete.folder");
+        if (nameValue) nameValue.textContent = instance.name || instanceId || "Instance";
+        if (pathValue) pathValue.textContent = instance.game_directory || "data/instances/...";
+        cancel.textContent = this.deleteInstanceText("instanceDelete.cancel");
+        confirm.textContent = this.deleteInstanceText("instanceDelete.confirm");
+
+        const cleanup = result => {
+          backdrop.classList.add("hidden");
+          backdrop.setAttribute("aria-hidden", "true");
+          close.removeEventListener("click", onCancel);
+          cancel.removeEventListener("click", onCancel);
+          confirm.removeEventListener("click", onConfirm);
+          backdrop.removeEventListener("click", onBackdrop);
+          window.removeEventListener("keydown", onKey);
+          resolve(result);
+        };
+
+        const onConfirm = () => cleanup(true);
+        const onCancel = () => cleanup(false);
+        const onBackdrop = event => {
+          if (event.target === backdrop) cleanup(false);
+        };
+        const onKey = event => {
+          if (event.key === "Escape") cleanup(false);
+        };
+
+        close.addEventListener("click", onCancel);
+        cancel.addEventListener("click", onCancel);
+        confirm.addEventListener("click", onConfirm);
+        backdrop.addEventListener("click", onBackdrop);
+        window.addEventListener("keydown", onKey);
+
+        backdrop.classList.remove("hidden");
+        backdrop.setAttribute("aria-hidden", "false");
+        setTimeout(() => confirm.focus(), 30);
+      });
+    },
+
+    dependencyPreviewText(key) {
+      const value = this.t(key);
+      if (value && value !== key) return value;
+
+      const lang = window.SLLState?.preferences?.language || "en";
+      const fallback = {
+        en: {
+          "dependencyPreview.eyebrow": "Dependencies",
+          "dependencyPreview.title": "Install required dependencies?",
+          "dependencyPreview.subtitle": "This project requires additional files.",
+          "dependencyPreview.summary": "The launcher will install {count} required dependencies. Already installed: {installed}.",
+          "dependencyPreview.conflictSummary": "Some dependency files already exist but do not match the selected source. Installation is blocked to protect user files.",
+          "dependencyPreview.mainProject": "Selected project",
+          "dependencyPreview.requiredDependencies": "Required dependencies",
+          "dependencyPreview.noDependencies": "No required dependencies.",
+          "dependencyPreview.willInstall": "Will install",
+          "dependencyPreview.alreadyInstalled": "Installed",
+          "dependencyPreview.conflict": "Conflict",
+          "dependencyPreview.install": "Install",
+          "dependencyPreview.installBlocked": "Blocked",
+          "dependencyPreview.cancel": "Cancel",
+          "dependencyPreview.fallbackConfirm": "This project requires dependencies. Continue installation?"
+        },
+        uk: {
+          "dependencyPreview.eyebrow": "Залежності",
+          "dependencyPreview.title": "Встановити обов'язкові залежності?",
+          "dependencyPreview.subtitle": "Цей проєкт потребує додаткових файлів.",
+          "dependencyPreview.summary": "Лаунчер встановить обов'язкові залежності: {count}. Уже встановлено: {installed}.",
+          "dependencyPreview.conflictSummary": "Деякі файли залежностей уже існують, але не збігаються з вибраним джерелом. Встановлення заблоковано, щоб не перезаписати файли користувача.",
+          "dependencyPreview.mainProject": "Вибраний проєкт",
+          "dependencyPreview.requiredDependencies": "Обов'язкові залежності",
+          "dependencyPreview.noDependencies": "Обов'язкових залежностей немає.",
+          "dependencyPreview.willInstall": "Буде встановлено",
+          "dependencyPreview.alreadyInstalled": "Встановлено",
+          "dependencyPreview.conflict": "Конфлікт",
+          "dependencyPreview.install": "Встановити",
+          "dependencyPreview.installBlocked": "Заблоковано",
+          "dependencyPreview.cancel": "Скасувати",
+          "dependencyPreview.fallbackConfirm": "Цей проєкт потребує залежностей. Продовжити встановлення?"
+        },
+        kk: {
+          "dependencyPreview.eyebrow": "Тәуелділіктер",
+          "dependencyPreview.title": "Міндетті тәуелділіктерді орнату керек пе?",
+          "dependencyPreview.subtitle": "Бұл жоба қосымша файлдарды қажет етеді.",
+          "dependencyPreview.summary": "Лаунчер {count} міндетті тәуелділікті орнатады. Бұрын орнатылған: {installed}.",
+          "dependencyPreview.conflictSummary": "Кейбір тәуелділік файлдары бұрыннан бар, бірақ таңдалған дереккөзге сәйкес келмейді. Пайдаланушы файлдарын қорғау үшін орнату бұғатталды.",
+          "dependencyPreview.mainProject": "Таңдалған жоба",
+          "dependencyPreview.requiredDependencies": "Міндетті тәуелділіктер",
+          "dependencyPreview.noDependencies": "Міндетті тәуелділіктер жоқ.",
+          "dependencyPreview.willInstall": "Орнатылады",
+          "dependencyPreview.alreadyInstalled": "Орнатылған",
+          "dependencyPreview.conflict": "Қақтығыс",
+          "dependencyPreview.install": "Орнату",
+          "dependencyPreview.installBlocked": "Бұғатталған",
+          "dependencyPreview.cancel": "Бас тарту",
+          "dependencyPreview.fallbackConfirm": "Бұл жоба тәуелділіктерді қажет етеді. Орнатуды жалғастыру керек пе?"
+        }
+      };
+      return fallback[lang]?.[key] || fallback.uk?.[key] || fallback.en?.[key] || key;
+    },
+
+    ensureDependencyPreviewDom() {
+      if ($("#dependencyPreviewBackdrop")) return;
+
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML = `
+        <div id="dependencyPreviewBackdrop" class="modal-backdrop hidden" aria-hidden="true">
+          <section id="dependencyPreviewDialog" class="modal-card dependency-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="dependencyPreviewTitle">
+            <header class="modal-card__header">
+              <div>
+                <div class="eyebrow" id="dependencyPreviewEyebrow"></div>
+                <h2 id="dependencyPreviewTitle"></h2>
+                <p id="dependencyPreviewSubtitle" class="modal-subtitle"></p>
+              </div>
+              <button id="dependencyPreviewClose" class="icon-button" type="button" aria-label="Close">×</button>
+            </header>
+
+            <div class="dependency-preview">
+              <div id="dependencyPreviewSummary" class="form-note"></div>
+              <div id="dependencyPreviewMain" class="dependency-preview__main"></div>
+              <div id="dependencyPreviewList" class="dependency-preview__list"></div>
+            </div>
+
+            <footer class="dependency-preview__actions">
+              <button id="dependencyPreviewCancel" class="button" type="button"></button>
+              <button id="dependencyPreviewInstall" class="button button--primary" type="button"></button>
+            </footer>
+          </section>
+        </div>
+      `.trim();
+
+      document.body.appendChild(wrapper.firstElementChild);
+    },
+
+    dependencyPreviewItemHtml(item, badgeText = "") {
+      const title = item.title || item.project_id || item.filename || "Dependency";
+      const version = item.version_number ? ` · ${item.version_number}` : "";
+      const meta = `${item.filename || ""}${version ? `<br>${this.escape(version.replace(/^ · /, ""))}` : ""}`;
+      const badgeClass = item.conflict
+        ? "dependency-preview__badge--danger"
+        : item.already_installed
+          ? "dependency-preview__badge--ok"
+          : "";
+      return `
+        <div class="dependency-preview__item">
+          <div>
+            <div class="dependency-preview__item-title">${this.escape(title)}</div>
+            <div class="dependency-preview__item-meta">${meta}</div>
+          </div>
+          <span class="dependency-preview__badge ${badgeClass}">${this.escape(badgeText)}</span>
+        </div>
+      `;
+    },
+
+    showDependencyPreview(plan) {
+      this.ensureDependencyPreviewDom();
+      return new Promise(resolve => {
+        const backdrop = $("#dependencyPreviewBackdrop");
+        const summary = $("#dependencyPreviewSummary");
+        const main = $("#dependencyPreviewMain");
+        const list = $("#dependencyPreviewList");
+        const install = $("#dependencyPreviewInstall");
+        const cancel = $("#dependencyPreviewCancel");
+        const closeButton = $("#dependencyPreviewClose");
+        const title = $("#dependencyPreviewTitle");
+        const subtitle = $("#dependencyPreviewSubtitle");
+        const eyebrow = $("#dependencyPreviewEyebrow");
+
+        if (!backdrop || !summary || !main || !list || !install || !cancel || !closeButton) {
+          resolve(window.confirm(this.dependencyPreviewText("dependencyPreview.fallbackConfirm")));
+          return;
+        }
+
+        if (eyebrow) eyebrow.textContent = this.dependencyPreviewText("dependencyPreview.eyebrow");
+        cancel.textContent = this.dependencyPreviewText("dependencyPreview.cancel");
+
+        const deps = plan.dependencies || [];
+        const depsToInstall = plan.dependencies_to_install || [];
+        const depsInstalled = plan.dependencies_already_installed || [];
+        const conflicts = plan.conflicts || [];
+        const sourceLabel = plan.source === "curseforge" ? "CurseForge" : "Modrinth";
+        const hasConflicts = conflicts.length > 0;
+
+        title.textContent = this.dependencyPreviewText("dependencyPreview.title");
+        subtitle.textContent = `${sourceLabel} · ${this.dependencyPreviewText("dependencyPreview.subtitle")}`;
+
+        summary.textContent = hasConflicts
+          ? this.dependencyPreviewText("dependencyPreview.conflictSummary")
+          : this.dependencyPreviewText("dependencyPreview.summary")
+              .replace("{count}", String(depsToInstall.length))
+              .replace("{installed}", String(depsInstalled.length));
+
+        main.innerHTML = `
+          <div class="dependency-preview__section-title">${this.escape(this.dependencyPreviewText("dependencyPreview.mainProject"))}</div>
+          ${this.dependencyPreviewItemHtml(plan.main || {}, plan.main?.already_installed ? this.dependencyPreviewText("dependencyPreview.alreadyInstalled") : this.dependencyPreviewText("dependencyPreview.willInstall"))}
+        `;
+
+        if (!deps.length) {
+          list.innerHTML = `<div class="form-note">${this.escape(this.dependencyPreviewText("dependencyPreview.noDependencies"))}</div>`;
+        } else {
+          list.innerHTML = `
+            <div class="dependency-preview__section-title">${this.escape(this.dependencyPreviewText("dependencyPreview.requiredDependencies"))}</div>
+            ${deps.map(item => this.dependencyPreviewItemHtml(
+              item,
+              item.conflict
+                ? this.dependencyPreviewText("dependencyPreview.conflict")
+                : item.already_installed
+                  ? this.dependencyPreviewText("dependencyPreview.alreadyInstalled")
+                  : this.dependencyPreviewText("dependencyPreview.willInstall")
+            )).join("")}
+          `;
+        }
+
+        install.disabled = hasConflicts;
+        install.textContent = hasConflicts ? this.dependencyPreviewText("dependencyPreview.installBlocked") : this.dependencyPreviewText("dependencyPreview.install");
+
+        const cleanup = result => {
+          backdrop.classList.add("hidden");
+          backdrop.setAttribute("aria-hidden", "true");
+          install.removeEventListener("click", onInstall);
+          cancel.removeEventListener("click", onCancel);
+          closeButton.removeEventListener("click", onCancel);
+          backdrop.removeEventListener("click", onBackdrop);
+          window.removeEventListener("keydown", onKey);
+          resolve(result);
+        };
+
+        const onInstall = () => cleanup(true);
+        const onCancel = () => cleanup(false);
+        const onBackdrop = event => {
+          if (event.target === backdrop) cleanup(false);
+        };
+        const onKey = event => {
+          if (event.key === "Escape") cleanup(false);
+        };
+
+        install.addEventListener("click", onInstall);
+        cancel.addEventListener("click", onCancel);
+        closeButton.addEventListener("click", onCancel);
+        backdrop.addEventListener("click", onBackdrop);
+        window.addEventListener("keydown", onKey);
+
+        backdrop.classList.remove("hidden");
+        backdrop.setAttribute("aria-hidden", "false");
+        setTimeout(() => (hasConflicts ? cancel : install).focus(), 30);
+      });
+    },
+
+    async confirmDependencyPlan(apiMethod, payload) {
+      const plan = await window.SLLApi.call(apiMethod, payload);
+      if (!plan?.ok) {
+        this.toast(this.localizeMessage(plan?.error || this.t("error.generic")), true);
+        return false;
+      }
+      if (!plan.requires_confirmation) return true;
+      return await this.showDependencyPreview(plan);
+    },
+
     async installModrinthProject(projectId) {
       const selected = this.selectedInstanceForCatalog();
 
@@ -1538,12 +1983,17 @@
           return;
         }
 
-        const result = await window.SLLApi.call("install_modrinth_project", {
+        const payload = {
           instance_id: selected?.id || "",
           project_id: projectId,
           project_type: project.project_type,
           filters: this.collectModrinthFilters()
-        });
+        };
+
+        const confirmed = await this.confirmDependencyPlan("preview_modrinth_install", payload);
+        if (!confirmed) return;
+
+        const result = await window.SLLApi.call("install_modrinth_project", payload);
 
         if (!result?.ok) {
           this.toast(this.localizeMessage(result?.error || this.t("error.generic")), true);
@@ -1553,15 +2003,20 @@
         if (result.state) this.setState(result.state);
 
         const isModpack = project.project_type === "modpack";
+        const dependencyCount = Array.isArray(result.dependencies_installed) ? result.dependencies_installed.length : 0;
+        const dependencySuffix = dependencyCount > 0
+          ? ` (+${dependencyCount} ${this.t("modrinth.dependencies")})`
+          : "";
+        const installLabel = result.already_installed ? this.t("modrinth.alreadyInstalled") : this.t("modrinth.installed");
         const message = isModpack
           ? `${this.t("modrinth.modpackInstalledInto")}: ${selected.name}`
-          : `${this.t("modrinth.installed")}: ${result.filename || project.title}`;
+          : `${installLabel}: ${result.filename || project.title}${dependencySuffix}`;
         this.toast(message);
 
         const logTarget = isModpack
           ? `${this.t("modrinth.target")} ${selected.name}`
           : `${result.folder || ""}/${result.filename || ""}`;
-        this.appendLog(`${this.t("modrinth.installed")} ${project.title} → ${logTarget}`);
+        this.appendLog(`${installLabel} ${project.title} → ${logTarget}${dependencySuffix}`);
 
         if (selected && this.instanceWindowId === selected.id) {
           const refreshed = await window.SLLApi.call("get_instance_window_data", selected.id);
@@ -1573,6 +2028,1313 @@
         buttons.forEach(button => {
           button.disabled = false;
           button.textContent = project?.project_type === "modpack" ? this.t("modrinth.installModpack") : this.t("modrinth.install");
+        });
+      }
+    },
+
+
+    curseforgeTypeLabel(type) {
+      const key = {
+        mod: "curseforge.mod",
+        resourcepack: "curseforge.resourcepack",
+        shader: "curseforge.shader",
+        modpack: "curseforge.modpack"
+      }[type] || "curseforge.project";
+      return this.t(key);
+    },
+
+    currentCurseForgeFilterKey(selected = null, type = null, includeSnapshots = null) {
+      selected = selected || this.selectedInstanceForCatalog();
+      type = type || $("#curseforgeTypeSelect")?.value || "mod";
+      includeSnapshots = includeSnapshots ?? Boolean($("#curseforgeShowSnapshotsCheckbox")?.checked);
+      return `${selected?.id || ""}|${type}|${includeSnapshots}`;
+    },
+
+    async loadCurseForgeFilters() {
+      const selected = this.selectedInstanceForCatalog();
+      const type = $("#curseforgeTypeSelect")?.value || "mod";
+      const includeSnapshots = Boolean($("#curseforgeShowSnapshotsCheckbox")?.checked);
+      const key = this.currentCurseForgeFilterKey(selected, type, includeSnapshots);
+
+      if (!selected) {
+        this.curseforgeFilterOptions = null;
+        this.curseforgeFilterKey = "";
+        this.renderCurseForgeFilters();
+        return null;
+      }
+
+      if (this.curseforgeFilterOptions && this.curseforgeFilterKey === key) {
+        this.renderCurseForgeFilters();
+        return this.curseforgeFilterOptions;
+      }
+
+      if (this.curseforgeFilterLoading) return this.curseforgeFilterOptions;
+
+      this.curseforgeFilterLoading = true;
+      this.renderCurseForgeFilters();
+
+      try {
+        const result = await window.SLLApi.call("get_curseforge_filter_options", {
+          project_type: type,
+          instance_id: selected.id,
+          include_snapshots: includeSnapshots
+        });
+
+        if (result?.ok) {
+          this.curseforgeFilterOptions = result;
+          this.curseforgeFilterKey = key;
+        } else {
+          this.curseforgeFilterOptions = null;
+          this.curseforgeFilterKey = "";
+        }
+      } catch (_error) {
+        this.curseforgeFilterOptions = null;
+        this.curseforgeFilterKey = "";
+      } finally {
+        this.curseforgeFilterLoading = false;
+        this.renderCurseForgeFilters();
+      }
+
+      return this.curseforgeFilterOptions;
+    },
+
+    renderCurseForgeFilters() {
+      const box = $("#curseforgeFilters");
+      const fields = $("#curseforgeFilterFields");
+      const groups = $("#curseforgeFilterGroups");
+      if (!box || !fields || !groups) return;
+
+      const options = this.curseforgeFilterOptions;
+      if (!options?.ok) {
+        box.classList.add("hidden");
+        fields.innerHTML = "";
+        groups.innerHTML = "";
+        return;
+      }
+
+      const currentKey = this.currentCurseForgeFilterKey();
+      const preserveCurrentValues = this.curseforgeRenderedFilterKey === currentKey;
+      const previousFilters = preserveCurrentValues ? this.collectCurseForgeFilters() : {};
+
+      box.classList.remove("hidden");
+      const sections = options.sections || [];
+      const selectSections = sections.filter(section => section.control === "select");
+      const chipSections = sections.filter(section => section.control === "chips" && (section.choices || []).length);
+
+      fields.innerHTML = selectSections.map(section =>
+        this.curseforgeSelectFilterHtml(section, previousFilters[section.key])
+      ).join("");
+      groups.innerHTML = chipSections.map(section =>
+        this.curseforgeChipFilterHtml(section, previousFilters[section.key] || [])
+      ).join("");
+
+      this.curseforgeRenderedFilterKey = currentKey;
+
+      fields.querySelectorAll("select[data-curseforge-filter-key]").forEach(select => {
+        select.addEventListener("change", () => {
+          if (this.curseforgeSearched) this.searchCurseForge(null, 1);
+        });
+      });
+
+      groups.querySelectorAll("[data-curseforge-filter-chip]").forEach(button => {
+        button.addEventListener("click", () => {
+          button.classList.toggle("is-active");
+          if (this.curseforgeSearched) this.searchCurseForge(null, 1);
+        });
+      });
+    },
+
+    curseforgeFilterLabel(key) {
+      return this.t(`curseforge.filter.${key}`);
+    },
+
+    curseforgeFilterChoiceLabel(sectionKey, choice) {
+      const id = String(choice?.id || "").trim();
+      const raw = String(choice?.label || id).trim();
+      if (sectionKey === "category_ids") {
+        return this.curseforgeCategoryLabel(choice);
+      }
+      const lang = window.SLLState?.preferences?.language || "en";
+      const labels = this.curseforgeChoiceLabels();
+      return labels[lang]?.[id] || labels.en?.[id] || raw;
+    },
+
+    curseforgeSelectFilterHtml(section, selectedValue = null) {
+      const choices = section.choices || [];
+      const choiceIds = new Set(choices.map(choice => String(choice.id)));
+      const savedValue = selectedValue == null ? "" : String(selectedValue);
+      const defaultValue = savedValue && choiceIds.has(savedValue) ? savedValue : (section.default || "");
+      return `
+        <label class="form-field catalog-filter-field">
+          <span>${this.escape(this.curseforgeFilterLabel(section.key))}</span>
+          <select class="select" data-curseforge-filter-key="${this.escape(section.key)}">
+            ${choices.map(choice => {
+              const id = String(choice.id);
+              return `
+                <option value="${this.escape(id)}" ${id === String(defaultValue) ? "selected" : ""}>${this.escape(this.curseforgeFilterChoiceLabel(section.key, choice))}</option>
+              `;
+            }).join("")}
+          </select>
+        </label>
+      `;
+    },
+
+    curseforgeChipFilterHtml(section, selectedValues = []) {
+      const choices = section.choices || [];
+      const active = new Set((Array.isArray(selectedValues) ? selectedValues : [])
+        .map(value => String(value))
+        .filter(Boolean));
+      return `
+        <section class="catalog-filter-group" data-curseforge-filter-group="${this.escape(section.key)}">
+          <div class="catalog-filter-group__title">${this.escape(this.curseforgeFilterLabel(section.key))}</div>
+          <div class="catalog-filter-chips">
+            ${choices.map(choice => {
+              const id = String(choice.id);
+              return `
+                <button class="catalog-filter-chip ${active.has(id) ? "is-active" : ""}" type="button" data-curseforge-filter-chip="${this.escape(section.key)}" data-filter-value="${this.escape(id)}" data-filter-slug="${this.escape(choice.slug || "")}">
+                  ${this.escape(this.curseforgeFilterChoiceLabel(section.key, choice))}
+                </button>
+              `;
+            }).join("")}
+          </div>
+        </section>
+      `;
+    },
+
+    collectCurseForgeFilters() {
+      const filters = {};
+      $$("[data-curseforge-filter-key]").forEach(select => {
+        const key = select.dataset.curseforgeFilterKey;
+        if (key) filters[key] = select.value || "";
+      });
+
+      $$("[data-curseforge-filter-group]").forEach(group => {
+        const key = group.dataset.curseforgeFilterGroup;
+        if (!key) return;
+        filters[key] = Array.from(group.querySelectorAll(".catalog-filter-chip.is-active"))
+          .map(button => button.dataset.filterValue)
+          .filter(Boolean);
+      });
+
+      return filters;
+    },
+
+    resetCurseForgeFilters() {
+      const snapshots = $("#curseforgeShowSnapshotsCheckbox");
+      if (snapshots) snapshots.checked = false;
+      const manualOnly = $("#curseforgeShowManualOnlyCheckbox");
+      if (manualOnly) manualOnly.checked = true;
+      this.curseforgeFilterOptions = null;
+      this.curseforgeFilterKey = "";
+      this.curseforgeRenderedFilterKey = "";
+      const fields = $("#curseforgeFilterFields");
+      const groups = $("#curseforgeFilterGroups");
+      if (fields) fields.innerHTML = "";
+      if (groups) groups.innerHTML = "";
+      this.curseforgeSearched = false;
+      this.curseforgeResults = [];
+      this.curseforgeLastTotal = 0;
+      this.curseforgeCurrentPage = 1;
+      this.curseforgeTotalPages = 1;
+      this.renderCurseForgeResults();
+      this.loadCurseForgeFilters();
+      const status = $("#curseforgeStatus");
+      if (status) {
+        status.textContent = this.t("curseforge.filtersReset");
+        status.classList.remove("hidden");
+      }
+    },
+
+    curseforgeCategoryLabel(category) {
+      const rawName = typeof category === "string" ? category : (category?.label || category?.name || category?.slug || "");
+      const rawSlug = typeof category === "object" ? (category.slug || "") : "";
+      const key = this.curseforgeCategoryKey(rawSlug || rawName);
+      const language = window.SLLState.preferences?.language || "en";
+      const maps = this.curseforgeChoiceLabels();
+      return maps[language]?.[key] || maps.en?.[key] || rawName;
+    },
+
+    curseforgeCategoryKey(value) {
+      return String(value || "")
+        .toLowerCase()
+        .replace(/&/g, " and ")
+        .replace(/\+/g, " plus ")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+    },
+
+    curseforgeChoiceLabels() {
+      return {
+        en: {
+          "": "Any",
+          fabric: "Fabric",
+          forge: "Forge",
+          quilt: "Quilt",
+          neoforge: "NeoForge",
+          "adventure-and-rpg": "Adventure and RPG",
+          adventure: "Adventure",
+          "armor-weapons-and-tools": "Armor, Weapons and Tools",
+          "cosmetic": "Cosmetic",
+          "cosmetic-armor": "Cosmetic armor",
+          "food": "Food",
+          "magic": "Magic",
+          "mobs": "Mobs",
+          "technology": "Technology",
+          "technology-processing": "Processing",
+          "technology-player-transport": "Player transport",
+          "technology-energy": "Energy",
+          "utility-and-qol": "Utility and QoL",
+          "map-and-information": "Map and information",
+          "world-gen": "World generation",
+          "worldgen": "World generation",
+          "biomes": "Biomes",
+          "storage": "Storage",
+          "transport": "Transport",
+          "farming": "Farming",
+          "energy": "Energy",
+          "library-api": "Library/API",
+          "api-and-library": "API and Library",
+          "automation": "Automation",
+          "structures": "Structures",
+          "dimensions": "Dimensions",
+          "ores-and-resources": "Ores and resources",
+          "server-utility": "Server utility",
+          "miscellaneous": "Miscellaneous",
+          "mc-addons": "Addons",
+          "bug-fixes": "Bug fixes",
+          "commands": "Commands",
+          "equipment": "Equipment",
+          "genetics": "Genetics",
+          "redstone": "Redstone",
+          "twitch-integration": "Twitch integration",
+          "16x": "16x",
+          "32x": "32x",
+          "64x": "64x",
+          "128x": "128x",
+          "256x": "256x",
+          "512x-and-higher": "512x and higher",
+          "animated": "Animated",
+          "audio": "Audio",
+          "font-packs": "Fonts",
+          "medieval": "Medieval",
+          "modern": "Modern",
+          "mod-support": "Mod support",
+          "photo-realistic": "Photo realistic",
+          "traditional": "Traditional",
+          "realistic": "Realistic",
+          "semi-realistic": "Semi-realistic",
+          "fantasy": "Fantasy",
+          "vanilla-plus": "Vanilla+",
+          "low-end": "Low-end",
+          "high-end": "High-end",
+          "pbr": "PBR",
+          "path-tracing": "Path tracing"
+        },
+        uk: {
+          "": "Будь-який",
+          fabric: "Fabric",
+          forge: "Forge",
+          quilt: "Quilt",
+          neoforge: "NeoForge",
+          "adventure-and-rpg": "Пригоди та RPG",
+          adventure: "Пригоди",
+          "armor-weapons-and-tools": "Броня, зброя та інструменти",
+          "cosmetic": "Косметика",
+          "cosmetic-armor": "Косметична броня",
+          "food": "Їжа",
+          "magic": "Магія",
+          "mobs": "Моби",
+          "technology": "Технології",
+          "technology-processing": "Обробка",
+          "technology-player-transport": "Транспорт гравця",
+          "technology-energy": "Енергія",
+          "utility-and-qol": "Корисне та QoL",
+          "map-and-information": "Мапа та інформація",
+          "world-gen": "Генерація світу",
+          "worldgen": "Генерація світу",
+          "biomes": "Біоми",
+          "storage": "Сховища",
+          "transport": "Транспорт",
+          "farming": "Фермерство",
+          "energy": "Енергія",
+          "library-api": "Бібліотека/API",
+          "api-and-library": "API та бібліотеки",
+          "automation": "Автоматизація",
+          "structures": "Структури",
+          "dimensions": "Виміри",
+          "ores-and-resources": "Руди та ресурси",
+          "server-utility": "Серверні утиліти",
+          "miscellaneous": "Різне",
+          "mc-addons": "Аддони",
+          "bug-fixes": "Виправлення помилок",
+          "commands": "Команди",
+          "equipment": "Спорядження",
+          "genetics": "Генетика",
+          "redstone": "Редстоун",
+          "twitch-integration": "Інтеграція Twitch",
+          "animated": "Анімовані",
+          "audio": "Аудіо",
+          "font-packs": "Шрифти",
+          "medieval": "Середньовічні",
+          "modern": "Сучасні",
+          "mod-support": "Підтримка модів",
+          "photo-realistic": "Фотореалістичні",
+          "traditional": "Традиційні",
+          "realistic": "Реалістичні",
+          "semi-realistic": "Напівреалістичні",
+          "fantasy": "Фентезі",
+          "vanilla-plus": "Vanilla+",
+          "low-end": "Для слабких ПК",
+          "high-end": "Для потужних ПК",
+          "path-tracing": "Path tracing"
+        },
+        kk: {
+          "": "Кез келген",
+          fabric: "Fabric",
+          forge: "Forge",
+          quilt: "Quilt",
+          neoforge: "NeoForge",
+          "adventure-and-rpg": "Шытырман оқиға және RPG",
+          adventure: "Шытырман оқиға",
+          "armor-weapons-and-tools": "Сауыт, қару және құралдар",
+          "cosmetic": "Косметика",
+          "cosmetic-armor": "Косметикалық сауыт",
+          "food": "Тағам",
+          "magic": "Магия",
+          "mobs": "Мобтар",
+          "technology": "Технология",
+          "technology-processing": "Өңдеу",
+          "technology-player-transport": "Ойыншы көлігі",
+          "technology-energy": "Энергия",
+          "utility-and-qol": "Пайдалы және QoL",
+          "map-and-information": "Карта және ақпарат",
+          "world-gen": "Әлем генерациясы",
+          "worldgen": "Әлем генерациясы",
+          "biomes": "Биомдар",
+          "storage": "Сақтау",
+          "transport": "Көлік",
+          "farming": "Фермерлік",
+          "energy": "Энергия",
+          "library-api": "Кітапхана/API",
+          "api-and-library": "API және кітапхана",
+          "automation": "Автоматтандыру",
+          "structures": "Құрылымдар",
+          "dimensions": "Өлшемдер",
+          "ores-and-resources": "Кендер мен ресурстар",
+          "server-utility": "Сервер утилиталары",
+          "miscellaneous": "Әртүрлі",
+          "mc-addons": "Аддондар",
+          "bug-fixes": "Қате түзетулері",
+          "commands": "Командалар",
+          "equipment": "Жабдық",
+          "genetics": "Генетика",
+          "redstone": "Редстоун",
+          "twitch-integration": "Twitch интеграциясы",
+          "animated": "Анимацияланған",
+          "audio": "Аудио",
+          "font-packs": "Қаріптер",
+          "medieval": "Ортағасырлық",
+          "modern": "Заманауи",
+          "mod-support": "Мод қолдауы",
+          "photo-realistic": "Фотореалистік",
+          "traditional": "Дәстүрлі",
+          "realistic": "Реалистік",
+          "semi-realistic": "Жартылай реалистік",
+          "fantasy": "Фэнтези",
+          "vanilla-plus": "Vanilla+",
+          "low-end": "Әлсіз ПК үшін",
+          "high-end": "Қуатты ПК үшін",
+          "path-tracing": "Path tracing"
+        }
+      };
+    },
+
+    renderCurseForge() {
+      const selected = this.selectedInstanceForCatalog();
+      const info = $("#curseforgeSelectedInstance");
+      if (info) {
+        if (selected) {
+          const loader = selected.loader === "vanilla" ? "Vanilla" : this.capitalize(selected.loader || "");
+          info.innerHTML = `
+            <span>${this.t("curseforge.target")}</span>
+            <strong>${this.escape(selected.name)} · ${this.escape(selected.minecraft_version || "?")} · ${this.escape(loader)}</strong>
+          `;
+        } else {
+          info.innerHTML = `<span>${this.t("curseforge.noTarget")}</span>`;
+        }
+      }
+
+      const type = $("#curseforgeTypeSelect")?.value || "mod";
+      this.loadCurseForgeFilters();
+      const status = $("#curseforgeStatus");
+      if (status && type === "mod" && selected?.loader === "vanilla") {
+        status.textContent = this.t("curseforge.vanillaModWarning");
+        status.classList.remove("hidden");
+      } else if (status && !this.curseforgeSearched) {
+        status.textContent = this.curseforgeCatalogHint(type);
+        status.classList.remove("hidden");
+      }
+
+      this.renderCurseForgeResults();
+    },
+
+    async searchCurseForge(event = null, page = null) {
+      event?.preventDefault();
+      if (page !== null) {
+        this.curseforgeCurrentPage = Math.max(1, Number(page) || 1);
+      }
+
+      const status = $("#curseforgeStatus");
+      const button = $("#curseforgeSearchButton");
+      const selected = this.selectedInstanceForCatalog();
+      const type = $("#curseforgeTypeSelect")?.value || "mod";
+
+      if (!selected) {
+        status.textContent = this.t("curseforge.noInstanceError");
+        status.classList.remove("hidden");
+        this.curseforgeResults = [];
+        this.curseforgeLastTotal = 0;
+        this.curseforgeCurrentPage = 1;
+        this.curseforgeTotalPages = 1;
+        this.renderCurseForgeResults();
+        return;
+      }
+
+      if (type === "mod" && selected?.loader === "vanilla") {
+        status.textContent = this.t("curseforge.vanillaModWarning");
+        status.classList.remove("hidden");
+        this.curseforgeResults = [];
+        this.curseforgeLastTotal = 0;
+        this.curseforgeCurrentPage = 1;
+        this.curseforgeTotalPages = 1;
+        this.renderCurseForgeResults();
+        return;
+      }
+
+      await this.loadCurseForgeFilters();
+
+      status.textContent = this.t("curseforge.searching");
+      status.classList.remove("hidden");
+      if (button) button.disabled = true;
+
+      try {
+        const query = $("#curseforgeQueryInput")?.value.trim() || "";
+        const sort = $("#curseforgeSortSelect")?.value || "popular";
+        const showManualOnly = $("#curseforgeShowManualOnlyCheckbox")?.checked !== false;
+        const filters = this.collectCurseForgeFilters();
+        const gameVersion = filters.game_version || selected?.minecraft_version || "";
+        const loader = ["mod", "modpack"].includes(type) ? (filters.loader || selected?.loader || "") : "";
+        const categoryIds = Array.isArray(filters.category_ids) ? filters.category_ids : [];
+
+        const limit = this.curseforgePageSize || 24;
+        const offset = Math.max(0, (this.curseforgeCurrentPage - 1) * limit);
+        const result = await window.SLLApi.call("search_curseforge", {
+          query,
+          project_type: type,
+          index: sort,
+          show_manual_only: showManualOnly,
+          instance_id: selected?.id || "",
+          filters: {
+            game_version: gameVersion,
+            loader,
+            category_ids: categoryIds
+          },
+          limit,
+          offset
+        });
+
+        if (!result?.ok) {
+          status.textContent = this.localizeMessage(result?.error || this.t("error.generic"));
+          this.curseforgeResults = [];
+          this.curseforgeLastTotal = 0;
+          this.curseforgeCurrentPage = 1;
+          this.curseforgeTotalPages = 1;
+          this.renderCurseForgeResults();
+          return;
+        }
+
+        this.curseforgeSearched = true;
+        this.curseforgeResults = result.hits || [];
+        this.curseforgeLastTotal = result.total_hits || this.curseforgeResults.length;
+        this.curseforgeCurrentPage = result.page || this.curseforgeCurrentPage || 1;
+        this.curseforgeTotalPages = result.total_pages || Math.max(1, Math.ceil((this.curseforgeLastTotal || 0) / (this.curseforgePageSize || 24)));
+        status.textContent = this.t(this.curseforgeResults.length ? "curseforge.resultsReady" : "curseforge.noResults");
+        this.renderCurseForgeResults();
+      } catch (error) {
+        status.textContent = this.localizeMessage(error?.message || String(error));
+        this.curseforgeResults = [];
+        this.curseforgeLastTotal = 0;
+        this.curseforgeCurrentPage = 1;
+        this.curseforgeTotalPages = 1;
+        this.renderCurseForgeResults();
+      } finally {
+        if (button) button.disabled = false;
+      }
+    },
+
+    renderCurseForgeResults() {
+      const grid = $("#curseforgeResults");
+      const empty = $("#curseforgeEmpty");
+      if (!grid || !empty) return;
+
+      const results = this.curseforgeResults || [];
+      empty.classList.toggle("hidden", results.length > 0 || !this.curseforgeSearched);
+      grid.innerHTML = results.map(project => this.curseforgeCardHtml(project)).join("");
+
+      $$('[data-curseforge-install]').forEach(button => {
+        button.addEventListener("click", () => this.installCurseForgeProject(button.dataset.curseforgeInstall));
+      });
+
+      $$('[data-curseforge-open-url]').forEach(button => {
+        button.addEventListener("click", () => this.openCurseForgeProjectUrl(button.dataset.curseforgeOpenUrl));
+      });
+
+      this.renderCurseForgePagination();
+    },
+
+    renderCurseForgePagination() {
+      const box = $("#curseforgePagination");
+      if (!box) return;
+
+      const total = Number(this.curseforgeLastTotal || 0);
+      const pageSize = Number(this.curseforgePageSize || 24);
+      const totalPages = Math.max(1, Number(this.curseforgeTotalPages || Math.ceil(total / pageSize) || 1));
+      const current = Math.max(1, Math.min(totalPages, Number(this.curseforgeCurrentPage || 1)));
+
+      if (!this.curseforgeSearched || total <= pageSize || totalPages <= 1) {
+        box.classList.add("hidden");
+        box.innerHTML = "";
+        return;
+      }
+
+      const pages = this.modrinthVisiblePages(current, totalPages);
+      const from = ((current - 1) * pageSize) + 1;
+      const to = Math.min(total, current * pageSize);
+
+      box.classList.remove("hidden");
+      box.innerHTML = `
+        <div class="catalog-pagination__summary">
+          ${this.escape(this.t("curseforge.paginationSummary"))
+            .replace("{from}", this.formatNumber(from))
+            .replace("{to}", this.formatNumber(to))
+            .replace("{total}", this.formatNumber(total))}
+        </div>
+        <div class="catalog-pagination__buttons">
+          <button class="catalog-page-btn" type="button" data-curseforge-page="${current - 1}" ${current <= 1 ? "disabled" : ""}>‹</button>
+          ${pages.map(item => item === "..."
+            ? `<span class="catalog-page-ellipsis">…</span>`
+            : `<button class="catalog-page-btn ${item === current ? "is-active" : ""}" type="button" data-curseforge-page="${item}" ${item === current ? "aria-current=\"page\"" : ""}>${item}</button>`
+          ).join("")}
+          <button class="catalog-page-btn" type="button" data-curseforge-page="${current + 1}" ${current >= totalPages ? "disabled" : ""}>›</button>
+        </div>
+      `;
+
+      box.querySelectorAll("[data-curseforge-page]").forEach(button => {
+        button.addEventListener("click", () => {
+          const page = Number(button.dataset.curseforgePage || 1);
+          if (page >= 1 && page <= totalPages && page !== current) {
+            this.searchCurseForge(null, page);
+          }
+        });
+      });
+    },
+
+    curseforgeCardHtml(project) {
+      const type = project.project_type || "mod";
+      const projectId = String(project.project_id || project.slug || "");
+      const icon = project.icon_url
+        ? `<img src="${this.escape(project.icon_url)}" alt="" loading="lazy">`
+        : `<span>${this.escape((project.title || "C").slice(0, 1).toUpperCase())}</span>`;
+      const downloads = this.formatNumber(project.downloads || 0);
+      const tags = [
+        ...(project.loaders || []).map(item => this.capitalize(String(item))),
+        ...(project.game_versions || []),
+        ...(project.categories || []).map(item => this.curseforgeCategoryLabel(item))
+      ].filter(Boolean).slice(0, 5)
+        .map(item => `<span class="catalog-tag">${this.escape(item)}</span>`)
+        .join("");
+
+      const isModpack = type === "modpack";
+      const downloadAvailable = project.compatible_file?.download_available !== false;
+      const buttonText = isModpack
+        ? this.t("curseforge.install")
+        : downloadAvailable
+          ? this.t("curseforge.install")
+          : this.t("curseforge.downloadUnavailableShort");
+      const disabled = (!downloadAvailable) ? "disabled" : "";
+      const title = isModpack
+        ? this.t("curseforge.installModpackHint")
+        : downloadAvailable
+          ? this.t("curseforge.install")
+          : this.t("curseforge.downloadUnavailableHint");
+
+      return `
+        <article class="catalog-card" data-curseforge-project="${this.escape(projectId)}">
+          <div class="catalog-card__icon">${icon}</div>
+          <div class="catalog-card__body">
+            <div class="catalog-card__top">
+              <div>
+                <h3>
+                  <button class="catalog-card__title-link" type="button" data-curseforge-open-url="${this.escape(project.project_url || "")}" title="${this.escape(this.t("curseforge.openProject"))}">
+                    ${this.escape(project.title || project.slug || "CurseForge")}
+                  </button>
+                </h3>
+                <div class="catalog-card__meta">${this.escape(this.curseforgeTypeLabel(type))} · ↓ ${downloads}${project.compatible_file?.file_name ? ` · ${this.escape(project.compatible_file.file_name)}` : ""}</div>
+              </div>
+              <span class="catalog-card__type">${this.escape(this.curseforgeTypeLabel(type))}</span>
+            </div>
+            <p>${this.escape(project.description || "")}</p>
+            <div class="catalog-tags">${tags}</div>
+            <div class="catalog-card__actions">
+              <button class="button button--primary button--compact" type="button" data-curseforge-install="${this.escape(projectId)}" title="${this.escape(title)}" ${disabled}>
+                ${buttonText}
+              </button>
+            </div>
+          </div>
+        </article>
+      `;
+    },
+
+    async openCurseForgeProjectUrl(url) {
+      if (!url) return;
+      try {
+        const result = await window.SLLApi.call("open_external_url", url);
+        if (!result?.ok) {
+          this.toast(result?.error || this.t("error.generic"), true);
+        }
+      } catch (error) {
+        this.toast(error?.message || String(error), true);
+      }
+    },
+
+    modpackUpdateText(key) {
+      const value = this.t(key);
+      if (value && value !== key) return value;
+
+      const lang = window.SLLState?.preferences?.language || "en";
+      const fallback = {
+        en: {
+          "modpackUpdate.check": "Check modpack",
+          "modpackUpdate.update": "Update modpack",
+          "modpackUpdate.current": "Current",
+          "modpackUpdate.latest": "Latest",
+          "modpackUpdate.smartPrune": "Safe cleanup",
+          "modpackUpdate.updateAvailable": "Modpack update available",
+          "modpackUpdate.upToDate": "Modpack is up to date",
+          "modpackUpdate.sourceModrinth": "Modrinth modpack",
+          "modpackUpdate.sourceCurseForge": "CurseForge modpack",
+
+          "modrinthModpack.hint": "This instance was installed from a Modrinth modpack. You can check for updates.",
+          "modrinthModpack.updateHint": "The update will reinstall the latest compatible Modrinth modpack version into this instance.",
+          "modrinthModpack.upToDateHint": "The installed version matches the latest compatible Modrinth version.",
+          "modrinthModpack.smartPruneReady": "tracked files: {count}",
+          "modrinthModpack.smartPruneLearning": "will start after the next managed install",
+          "modrinthModpack.checked": "Modrinth modpack update check completed.",
+          "modrinthModpack.confirmUpdate": "Update this Modrinth modpack in the selected instance?",
+          "modrinthModpack.updated": "Modrinth modpack updated.",
+
+          "curseforgeModpack.hint": "This instance was installed from a CurseForge modpack. You can check for updates and reopen the install report.",
+          "curseforgeModpack.updateHint": "The update will reinstall the latest compatible CurseForge modpack manifest into this instance.",
+          "curseforgeModpack.upToDateHint": "No newer compatible CurseForge file was found for the current Minecraft version and loader.",
+          "curseforgeModpack.smartPruneReady": "tracked files: {count}",
+          "curseforgeModpack.smartPruneLearning": "will start after the next managed install",
+          "curseforgeModpack.checked": "CurseForge modpack update check completed.",
+          "curseforgeModpack.confirmUpdate": "Update this CurseForge modpack in the selected instance?",
+          "curseforgeModpack.updated": "CurseForge modpack updated.",
+          "curseforgeModpack.prunedToast": "Removed obsolete files: {count}."
+        },
+        uk: {
+          "modpackUpdate.check": "Перевірити модпак",
+          "modpackUpdate.update": "Оновити модпак",
+          "modpackUpdate.current": "Поточна",
+          "modpackUpdate.latest": "Нова",
+          "modpackUpdate.smartPrune": "Безпечне очищення",
+          "modpackUpdate.updateAvailable": "Доступне оновлення модпака",
+          "modpackUpdate.upToDate": "Модпак актуальний",
+          "modpackUpdate.sourceModrinth": "Modrinth-модпак",
+          "modpackUpdate.sourceCurseForge": "CurseForge-модпак",
+
+          "modrinthModpack.hint": "Ця збірка встановлена з Modrinth-модпака. Можна перевірити оновлення.",
+          "modrinthModpack.updateHint": "Оновлення перевстановить найновішу сумісну версію Modrinth-модпака в цій збірці.",
+          "modrinthModpack.upToDateHint": "Встановлена версія збігається з найновішою сумісною версією Modrinth.",
+          "modrinthModpack.smartPruneReady": "відстежуваних файлів: {count}",
+          "modrinthModpack.smartPruneLearning": "почне працювати після наступного керованого встановлення",
+          "modrinthModpack.checked": "Перевірку оновлень Modrinth-модпака завершено.",
+          "modrinthModpack.confirmUpdate": "Оновити цей Modrinth-модпак у вибраній збірці?",
+          "modrinthModpack.updated": "Modrinth-модпак оновлено.",
+
+          "curseforgeModpack.hint": "Ця збірка встановлена з CurseForge-модпака. Можна перевірити оновлення та знову відкрити підсумок завантаження.",
+          "curseforgeModpack.updateHint": "Оновлення перевстановить найновіший сумісний manifest CurseForge-модпака в цій збірці.",
+          "curseforgeModpack.upToDateHint": "Новіший сумісний файл CurseForge для поточної версії Minecraft і завантажувача не знайдено.",
+          "curseforgeModpack.smartPruneReady": "відстежуваних файлів: {count}",
+          "curseforgeModpack.smartPruneLearning": "почне працювати після наступного керованого встановлення",
+          "curseforgeModpack.checked": "Перевірку оновлень CurseForge-модпака завершено.",
+          "curseforgeModpack.confirmUpdate": "Оновити цей CurseForge-модпак у вибраній збірці?",
+          "curseforgeModpack.updated": "CurseForge-модпак оновлено.",
+          "curseforgeModpack.prunedToast": "Видалено застарілих файлів: {count}."
+        },
+        kk: {
+          "modpackUpdate.check": "Модпакты тексеру",
+          "modpackUpdate.update": "Модпакты жаңарту",
+          "modpackUpdate.current": "Ағымдағы",
+          "modpackUpdate.latest": "Жаңа",
+          "modpackUpdate.smartPrune": "Қауіпсіз тазалау",
+          "modpackUpdate.updateAvailable": "Модпак жаңартуы қолжетімді",
+          "modpackUpdate.upToDate": "Модпак өзекті",
+          "modpackUpdate.sourceModrinth": "Modrinth модпагы",
+          "modpackUpdate.sourceCurseForge": "CurseForge модпагы",
+
+          "modrinthModpack.hint": "Бұл жинақ Modrinth модпагынан орнатылған. Жаңартуды тексеруге болады.",
+          "modrinthModpack.updateHint": "Жаңарту осы жинаққа ең жаңа үйлесімді Modrinth модпак нұсқасын қайта орнатады.",
+          "modrinthModpack.upToDateHint": "Орнатылған нұсқа ең жаңа үйлесімді Modrinth нұсқасымен сәйкес келеді.",
+          "modrinthModpack.smartPruneReady": "бақыланатын файлдар: {count}",
+          "modrinthModpack.smartPruneLearning": "келесі басқарылатын орнатудан кейін жұмыс істей бастайды",
+          "modrinthModpack.checked": "Modrinth модпагының жаңартуын тексеру аяқталды.",
+          "modrinthModpack.confirmUpdate": "Бұл Modrinth модпагын таңдалған жинақта жаңарту керек пе?",
+          "modrinthModpack.updated": "Modrinth модпагы жаңартылды.",
+
+          "curseforgeModpack.hint": "Бұл жинақ CurseForge модпагынан орнатылған. Жаңартуды тексеруге және орнату есебін қайта ашуға болады.",
+          "curseforgeModpack.updateHint": "Жаңарту осы жинаққа ең жаңа үйлесімді CurseForge модпак manifest файлын қайта орнатады.",
+          "curseforgeModpack.upToDateHint": "Ағымдағы Minecraft нұсқасы мен жүктеуші үшін жаңарақ CurseForge файлы табылмады.",
+          "curseforgeModpack.smartPruneReady": "бақыланатын файлдар: {count}",
+          "curseforgeModpack.smartPruneLearning": "келесі басқарылатын орнатудан кейін жұмыс істей бастайды",
+          "curseforgeModpack.checked": "CurseForge модпагының жаңартуын тексеру аяқталды.",
+          "curseforgeModpack.confirmUpdate": "Бұл CurseForge модпагын таңдалған жинақта жаңарту керек пе?",
+          "curseforgeModpack.updated": "CurseForge модпагы жаңартылды.",
+          "curseforgeModpack.prunedToast": "Ескірген файлдар жойылды: {count}."
+        }
+      };
+
+      return fallback[lang]?.[key] || fallback.uk?.[key] || fallback.en?.[key] || key;
+    },
+
+    curseforgeCatalogHint(type) {
+      if (type !== "modpack") return this.t("curseforge.readyHint");
+      const key = "curseforge.modpackHint";
+      const value = this.t(key);
+      if (value && value !== key && !value.includes("окремим етапом") && !value.includes("separate stage")) return value;
+
+      const lang = window.SLLState?.preferences?.language || "en";
+      return {
+        en: "Search and install CurseForge modpacks into the selected instance.",
+        uk: "Шукайте та встановлюйте CurseForge-модпаки у вибрану збірку.",
+        kk: "CurseForge модпактарын іздеп, таңдалған жинаққа орнатыңыз."
+      }[lang] || "Search and install CurseForge modpacks into the selected instance.";
+    },
+
+    curseforgeModpackReportLabel() {
+      const key = "curseforgeModpack.report";
+      const value = this.t(key);
+      if (value && value !== key) return value;
+      const lang = window.SLLState?.preferences?.language || "en";
+      return {
+        en: "Install report",
+        uk: "Підсумок завантаження",
+        kk: "Жүктеу қорытындысы"
+      }[lang] || "Install report";
+    },
+
+    modpackPreflightText(key) {
+      const value = this.t(key);
+      if (value && value !== key) return value;
+      const lang = window.SLLState?.preferences?.language || "en";
+      const fallback = {
+        en: {
+          "curseforgeModpackPreview.title": "CurseForge modpack preflight",
+          "curseforgeModpackPreview.subtitle": "Installation is not started yet. This check only reads the modpack manifest.",
+          "curseforgeModpackPreview.selectedInstance": "Selected instance",
+          "curseforgeModpackPreview.packSettings": "Pack settings",
+          "curseforgeModpackPreview.files": "Files",
+          "curseforgeModpackPreview.available": "Available",
+          "curseforgeModpackPreview.manual": "Manual required",
+          "curseforgeModpackPreview.overrides": "Overrides",
+          "curseforgeModpackPreview.reconfigure": "The selected instance will be reconfigured to this modpack's Minecraft version and loader, like Modrinth modpacks.",
+          "curseforgeModpackPreview.noReconfigure": "The selected instance already matches the modpack version and loader.",
+          "curseforgeModpackPreview.manualTitle": "Files requiring manual installation",
+          "curseforgeModpackPreview.openProject": "Open project",
+          "curseforgeModpackPreview.close": "Close",
+          "curseforgeModpackPreview.copyList": "Copy list",
+          "curseforge.installModpackHint": "Read the CurseForge modpack manifest and install it into the selected instance.",
+          "curseforgeModpackPreview.install": "Install",
+          "curseforgeModpackPreview.installConfirmFallback": "Install this CurseForge modpack into the selected instance?",
+          "curseforgeModpackPreview.installDoneTitle": "CurseForge modpack installed",
+          "curseforgeModpackPreview.installPartialTitle": "CurseForge modpack installed partially",
+          "curseforgeModpackPreview.installDoneSummary": "The modpack was installed successfully.",
+          "curseforgeModpackPreview.installPartialSummary": "The modpack was installed, but some files require manual installation.",
+          "curseforgeModpackPreview.installed": "Installed",
+          "curseforgeModpackPreview.alreadyInstalled": "Already installed",
+          "curseforgeModpackPreview.openInstanceFolder": "Open instance folder",
+          "curseforgeModpackPreview.folder": "Folder",
+          "curseforgeModpackPreview.resultSubtitle": "Installation summary.",
+          "curseforgeModpackPreview.resultToast": "CurseForge modpack installation finished.",
+        },
+        uk: {
+          "curseforgeModpackPreview.title": "Перевірка CurseForge-модпака",
+          "curseforgeModpackPreview.subtitle": "Встановлення ще не починається. Цей етап лише читає manifest модпака.",
+          "curseforgeModpackPreview.selectedInstance": "Вибрана збірка",
+          "curseforgeModpackPreview.packSettings": "Параметри модпака",
+          "curseforgeModpackPreview.files": "Файли",
+          "curseforgeModpackPreview.available": "Доступно",
+          "curseforgeModpackPreview.manual": "Потрібно вручну",
+          "curseforgeModpackPreview.overrides": "Overrides",
+          "curseforgeModpackPreview.reconfigure": "Вибрана збірка буде переналаштована під версію Minecraft і завантажувач цього модпака, як у Modrinth-модпаках.",
+          "curseforgeModpackPreview.noReconfigure": "Вибрана збірка вже відповідає версії та завантажувачу модпака.",
+          "curseforgeModpackPreview.manualTitle": "Файли, які потрібно встановити вручну",
+          "curseforgeModpackPreview.openProject": "Відкрити проєкт",
+          "curseforgeModpackPreview.close": "Закрити",
+          "curseforgeModpackPreview.copyList": "Скопіювати список",
+          "curseforge.installModpackHint": "Прочитати manifest CurseForge-модпака та встановити його у вибрану збірку.",
+          "curseforgeModpackPreview.install": "Встановити",
+          "curseforgeModpackPreview.installConfirmFallback": "Встановити цей CurseForge-модпак у вибрану збірку?",
+          "curseforgeModpackPreview.installDoneTitle": "CurseForge-модпак встановлено",
+          "curseforgeModpackPreview.installPartialTitle": "CurseForge-модпак встановлено частково",
+          "curseforgeModpackPreview.installDoneSummary": "Модпак успішно встановлено.",
+          "curseforgeModpackPreview.installPartialSummary": "Модпак встановлено, але частину файлів потрібно додати вручну.",
+          "curseforgeModpackPreview.installed": "Встановлено",
+          "curseforgeModpackPreview.alreadyInstalled": "Уже було",
+          "curseforgeModpackPreview.openInstanceFolder": "Відкрити папку збірки",
+          "curseforgeModpackPreview.folder": "Папка",
+          "curseforgeModpackPreview.resultSubtitle": "Підсумок встановлення.",
+          "curseforgeModpackPreview.resultToast": "Встановлення CurseForge-модпака завершено.",
+        },
+        kk: {
+          "curseforgeModpackPreview.title": "CurseForge модпагын алдын ала тексеру",
+          "curseforgeModpackPreview.subtitle": "Орнату әлі басталмайды. Бұл кезең тек модпак manifest файлын оқиды.",
+          "curseforgeModpackPreview.selectedInstance": "Таңдалған жинақ",
+          "curseforgeModpackPreview.packSettings": "Модпак параметрлері",
+          "curseforgeModpackPreview.files": "Файлдар",
+          "curseforgeModpackPreview.available": "Қолжетімді",
+          "curseforgeModpackPreview.manual": "Қолмен керек",
+          "curseforgeModpackPreview.overrides": "Overrides",
+          "curseforgeModpackPreview.reconfigure": "Таңдалған жинақ Modrinth модпактарындағыдай осы модпактың Minecraft нұсқасы мен жүктеушісіне қайта бапталады.",
+          "curseforgeModpackPreview.noReconfigure": "Таңдалған жинақ модпак нұсқасы мен жүктеушісіне сәйкес келеді.",
+          "curseforgeModpackPreview.manualTitle": "Қолмен орнатуды қажет ететін файлдар",
+          "curseforgeModpackPreview.openProject": "Жобаны ашу",
+          "curseforgeModpackPreview.close": "Жабу",
+          "curseforgeModpackPreview.copyList": "Тізімді көшіру",
+          "curseforge.installModpackHint": "CurseForge модпак manifest файлын оқып, оны таңдалған жинаққа орнату.",
+          "curseforgeModpackPreview.resultSubtitle": "Орнату қорытындысы.",
+          "curseforgeModpackPreview.resultToast": "CurseForge модпагын орнату аяқталды.",
+        }
+      };
+      return fallback[lang]?.[key] || fallback.uk?.[key] || fallback.en?.[key] || key;
+    },
+
+    ensureCurseForgeModpackPreflightDom() {
+      if ($("#curseforgeModpackPreflightBackdrop")) return;
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML = `
+        <div id="curseforgeModpackPreflightBackdrop" class="modal-backdrop hidden" aria-hidden="true">
+          <section class="modal-card dependency-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="curseforgeModpackPreflightTitle">
+            <header class="modal-card__header">
+              <div>
+                <div class="eyebrow">CurseForge</div>
+                <h2 id="curseforgeModpackPreflightTitle"></h2>
+                <p id="curseforgeModpackPreflightSubtitle" class="modal-subtitle"></p>
+              </div>
+              <button id="curseforgeModpackPreflightClose" class="icon-button" type="button" aria-label="Close">×</button>
+            </header>
+            <div class="dependency-preview">
+              <div id="curseforgeModpackPreflightSummary" class="form-note"></div>
+              <div id="curseforgeModpackPreflightCards" class="modpack-preflight__cards"></div>
+              <div id="curseforgeModpackPreflightManual" class="dependency-preview__list"></div>
+            </div>
+            <footer class="dependency-preview__actions">
+              <button id="curseforgeModpackPreflightCopy" class="button" type="button"></button>
+              <button id="curseforgeModpackPreflightDone" class="button button--primary" type="button"></button>
+            </footer>
+          </section>
+        </div>
+      `.trim();
+      document.body.appendChild(wrapper.firstElementChild);
+    },
+
+    formatCurseForgeManualList(plan, manualItems) {
+      const pack = plan?.pack || {};
+      const instance = plan?.target_instance || {};
+      const commonNoDownload = "No downloadUrl returned by CurseForge API";
+
+      const header = [
+        this.modpackPreflightText("curseforgeModpackPreview.manualTitle"),
+        "",
+        pack.name || plan?.project?.title || "CurseForge modpack",
+        `${pack.minecraft_version || instance.minecraft_version || "?"} · ${pack.loader || instance.loader || "vanilla"} ${pack.loader_version || ""}`.trim(),
+        ""
+      ];
+
+      const lines = (manualItems || []).map((item, index) => {
+        const reason = String(item.reason || "").trim();
+        const block = [
+          `${index + 1}. ${item.title || `Project ${item.project_id || "?"}`}`,
+          `   Project ID: ${item.project_id || "?"}`,
+          `   File ID: ${item.file_id || "?"}`,
+          `   URL: ${item.project_url || ""}`
+        ];
+
+        if (reason && reason !== commonNoDownload) {
+          block.push(`   Reason: ${reason}`);
+        }
+
+        return block.join("\n");
+      });
+
+      return [...header, ...lines].join("\n\n").trim();
+    },
+
+    showCurseForgeModpackPreflight(plan, options = {}) {
+      this.ensureCurseForgeModpackPreflightDom();
+
+      return new Promise(resolve => {
+        const backdrop = $("#curseforgeModpackPreflightBackdrop");
+        const title = $("#curseforgeModpackPreflightTitle");
+        const subtitle = $("#curseforgeModpackPreflightSubtitle");
+        const summary = $("#curseforgeModpackPreflightSummary");
+        const cards = $("#curseforgeModpackPreflightCards");
+        const manual = $("#curseforgeModpackPreflightManual");
+        const close = $("#curseforgeModpackPreflightClose");
+        const done = $("#curseforgeModpackPreflightDone");
+        const copy = $("#curseforgeModpackPreflightCopy");
+
+        if (!backdrop || !title || !cards || !manual || !done || !close || !copy) {
+          resolve(window.confirm(this.modpackPreflightText("curseforgeModpackPreview.installConfirmFallback")));
+          return;
+        }
+
+        const pack = plan.pack || {};
+        const counts = plan.counts || {};
+        const instance = plan.target_instance || {};
+        const manualItems = plan.manual_items || [];
+        const installMode = Boolean(options.install);
+
+        title.textContent = this.modpackPreflightText("curseforgeModpackPreview.title");
+        subtitle.textContent = this.modpackPreflightText("curseforgeModpackPreview.subtitle");
+        done.textContent = installMode
+          ? this.modpackPreflightText("curseforgeModpackPreview.install")
+          : this.modpackPreflightText("curseforgeModpackPreview.close");
+        copy.textContent = this.modpackPreflightText("curseforgeModpackPreview.copyList");
+        copy.disabled = manualItems.length === 0;
+
+        summary.textContent = pack.will_reconfigure_instance
+          ? this.modpackPreflightText("curseforgeModpackPreview.reconfigure")
+          : this.modpackPreflightText("curseforgeModpackPreview.noReconfigure");
+
+        const stat = (label, value) => `
+          <div class="modpack-preflight__stat">
+            <div class="modpack-preflight__stat-value">${this.escape(String(value ?? "—"))}</div>
+            <div class="modpack-preflight__stat-label">${this.escape(label)}</div>
+          </div>
+        `;
+
+        cards.innerHTML = `
+          <section class="modpack-preflight__panel">
+            <h3>${this.escape(this.modpackPreflightText("curseforgeModpackPreview.selectedInstance"))}</h3>
+            <p>${this.escape(instance.name || "—")}</p>
+            <p>${this.escape(instance.minecraft_version || "—")} · ${this.escape(instance.loader || "vanilla")}</p>
+          </section>
+          <section class="modpack-preflight__panel">
+            <h3>${this.escape(this.modpackPreflightText("curseforgeModpackPreview.packSettings"))}</h3>
+            <p>${this.escape(pack.name || plan.project?.title || "CurseForge modpack")}</p>
+            <p>${this.escape(pack.minecraft_version || "—")} · ${this.escape(pack.loader || "vanilla")} ${this.escape(pack.loader_version || "")}</p>
+          </section>
+          <section class="modpack-preflight__stats">
+            ${stat(this.modpackPreflightText("curseforgeModpackPreview.files"), counts.manifest_files || 0)}
+            ${stat(this.modpackPreflightText("curseforgeModpackPreview.available"), counts.available || 0)}
+            ${stat(this.modpackPreflightText("curseforgeModpackPreview.manual"), counts.manual_required || 0)}
+            ${stat(this.modpackPreflightText("curseforgeModpackPreview.overrides"), counts.overrides_files || 0)}
+          </section>
+        `;
+
+        this.renderCurseForgeManualItems(manual, manualItems);
+        manual.querySelectorAll("[data-cf-manual-open]").forEach(button => {
+          button.addEventListener("click", () => this.openCurseForgeProjectUrl(button.dataset.cfManualOpen));
+        });
+
+        const manualText = this.formatCurseForgeManualList(plan, manualItems);
+
+        const onCopy = async () => {
+          if (!manualText) return;
+          try {
+            await navigator.clipboard.writeText(manualText);
+            this.toast(this.t("common.copied") || "Copied");
+          } catch (_error) {
+            this.toast(manualText);
+          }
+        };
+
+        const cleanup = result => {
+          backdrop.classList.add("hidden");
+          backdrop.setAttribute("aria-hidden", "true");
+          close.removeEventListener("click", onCancel);
+          done.removeEventListener("click", onDone);
+          copy.removeEventListener("click", onCopy);
+          backdrop.removeEventListener("click", onBackdrop);
+          window.removeEventListener("keydown", onKey);
+          resolve(result);
+        };
+
+        const onDone = () => cleanup(installMode);
+        const onCancel = () => cleanup(false);
+        const onBackdrop = event => {
+          if (event.target === backdrop) cleanup(false);
+        };
+        const onKey = event => {
+          if (event.key === "Escape") cleanup(false);
+        };
+
+        close.addEventListener("click", onCancel);
+        done.addEventListener("click", onDone);
+        copy.addEventListener("click", onCopy);
+        backdrop.addEventListener("click", onBackdrop);
+        window.addEventListener("keydown", onKey);
+
+        backdrop.classList.remove("hidden");
+        backdrop.setAttribute("aria-hidden", "false");
+        setTimeout(() => done.focus(), 30);
+      });
+    },
+
+    renderCurseForgeManualItems(container, manualItems) {
+      if (!container) return;
+      if (!manualItems?.length) {
+        container.innerHTML = "";
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="dependency-preview__section-title">${this.escape(this.modpackPreflightText("curseforgeModpackPreview.manualTitle"))}</div>
+        ${manualItems.map(item => `
+          <div class="dependency-preview__item">
+            <div>
+              <div class="dependency-preview__item-title">${this.escape(item.title || `Project ${item.project_id || "?"}`)}</div>
+              <div class="dependency-preview__item-meta">
+                Project ${this.escape(item.project_id || "?")} / File ${this.escape(item.file_id || "?")}<br>
+                ${item.folder ? `${this.escape(this.modpackPreflightText("curseforgeModpackPreview.folder"))}: ${this.escape(item.folder)}<br>` : ""}
+                ${item.filename ? `${this.escape(item.filename)}<br>` : ""}
+                ${this.escape(String(item.reason || ""))}
+              </div>
+            </div>
+            <button class="button button--compact" type="button" data-cf-manual-open="${this.escape(item.project_url || "")}">
+              ${this.escape(this.modpackPreflightText("curseforgeModpackPreview.openProject"))}
+            </button>
+          </div>
+        `).join("")}
+      `;
+    },
+
+    showCurseForgeModpackInstallResult(result) {
+      this.ensureCurseForgeModpackPreflightDom();
+
+      const backdrop = $("#curseforgeModpackPreflightBackdrop");
+      const title = $("#curseforgeModpackPreflightTitle");
+      const subtitle = $("#curseforgeModpackPreflightSubtitle");
+      const summary = $("#curseforgeModpackPreflightSummary");
+      const cards = $("#curseforgeModpackPreflightCards");
+      const manual = $("#curseforgeModpackPreflightManual");
+      const close = $("#curseforgeModpackPreflightClose");
+      const done = $("#curseforgeModpackPreflightDone");
+      const copy = $("#curseforgeModpackPreflightCopy");
+
+      if (!backdrop || !title || !cards || !manual || !done || !close || !copy) {
+        this.toast(result?.message || this.t("curseforge.installed"));
+        return;
+      }
+
+      const pack = result.pack || {};
+      const counts = result.counts || {};
+      const manualItems = result.manual_items || [];
+      const partial = Boolean(result.partial || manualItems.length);
+
+      title.textContent = partial
+        ? this.modpackPreflightText("curseforgeModpackPreview.installPartialTitle")
+        : this.modpackPreflightText("curseforgeModpackPreview.installDoneTitle");
+      subtitle.textContent = this.modpackPreflightText("curseforgeModpackPreview.resultSubtitle");
+      done.textContent = this.modpackPreflightText("curseforgeModpackPreview.close");
+      copy.textContent = manualItems.length
+        ? this.modpackPreflightText("curseforgeModpackPreview.copyList")
+        : this.modpackPreflightText("curseforgeModpackPreview.openInstanceFolder");
+      copy.disabled = false;
+
+      summary.textContent = partial
+        ? this.modpackPreflightText("curseforgeModpackPreview.installPartialSummary")
+        : this.modpackPreflightText("curseforgeModpackPreview.installDoneSummary");
+
+      const stat = (label, value) => `
+        <div class="modpack-preflight__stat">
+          <div class="modpack-preflight__stat-value">${this.escape(String(value ?? "—"))}</div>
+          <div class="modpack-preflight__stat-label">${this.escape(label)}</div>
+        </div>
+      `;
+
+      cards.innerHTML = `
+        <section class="modpack-preflight__panel">
+          <h3>${this.escape(pack.name || result.project?.title || "CurseForge modpack")}</h3>
+          <p>${this.escape(pack.minecraft_version || "—")} · ${this.escape(pack.loader || "vanilla")} ${this.escape(pack.loader_version || "")}</p>
+          <p>
+            <button class="button button--compact" type="button" data-cf-open-instance-folder="${this.escape(result.target_instance_id || "")}">
+              ${this.escape(this.modpackPreflightText("curseforgeModpackPreview.openInstanceFolder"))}
+            </button>
+          </p>
+        </section>
+        <section class="modpack-preflight__stats">
+          ${stat(this.modpackPreflightText("curseforgeModpackPreview.installed"), counts.installed || 0)}
+          ${stat(this.modpackPreflightText("curseforgeModpackPreview.alreadyInstalled"), counts.skipped_existing || 0)}
+          ${stat(this.modpackPreflightText("curseforgeModpackPreview.manual"), counts.manual_required || 0)}
+          ${stat(this.modpackPreflightText("curseforgeModpackPreview.overrides"), counts.overrides_files || 0)}
+        </section>
+      `;
+
+      cards.querySelectorAll("[data-cf-open-instance-folder]").forEach(button => {
+        button.addEventListener("click", async () => {
+          const targetId = button.dataset.cfOpenInstanceFolder || result.target_instance_id || "";
+          const opened = await window.SLLApi.call("open_instance_folder", targetId);
+          if (!opened?.ok) this.toast(opened?.error || this.t("error.generic"), true);
+        });
+      });
+
+      this.renderCurseForgeManualItems(manual, manualItems);
+      manual.querySelectorAll("[data-cf-manual-open]").forEach(button => {
+        button.addEventListener("click", () => this.openCurseForgeProjectUrl(button.dataset.cfManualOpen));
+      });
+
+      const manualText = this.formatCurseForgeManualList(result, manualItems);
+
+      const onCopy = async () => {
+        if (manualItems.length) {
+          try {
+            await navigator.clipboard.writeText(manualText);
+            this.toast(this.t("common.copied") || "Copied");
+          } catch (_error) {
+            this.toast(manualText);
+          }
+          return;
+        }
+        const opened = await window.SLLApi.call("open_instance_folder", result.target_instance_id || "");
+        if (!opened?.ok) this.toast(opened?.error || this.t("error.generic"), true);
+      };
+
+      const cleanup = () => {
+        backdrop.classList.add("hidden");
+        backdrop.setAttribute("aria-hidden", "true");
+        close.removeEventListener("click", cleanup);
+        done.removeEventListener("click", cleanup);
+        copy.removeEventListener("click", onCopy);
+        backdrop.removeEventListener("click", onBackdrop);
+        window.removeEventListener("keydown", onKey);
+      };
+
+      const onBackdrop = event => {
+        if (event.target === backdrop) cleanup();
+      };
+      const onKey = event => {
+        if (event.key === "Escape") cleanup();
+      };
+
+      close.addEventListener("click", cleanup);
+      done.addEventListener("click", cleanup);
+      copy.addEventListener("click", onCopy);
+      backdrop.addEventListener("click", onBackdrop);
+      window.addEventListener("keydown", onKey);
+
+      backdrop.classList.remove("hidden");
+      backdrop.setAttribute("aria-hidden", "false");
+      setTimeout(() => done.focus(), 30);
+    },
+
+    async installCurseForgeProject(projectId) {
+      const selected = this.selectedInstanceForCatalog();
+      const project = (this.curseforgeResults || []).find(item => String(item.project_id || item.slug || "") === String(projectId));
+      if (!project) {
+        this.toast(this.t("curseforge.projectMissing"), true);
+        return;
+      }
+      if (project.compatible_file?.download_available === false) {
+        this.toast(this.t("curseforge.downloadUnavailableHint"), true);
+        return;
+      }
+
+      const buttons = $$(`[data-curseforge-install="${CSS.escape(String(projectId))}"]`);
+      buttons.forEach(button => {
+        button.disabled = true;
+        button.textContent = this.t("curseforge.installing");
+      });
+
+      try {
+        if (!selected) {
+          this.toast(this.t("curseforge.noInstanceError"), true);
+          return;
+        }
+
+        const curseforgeFilters = this.collectCurseForgeFilters();
+        const payload = {
+          instance_id: selected?.id || "",
+          project_id: projectId,
+          file_id: project.compatible_file?.file_id || "",
+          project_type: project.project_type,
+          filters: {
+            game_version: (curseforgeFilters.game_version || selected?.minecraft_version || ""),
+            loader: ["mod", "modpack"].includes(project.project_type)
+              ? (curseforgeFilters.loader || selected?.loader || "")
+              : "",
+            category_ids: curseforgeFilters.category_ids || []
+          }
+        };
+
+        if (project.project_type === "modpack") {
+          const plan = await window.SLLApi.call("preview_curseforge_modpack_install", payload);
+          if (!plan?.ok) {
+            this.toast(this.localizeMessage(plan?.error || this.t("error.generic")), true);
+            return;
+          }
+
+          const confirmed = await this.showCurseForgeModpackPreflight(plan, { install: true });
+          if (!confirmed) return;
+
+          const result = await window.SLLApi.call("install_curseforge_modpack_project", payload);
+          if (!result?.ok) {
+            this.toast(this.localizeMessage(result?.error || this.t("error.generic")), true);
+            return;
+          }
+
+          if (result.state) this.setState(result.state);
+          if (this.instanceWindowId === (result.target_instance_id || selected?.id || "")) {
+            const refreshed = await window.SLLApi.call("get_instance_window_data", this.instanceWindowId);
+            if (refreshed?.ok) this.renderInstanceWindow(refreshed);
+          }
+          this.showCurseForgeModpackInstallResult(result);
+          this.toast(this.modpackPreflightText("curseforgeModpackPreview.resultToast"));
+          return;
+        }
+
+        const confirmed = await this.confirmDependencyPlan("preview_curseforge_install", payload);
+        if (!confirmed) return;
+
+        const result = await window.SLLApi.call("install_curseforge_project", payload);
+
+        if (!result?.ok) {
+          this.toast(this.localizeMessage(result?.error || this.t("error.generic")), true);
+          return;
+        }
+
+        if (result.state) this.setState(result.state);
+        const label = result.already_installed ? this.t("curseforge.alreadyInstalled") : this.t("curseforge.installed");
+        const dependencyCount = Array.isArray(result.dependencies_installed) ? result.dependencies_installed.length : 0;
+        const dependencySuffix = dependencyCount > 0
+          ? ` (+${dependencyCount} ${this.t("curseforge.dependencies")})`
+          : "";
+        const message = `${label}: ${result.filename || project.title}${dependencySuffix}`;
+        this.toast(message);
+        this.appendLog(`${label} ${project.title} → ${result.folder || ""}/${result.filename || ""}${dependencySuffix}`);
+
+        if (selected && this.instanceWindowId === selected.id) {
+          const refreshed = await window.SLLApi.call("get_instance_window_data", selected.id);
+          if (refreshed?.ok) this.renderInstanceWindow(refreshed);
+        }
+      } catch (error) {
+        this.toast(error?.message || String(error), true);
+      } finally {
+        buttons.forEach(button => {
+          button.disabled = false;
+          button.textContent = this.t("curseforge.install");
         });
       }
     },
@@ -1683,7 +3445,7 @@
     openAboutDialog() {
       const launcher = window.SLLState?.launcher || {};
       const name = launcher.name || "StoneLight Launcher";
-      const version = launcher.version || "0.6.70";
+      const version = launcher.version || "0.6.71";
       const versionLabel = $("#aboutVersion");
       if (versionLabel) {
         versionLabel.textContent = `${name} v${version}`;
@@ -1768,6 +3530,12 @@
       $("#forgeToolsRow").classList.toggle("hidden", (instance.loader || "").toLowerCase() !== "forge");
       this.renderOfficialUpdateNotice(data.official_update || null);
       this.renderModrinthModpackUpdateNotice(data.modrinth_modpack_update || null);
+      this.renderCurseForgeModpackUpdateNotice(data.curseforge_modpack_update || null);
+      const curseforgeReportButton = $("#curseforgeModpackReportButton");
+      if (curseforgeReportButton) {
+        curseforgeReportButton.classList.add("hidden");
+        curseforgeReportButton.textContent = this.curseforgeModpackReportLabel();
+      }
 
       this.renderFolderSubtabs(data.folders || []);
       this.populateWindowSettings(instance);
@@ -1779,15 +3547,15 @@
       const updateButton = $("#modrinthModpackUpdateButton");
       if (!box || !checkButton || !updateButton) return;
 
+      // Stage 11.1: update controls live inside the notice card for both
+      // Modrinth and CurseForge. Keep legacy action-row buttons hidden.
+      checkButton.classList.add("hidden");
+      updateButton.classList.add("hidden");
+
       if (!update?.supported) {
         box.classList.add("hidden");
-        checkButton.classList.add("hidden");
-        updateButton.classList.add("hidden");
         return;
       }
-
-      checkButton.classList.remove("hidden");
-      updateButton.classList.toggle("hidden", !update.needs_update);
 
       const title = this.escape(update.title || "Modrinth modpack");
       const current = this.escape(update.current_version_number || update.current_version_id || "?");
@@ -1795,43 +3563,51 @@
       const checked = Boolean(update.checked);
       const managedFiles = Number(update.managed_files || 0);
       const pruneText = update.smart_prune_available
-        ? this.t("modrinthModpack.smartPruneReady").replace("{count}", this.formatNumber(managedFiles))
-        : this.t("modrinthModpack.smartPruneLearning");
+        ? this.modpackUpdateText("modrinthModpack.smartPruneReady").replace("{count}", this.formatNumber(managedFiles))
+        : this.modpackUpdateText("modrinthModpack.smartPruneLearning");
+
+      const statusTitle = !checked
+        ? `${this.modpackUpdateText("modpackUpdate.sourceModrinth")}: ${title}`
+        : update.needs_update
+          ? `${this.modpackUpdateText("modpackUpdate.updateAvailable")}: ${title}`
+          : `${this.modpackUpdateText("modpackUpdate.upToDate")}: ${title}`;
+
+      const statusText = !checked
+        ? this.modpackUpdateText("modrinthModpack.hint")
+        : update.needs_update
+          ? this.modpackUpdateText("modrinthModpack.updateHint")
+          : this.modpackUpdateText("modrinthModpack.upToDateHint");
+
+      const latestRow = checked && update.needs_update
+        ? `<div class="official-update-row"><span>${this.modpackUpdateText("modpackUpdate.latest")}</span><strong>${latest}</strong></div>`
+        : "";
+
+      const updateButtonHtml = checked && update.needs_update
+        ? `<button class="button button--accent-soft button--compact" type="button" data-modpack-update-action="modrinth-update">${this.escape(this.modpackUpdateText("modpackUpdate.update"))}</button>`
+        : "";
 
       box.classList.remove("hidden");
-      if (!checked) {
-        box.innerHTML = `
-          <div class="official-update-notice__title">◇ ${this.t("modrinthModpack.title")}: ${title}</div>
-          <div class="official-update-notice__text">${this.t("modrinthModpack.hint")}</div>
-          <div class="official-update-list">
-            <div class="official-update-row"><span>${this.t("modrinthModpack.current")}</span><strong>${current}</strong></div>
-            <div class="official-update-row"><span>${this.t("modrinthModpack.smartPrune")}</span><strong>${this.escape(pruneText)}</strong></div>
-          </div>
-        `;
-        return;
-      }
-
-      if (update.needs_update) {
-        box.innerHTML = `
-          <div class="official-update-notice__title">⬆ ${this.t("modrinthModpack.updateAvailable")}: ${title}</div>
-          <div class="official-update-notice__text">${this.t("modrinthModpack.updateHint")}</div>
-          <div class="official-update-list">
-            <div class="official-update-row"><span>${this.t("modrinthModpack.current")}</span><strong>${current}</strong></div>
-            <div class="official-update-row"><span>${this.t("modrinthModpack.latest")}</span><strong>${latest}</strong></div>
-            <div class="official-update-row"><span>${this.t("modrinthModpack.smartPrune")}</span><strong>${this.escape(pruneText)}</strong></div>
-          </div>
-        `;
-        return;
-      }
-
       box.innerHTML = `
-        <div class="official-update-notice__title">✅ ${this.t("modrinthModpack.upToDate")}: ${title}</div>
-        <div class="official-update-notice__text">${this.t("modrinthModpack.upToDateHint")}</div>
+        <div class="modpack-update-card__head">
+          <div>
+            <div class="official-update-notice__title">${checked && update.needs_update ? "⬆" : checked ? "✅" : "◇"} ${statusTitle}</div>
+            <div class="official-update-notice__text">${statusText}</div>
+          </div>
+          <span class="modpack-update-card__source modpack-update-card__source--modrinth">Modrinth</span>
+        </div>
         <div class="official-update-list">
-          <div class="official-update-row"><span>${this.t("modrinthModpack.current")}</span><strong>${current}</strong></div>
-          <div class="official-update-row"><span>${this.t("modrinthModpack.smartPrune")}</span><strong>${this.escape(pruneText)}</strong></div>
+          <div class="official-update-row"><span>${this.modpackUpdateText("modpackUpdate.current")}</span><strong>${current}</strong></div>
+          ${latestRow}
+          <div class="official-update-row"><span>${this.modpackUpdateText("modpackUpdate.smartPrune")}</span><strong>${this.escape(pruneText)}</strong></div>
+        </div>
+        <div class="modpack-update-card__actions">
+          <button class="button button--compact" type="button" data-modpack-update-action="modrinth-check">${this.escape(this.modpackUpdateText("modpackUpdate.check"))}</button>
+          ${updateButtonHtml}
         </div>
       `;
+
+      box.querySelector('[data-modpack-update-action="modrinth-check"]')?.addEventListener("click", () => this.checkModrinthModpackUpdate());
+      box.querySelector('[data-modpack-update-action="modrinth-update"]')?.addEventListener("click", () => this.applyModrinthModpackUpdate());
     },
 
     async checkModrinthModpackUpdate() {
@@ -1847,7 +3623,7 @@
         this.instanceWindowData = this.instanceWindowData || {};
         this.instanceWindowData.modrinth_modpack_update = result;
         this.renderModrinthModpackUpdateNotice(result);
-        this.toast(this.localizeMessage(result.message || this.t("modrinthModpack.checked")));
+        this.toast(this.localizeMessage(result.message || this.modpackUpdateText("modrinthModpack.checked")));
       } catch (error) {
         this.toast(error?.message || String(error), true);
       } finally {
@@ -1857,7 +3633,7 @@
 
     async applyModrinthModpackUpdate() {
       if (!this.instanceWindowId) return;
-      if (!window.confirm(this.t("modrinthModpack.confirmUpdate"))) return;
+      if (!window.confirm(this.modpackUpdateText("modrinthModpack.confirmUpdate"))) return;
 
       const button = $("#modrinthModpackUpdateButton");
       if (button) button.disabled = true;
@@ -1871,13 +3647,142 @@
 
         const deletedCount = Number(result.smart_prune?.deleted_files || 0);
         const toastMessage = deletedCount > 0
-          ? `${this.localizeMessage(result.message || this.t("modrinthModpack.updated"))} ${this.t("modrinthModpack.prunedToast").replace("{count}", this.formatNumber(deletedCount))}`
-          : this.localizeMessage(result.message || this.t("modrinthModpack.updated"));
+          ? `${this.localizeMessage(result.message || this.modpackUpdateText("modrinthModpack.updated"))} ${this.modpackUpdateText("modrinthModpack.prunedToast").replace("{count}", this.formatNumber(deletedCount))}`
+          : this.localizeMessage(result.message || this.modpackUpdateText("modrinthModpack.updated"));
         this.toast(toastMessage);
         if (result.state) {
           this.setState(result.state);
         }
         await this.refreshInstanceWindow();
+      } catch (error) {
+        this.toast(error?.message || String(error), true);
+      } finally {
+        if (button) button.disabled = false;
+      }
+    },
+
+    renderCurseForgeModpackUpdateNotice(update) {
+      const box = $("#curseforgeModpackUpdateNotice");
+      const checkButton = $("#curseforgeModpackCheckButton");
+      const updateButton = $("#curseforgeModpackUpdateButton");
+      if (!box || !checkButton || !updateButton) return;
+
+      // Stage 11.1: update controls live inside the notice card for both
+      // Modrinth and CurseForge. Keep legacy action-row buttons hidden.
+      checkButton.classList.add("hidden");
+      updateButton.classList.add("hidden");
+
+      if (!update?.supported) {
+        box.classList.add("hidden");
+        return;
+      }
+
+      const title = this.escape(update.title || "CurseForge modpack");
+      const current = this.escape(update.current_display_name || update.current_file_name || update.current_file_id || "?");
+      const latest = this.escape(update.latest_display_name || update.latest_file_name || update.latest_file_id || "");
+      const checked = Boolean(update.checked);
+      const managedFiles = Number(update.managed_files || 0);
+      const pruneText = update.smart_prune_available
+        ? this.modpackUpdateText("curseforgeModpack.smartPruneReady").replace("{count}", this.formatNumber(managedFiles))
+        : this.modpackUpdateText("curseforgeModpack.smartPruneLearning");
+
+      const statusTitle = !checked
+        ? `${this.modpackUpdateText("modpackUpdate.sourceCurseForge")}: ${title}`
+        : update.needs_update
+          ? `${this.modpackUpdateText("modpackUpdate.updateAvailable")}: ${title}`
+          : `${this.modpackUpdateText("modpackUpdate.upToDate")}: ${title}`;
+
+      const statusText = !checked
+        ? this.modpackUpdateText("curseforgeModpack.hint")
+        : update.needs_update
+          ? this.modpackUpdateText("curseforgeModpack.updateHint")
+          : this.modpackUpdateText("curseforgeModpack.upToDateHint");
+
+      const latestRow = checked && update.needs_update
+        ? `<div class="official-update-row"><span>${this.modpackUpdateText("modpackUpdate.latest")}</span><strong>${latest}</strong></div>`
+        : "";
+
+      const updateButtonHtml = checked && update.needs_update
+        ? `<button class="button button--accent-soft button--compact" type="button" data-modpack-update-action="curseforge-update">${this.escape(this.modpackUpdateText("modpackUpdate.update"))}</button>`
+        : "";
+
+      const reportButtonHtml = this.instanceWindowData?.curseforge_modpack_install_report?.supported
+        ? `<button class="button button--compact" type="button" data-modpack-update-action="curseforge-report">${this.escape(this.curseforgeModpackReportLabel())}</button>`
+        : "";
+
+      box.classList.remove("hidden");
+      box.innerHTML = `
+        <div class="modpack-update-card__head">
+          <div>
+            <div class="official-update-notice__title">${checked && update.needs_update ? "⬆" : checked ? "✅" : "◇"} ${statusTitle}</div>
+            <div class="official-update-notice__text">${statusText}</div>
+          </div>
+          <span class="modpack-update-card__source modpack-update-card__source--curseforge">CurseForge</span>
+        </div>
+        <div class="official-update-list">
+          <div class="official-update-row"><span>${this.modpackUpdateText("modpackUpdate.current")}</span><strong>${current}</strong></div>
+          ${latestRow}
+          <div class="official-update-row"><span>${this.modpackUpdateText("modpackUpdate.smartPrune")}</span><strong>${this.escape(pruneText)}</strong></div>
+        </div>
+        <div class="modpack-update-card__actions">
+          <button class="button button--compact" type="button" data-modpack-update-action="curseforge-check">${this.escape(this.modpackUpdateText("modpackUpdate.check"))}</button>
+          ${updateButtonHtml}
+          ${reportButtonHtml}
+        </div>
+      `;
+
+      box.querySelector('[data-modpack-update-action="curseforge-check"]')?.addEventListener("click", () => this.checkCurseForgeModpackUpdate());
+      box.querySelector('[data-modpack-update-action="curseforge-update"]')?.addEventListener("click", () => this.applyCurseForgeModpackUpdate());
+      box.querySelector('[data-modpack-update-action="curseforge-report"]')?.addEventListener("click", () => {
+        const report = this.instanceWindowData?.curseforge_modpack_install_report;
+        if (report?.supported) this.showCurseForgeModpackInstallResult(report);
+      });
+    },
+
+    async checkCurseForgeModpackUpdate() {
+      if (!this.instanceWindowId) return;
+      const button = $("#curseforgeModpackCheckButton");
+      if (button) button.disabled = true;
+      try {
+        const result = await window.SLLApi.call("check_curseforge_modpack_update", this.instanceWindowId);
+        if (!result?.ok && result?.error) {
+          this.toast(this.localizeMessage(result.error), true);
+          return;
+        }
+        this.instanceWindowData = this.instanceWindowData || {};
+        this.instanceWindowData.curseforge_modpack_update = result;
+        this.renderCurseForgeModpackUpdateNotice(result);
+        this.toast(this.localizeMessage(result.message || this.modpackUpdateText("curseforgeModpack.checked")));
+      } catch (error) {
+        this.toast(error?.message || String(error), true);
+      } finally {
+        if (button) button.disabled = false;
+      }
+    },
+
+    async applyCurseForgeModpackUpdate() {
+      if (!this.instanceWindowId) return;
+      if (!window.confirm(this.modpackUpdateText("curseforgeModpack.confirmUpdate"))) return;
+
+      const button = $("#curseforgeModpackUpdateButton");
+      if (button) button.disabled = true;
+
+      try {
+        const result = await window.SLLApi.call("apply_curseforge_modpack_update", this.instanceWindowId);
+        if (!result?.ok) {
+          this.toast(this.localizeMessage(result?.error || this.t("error.generic")), true);
+          return;
+        }
+
+        if (result.state) this.setState(result.state);
+        await this.refreshInstanceWindow();
+        this.showCurseForgeModpackInstallResult(result);
+
+        const pruned = Number(result.counts?.pruned || result.smart_prune?.deleted_files || 0);
+        const toastMessage = pruned > 0
+          ? `${this.localizeMessage(result.message || this.modpackUpdateText("curseforgeModpack.updated"))} ${this.modpackUpdateText("curseforgeModpack.prunedToast").replace("{count}", this.formatNumber(pruned))}`
+          : this.localizeMessage(result.message || this.modpackUpdateText("curseforgeModpack.updated"));
+        this.toast(toastMessage);
       } catch (error) {
         this.toast(error?.message || String(error), true);
       } finally {
@@ -2350,10 +4255,23 @@
         await this.checkModrinthModpackUpdate();
       } else if (action === "modrinth-modpack-update") {
         await this.applyModrinthModpackUpdate();
+      } else if (action === "curseforge-modpack-check") {
+        await this.checkCurseForgeModpackUpdate();
+      } else if (action === "curseforge-modpack-update") {
+        await this.applyCurseForgeModpackUpdate();
       } else if (action === "stop") {
         await this.runAction("stop");
       } else if (action === "folder") {
         await this.openInstanceSubfolder("root");
+      } else if (action === "curseforge-modpack-report") {
+        const report = this.instanceWindowData?.curseforge_modpack_install_report;
+        if (report?.supported) {
+          this.showCurseForgeModpackInstallResult(report);
+        } else {
+          const result = await window.SLLApi.call("get_curseforge_modpack_install_report", this.instanceWindowId || window.SLLState.selected_instance_id || "");
+          if (result?.ok && result.report?.supported) this.showCurseForgeModpackInstallResult(result.report);
+          else this.toast(result?.error || this.t("error.generic"), true);
+        }
       } else if (action === "settings") {
         this.switchInstanceWindowTab("settings");
       } else if (action === "delete") {
@@ -2370,17 +4288,23 @@
     async deleteSelectedInstance(instanceId = "") {
       const targetId = instanceId || window.SLLState.selected_instance_id || "";
       if (!targetId) return;
-      if (!window.confirm(this.t("instanceWindow.deleteConfirm"))) return;
 
-      const result = await window.SLLApi.call("delete_instance", targetId, false);
+      const confirmed = await this.confirmDeleteInstance(targetId);
+      if (!confirmed) return;
+
+      const result = await window.SLLApi.call("delete_instance", targetId, true);
       if (!result?.ok) {
-        this.toast(result?.error || this.t("error.generic"), true);
+        this.toast(this.localizeMessage(result?.error || this.t("error.generic")), true);
         return;
       }
 
       if (result.state) this.setState(result.state);
       if (this.instanceWindowId === targetId) this.closeInstanceWindow();
-      this.toast(this.t("editor.deleted"));
+      this.toast(
+        result.files_missing
+          ? this.deleteInstanceText("instanceDelete.deletedMissing")
+          : this.deleteInstanceText("instanceDelete.deleted")
+      );
     },
 
     async openLaunchSettings() {
@@ -2769,8 +4693,8 @@
       );
       $("#instanceLockedNote").classList.toggle("hidden", !locked);
       $("#deleteInstanceButton").classList.toggle("hidden", this.editorMode !== "edit");
-      $("#deleteFilesRow").classList.toggle("hidden", this.editorMode !== "edit");
-      $("#deleteInstanceFiles").checked = false;
+      $("#deleteFilesRow").classList.add("hidden");
+      $("#deleteInstanceFiles").checked = true;
 
       for (const element of [
         $("#instanceNameInput"),
@@ -2793,7 +4717,7 @@
 
       this.syncInstanceEditorFields();
 
-      // v0.6.70: version pickers open only by pressing the load buttons.
+      // v0.6.71: version pickers open only by pressing the load buttons.
       // Opening settings must not immediately pop up extra modal windows.
       const backdrop = $("#instanceEditorBackdrop");
       backdrop.classList.remove("hidden");
@@ -2916,10 +4840,21 @@
         : this.t("editor.noVersions");
 
       const backdrop = $("#versionPickerBackdrop");
+      const list = $("#versionPickerList");
+      // Reset scroll only when a freshly loaded picker is opened. Do not do it
+      // inside renderVersionPickerList(), because that method is also used while
+      // filtering and should not fight the user's manual scrolling through older
+      // versions.
+      if (list) list.scrollTop = 0;
+
       backdrop.classList.remove("hidden");
       backdrop.setAttribute("aria-hidden", "false");
 
       this.renderVersionPickerList(currentValue);
+      requestAnimationFrame(() => {
+        const freshList = $("#versionPickerList");
+        if (freshList) freshList.scrollTop = 0;
+      });
       setTimeout(() => $("#versionPickerFilter").focus(), 30);
     },
 
@@ -3061,10 +4996,8 @@
     async deleteEditedInstance() {
       if (!this.editorInstanceId) return;
 
-      const deleteFiles = $("#deleteInstanceFiles").checked;
-      let message = this.t("editor.deleteConfirm");
-      if (deleteFiles) message += `\n\n${this.t("editor.deleteFilesConfirm")}`;
-      if (!window.confirm(message)) return;
+      const confirmed = await this.confirmDeleteInstance(this.editorInstanceId);
+      if (!confirmed) return;
 
       const button = $("#deleteInstanceButton");
       button.disabled = true;
@@ -3074,16 +5007,20 @@
         const result = await window.SLLApi.call(
           "delete_instance",
           this.editorInstanceId,
-          deleteFiles
+          true
         );
         if (!result?.ok) {
-          this.setEditorError(result?.error || this.t("error.generic"));
+          this.setEditorError(this.localizeMessage(result?.error || this.t("error.generic")));
           return;
         }
 
         if (result.state) this.setState(result.state);
         this.closeInstanceEditor();
-        this.toast(this.t("editor.deleted"));
+        this.toast(
+          result.files_missing
+            ? this.deleteInstanceText("instanceDelete.deletedMissing")
+            : this.deleteInstanceText("instanceDelete.deleted")
+        );
       } catch (error) {
         this.setEditorError(error?.message || String(error));
       } finally {
@@ -3115,9 +5052,11 @@
     showContextMenu(instanceId, x, y) {
       window.SLLState.contextInstanceId = instanceId;
       const menu = $("#contextMenu");
+      const cloneButton = menu.querySelector('[data-context-action="clone"]');
+      if (cloneButton) cloneButton.textContent = this.instanceToolText("instanceTools.clone");
       menu.classList.remove("hidden");
       const width = 200;
-      const height = 160;
+      const height = 198;
       menu.style.left = `${Math.min(x, window.innerWidth - width - 10)}px`;
       menu.style.top = `${Math.min(y, window.innerHeight - height - 10)}px`;
     },
@@ -3240,6 +5179,23 @@
       this.closeIconPicker();
     },
 
+    async cloneInstance(instanceId) {
+      if (!instanceId) return;
+      const result = await window.SLLApi.call("clone_instance", instanceId);
+      if (!result?.ok) {
+        this.toast(this.localizeMessage(result?.error || this.t("error.generic")), true);
+        return;
+      }
+
+      if (result.state) this.setState(result.state);
+      const name = result.cloned_instance_name || "";
+      this.toast(
+        name
+          ? this.instanceToolText("instanceTools.clonedNamed").replace("{name}", name)
+          : this.instanceToolText("instanceTools.cloned")
+      );
+    },
+
     async runContextAction(action) {
       const instanceId = window.SLLState.contextInstanceId;
       this.hideContextMenu();
@@ -3251,6 +5207,8 @@
         await window.SLLApi.call("open_instance_folder", instanceId);
       } else if (action === "window") {
         await this.openInstanceWindow(instanceId);
+      } else if (action === "clone") {
+        await this.cloneInstance(instanceId);
       } else if (action === "icon") {
         await this.openIconPicker(instanceId);
       }

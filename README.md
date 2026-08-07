@@ -1,4 +1,4 @@
-# StoneLight Launcher v0.6.70
+# StoneLight Launcher v0.6.71
 
 Unofficial AI-coded Minecraft launcher with custom instances, account management and Modrinth integration.
 
@@ -42,7 +42,7 @@ and [SECURITY.md](SECURITY.md) for details.
 
 ---
 
-# StoneLight Launcher v0.6.70
+# StoneLight Launcher v0.6.71
 
 Неофіційний Minecraft-лаунчер, створений за допомогою ШІ з підтримкою користувацьких збірок, керування акаунтами та інтеграції Modrinth.
 
