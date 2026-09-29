@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>StoneLight Launcher</title>
-  <link rel="stylesheet" href="styles/base.css?v=0.6.71">
-  <link rel="stylesheet" href="styles/themes.css?v=0.6.71">
-  <link rel="stylesheet" href="styles/layout.css?v=0.6.71">
-  <link rel="stylesheet" href="styles/animations.css?v=0.6.71">
+  <link rel="stylesheet" href="styles/base.css?v=1.0.0">
+  <link rel="stylesheet" href="styles/themes.css?v=1.0.0">
+  <link rel="stylesheet" href="styles/layout.css?v=1.0.0">
+  <link rel="stylesheet" href="styles/animations.css?v=1.0.0">
 </head>
 <body>
   <div id="app" class="app-shell">
@@ -59,7 +59,7 @@
       </nav>
 
       <div class="menu-bar__spacer"></div>
-      <span id="versionLabel" class="version-label">v0.6.71</span>
+      <span id="versionLabel" class="version-label">v1.0.0</span>
     </header>
 
     <section class="hero card card--strong" id="hero">
@@ -528,6 +528,7 @@
         <div class="instance-window__tabs" role="tablist">
           <button class="instance-window__tab is-active" type="button" data-instance-window-tab="overview" data-i18n="instanceWindow.overview">Overview</button>
           <button class="instance-window__tab" type="button" data-instance-window-tab="folders" data-i18n="instanceWindow.folders">Folders</button>
+          <button class="instance-window__tab" type="button" data-instance-window-tab="console" data-i18n="instanceWindow.console">Console</button>
           <button class="instance-window__tab" type="button" data-instance-window-tab="settings" data-i18n="instanceWindow.settings">Settings</button>
         </div>
 
@@ -547,6 +548,7 @@
               <button class="button button--danger-soft button--compact" data-instance-window-action="stop" data-i18n="actions.stop">Stop</button>
               <button class="button button--compact" data-instance-window-action="folder" data-i18n="instanceTools.folder">Instance folder</button>
               <button class="button button--compact hidden" id="curseforgeModpackReportButton" data-instance-window-action="curseforge-modpack-report" data-i18n="curseforgeModpack.report">Install report</button>
+              <button class="button button--accent-soft button--compact hidden" id="contentUpdateButton" data-instance-window-action="content-update" data-i18n="contentUpdate.open">Update content</button>
             </div>
             <div id="forgeToolsRow" class="forge-tools-row hidden">
               <button class="button button--compact" data-instance-window-action="forge-manual" data-i18n="forge.manual">Manual Forge Installer</button>
@@ -569,8 +571,25 @@
               </div>
             </div>
             <div id="folderFileList" class="mods-list"></div>
-            <pre id="instanceConsoleOutput" class="instance-console-output hidden" tabindex="0" aria-label="Instance console"></pre>
             <div id="folderFileEmpty" class="form-note hidden" data-i18n="instanceWindow.emptyFolder">Folder is empty.</div>
+          </section>
+
+          <section class="instance-window__panel instance-window__panel--console" data-instance-window-panel="console">
+            <div class="folder-panel-toolbar console-panel-toolbar">
+              <div>
+                <strong id="instanceConsoleTitle" data-i18n="instanceWindow.console">Console</strong>
+              </div>
+              <div class="mods-toolbar__actions">
+                <button class="button button--compact" id="clearInstanceConsoleButton" type="button" data-i18n="console.clear">Clear console</button>
+                <button class="button button--compact" id="openInstanceLogsFolderButton" type="button" data-i18n="console.openLogs">Open logs folder</button>
+                <button class="button button--accent-soft button--compact" id="uploadLatestLogButton" type="button" data-i18n="console.uploadLatest">Upload latest.log</button>
+              </div>
+            </div>
+            <div id="mclogsLinkRow" class="mclogs-link-row hidden">
+              <input id="mclogsLinkInput" class="text-input mclogs-link-input" type="text" readonly value="" aria-label="mclo.gs link">
+              <button class="button button--compact" id="copyMclogsLinkButton" type="button" data-i18n="console.copyLink">Copy link</button>
+            </div>
+            <div id="instanceConsoleOutput" class="instance-console-output" tabindex="0" aria-label="Instance console"></div>
           </section>
 
           <section class="instance-window__panel" data-instance-window-panel="settings">
@@ -643,6 +662,70 @@
       </section>
     </div>
 
+
+    <div id="contentUpdateBackdrop" class="modal-backdrop hidden" aria-hidden="true">
+      <section id="contentUpdateDialog" class="modal-card content-update-dialog" role="dialog" aria-modal="true" aria-labelledby="contentUpdateTitle">
+        <header class="modal-card__header">
+          <div>
+            <div class="eyebrow" data-i18n="contentUpdate.eyebrow">Content updates</div>
+            <h2 id="contentUpdateTitle" data-i18n="contentUpdate.title">Content update</h2>
+            <p id="contentUpdateSubtitle" class="modal-subtitle"></p>
+          </div>
+          <button id="contentUpdateClose" class="icon-button" type="button" aria-label="Close">×</button>
+        </header>
+
+        <div class="content-update-body">
+          <div class="content-update-options">
+            <fieldset class="content-update-fieldset">
+              <legend data-i18n="contentUpdate.whatToUpdate">What to update</legend>
+              <label class="check-row"><input type="checkbox" data-content-update-folder="mods" checked><span data-i18n="folder.mods">mods</span></label>
+              <label class="check-row"><input type="checkbox" data-content-update-folder="resourcepacks" checked><span data-i18n="folder.resourcepacks">resourcepacks</span></label>
+              <label class="check-row"><input type="checkbox" data-content-update-folder="shaderpacks" checked><span data-i18n="folder.shaderpacks">shaderpacks</span></label>
+            </fieldset>
+
+            <div class="content-update-target">
+              <label class="form-field">
+                <span data-i18n="contentUpdate.targetMinecraft">Target Minecraft version</span>
+                <div class="input-action-row">
+                  <input id="contentUpdateMinecraftInput" class="text-input" type="text" maxlength="40" autocomplete="off">
+                  <button id="contentUpdateLoadMinecraftVersionsButton" class="icon-button input-action-row__button" type="button" data-i18n-title="editor.loadVersions" title="Load versions">↻</button>
+                  <button id="contentUpdateResetMinecraftButton" class="icon-button input-action-row__button" type="button" data-i18n-title="contentUpdate.resetTarget" title="Reset target version">↺</button>
+                </div>
+                <small id="contentUpdateMinecraftVersionsNote" class="form-help"></small>
+              </label>
+              <label class="form-field">
+                <span data-i18n="contentUpdate.targetLoader">Mod loader</span>
+                <select id="contentUpdateLoaderSelect" class="select">
+                  <option value="vanilla">Vanilla</option>
+                  <option value="fabric">Fabric</option>
+                  <option value="forge">Forge</option>
+                  <option value="quilt">Quilt</option>
+                  <option value="neoforge">NeoForge</option>
+                </select>
+              </label>
+              <label class="form-field content-update-loader-version-field">
+                <span data-i18n="contentUpdate.targetLoaderVersion">Loader version</span>
+                <div class="input-action-row">
+                  <input id="contentUpdateLoaderVersionInput" class="text-input" type="text" maxlength="80" autocomplete="off">
+                  <button id="contentUpdateLoadLoaderVersionsButton" class="icon-button input-action-row__button" type="button" data-i18n-title="editor.loadVersions" title="Load versions">↻</button>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div class="content-update-summary" id="contentUpdateSummary"></div>
+          <div class="content-update-list" id="contentUpdateList"></div>
+        </div>
+
+        <footer class="modal-card__footer content-update-footer">
+          <button id="contentUpdateRefresh" class="button button--compact" type="button" data-i18n="contentUpdate.refreshInventory">Refresh inventory</button>
+          <span class="modal-card__footer-spacer"></span>
+          <button id="contentUpdateFind" class="button button--primary button--compact" type="button" data-i18n="contentUpdate.findUpdates">Find updates</button>
+          <button id="contentUpdateApply" class="button button--accent-soft button--compact hidden" type="button" data-i18n="contentUpdate.applyUpdates">Apply updates</button>
+          <button id="contentUpdateCancel" class="button button--compact button--secondary-inline" type="button" data-i18n="editor.cancel">Cancel</button>
+        </footer>
+      </section>
+    </div>
 
 
     <div id="updateCenterBackdrop" class="modal-backdrop hidden" aria-hidden="true">
@@ -963,9 +1046,9 @@
     <div id="toastHost" class="toast-host" aria-live="polite"></div>
   </div>
 
-  <script src="scripts/i18n.js?v=0.6.71-cf2"></script>
-  <script src="scripts/state.js?v=0.6.71"></script>
-  <script src="scripts/api.js?v=0.6.71"></script>
-  <script src="scripts/app.js?v=0.6.71-cf2"></script>
+  <script src="scripts/i18n.js?v=1.0.0-cf2"></script>
+  <script src="scripts/state.js?v=1.0.0"></script>
+  <script src="scripts/api.js?v=1.0.0"></script>
+  <script src="scripts/app.js?v=1.0.0-cf2"></script>
 </body>
 </html>

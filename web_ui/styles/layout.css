@@ -1495,7 +1495,7 @@
 }
 
 
-/* v0.6.71: keep the instance window stable and avoid whole-window scroll jitter. */
+/* v1.0.0: keep the instance window stable and avoid whole-window scroll jitter. */
 .instance-window {
   max-height: min(860px, calc(100vh - 38px));
   overflow: hidden;
@@ -1555,7 +1555,7 @@
 }
 
 
-/* v0.6.71: fixed folder-preview scrolling. */
+/* v1.0.0: fixed folder-preview scrolling. */
 .instance-window__body {
   min-height: 0;
   flex: 1 1 auto;
@@ -1643,7 +1643,7 @@
 }
 
 
-/* v0.6.71: stronger file-list scroll containment. */
+/* v1.0.0: stronger file-list scroll containment. */
 .instance-window {
   height: min(860px, calc(100vh - 38px));
   max-height: calc(100vh - 38px);
@@ -1724,7 +1724,7 @@
 }
 
 
-/* v0.6.71: compact instance-window controls and fixed screenshot scrolling. */
+/* v1.0.0: compact instance-window controls and fixed screenshot scrolling. */
 .instance-window__panel[data-instance-window-panel="overview"].is-active {
   align-content: start;
 }
@@ -1871,7 +1871,7 @@
 }
 
 
-/* v0.6.71: compact cards, embedded settings pickers and folder-overlap fix. */
+/* v1.0.0: compact cards, embedded settings pickers and folder-overlap fix. */
 .instance-window__summary {
   gap: 8px;
   grid-auto-rows: minmax(70px, auto);
@@ -2010,7 +2010,7 @@
 }
 
 
-/* v0.6.71: folder subtab height, toolbar overlap and settings footer hotfix. */
+/* v1.0.0: folder subtab height, toolbar overlap and settings footer hotfix. */
 .instance-window__panel[data-instance-window-panel="folders"].is-active {
   display: grid;
   grid-template-rows: 40px 58px minmax(0, 1fr);
@@ -2196,7 +2196,7 @@
 }
 
 
-/* v0.6.71: logs subtab is a selectable console, not a folder file list. */
+/* v1.0.0: instance console output. */
 .instance-console-output {
   grid-area: files;
   min-height: 0;
@@ -2229,7 +2229,7 @@
 }
 
 
-/* v0.6.71: official instance update notice. */
+/* v1.0.0: official instance update notice. */
 .button--accent-soft {
   color: var(--accent-text);
   background: color-mix(in srgb, var(--accent) 72%, var(--button));
@@ -2282,7 +2282,7 @@
 }
 
 
-/* v0.6.71: Crafthead account avatars. */
+/* v1.0.0: Crafthead account avatars. */
 .account-avatar {
   overflow: hidden;
   padding: 0;
@@ -2303,7 +2303,7 @@
 }
 
 
-/* v0.6.71: global launch settings dialog. */
+/* v1.0.0: global launch settings dialog. */
 .launch-settings-dialog {
   width: min(760px, 100%);
 }
@@ -2342,7 +2342,7 @@
 }
 
 
-/* v0.6.71: update center modal. */
+/* v1.0.0: update center modal. */
 .update-center-dialog {
   width: min(780px, 100%);
 }
@@ -2450,7 +2450,7 @@
 }
 
 
-/* v0.6.71: align fields in the create/edit instance dialog. */
+/* v1.0.0: align fields in the create/edit instance dialog. */
 .instance-form--editor {
   gap: 14px 14px;
   align-items: start;
@@ -2544,7 +2544,7 @@
 }
 
 
-/* v0.6.71: align fields in the instance-window Settings tab. */
+/* v1.0.0: align fields in the instance-window Settings tab. */
 #instanceWindowSettingsForm.instance-form--embedded {
   gap: 14px 14px;
   align-items: start;
@@ -2633,7 +2633,7 @@
 }
 
 
-/* v0.6.71: instance icon pack and picker. */
+/* v1.0.0: instance icon pack and picker. */
 .instance-tile__icon--image {
   overflow: hidden;
   padding: 0;
@@ -2782,7 +2782,7 @@
 }
 
 
-/* v0.6.71: site-inspired depth, glass and gradient polish for launcher themes. */
+/* v1.0.0: site-inspired depth, glass and gradient polish for launcher themes. */
 .menu-bar {
   backdrop-filter: blur(16px);
 }
@@ -2881,7 +2881,7 @@ textarea,
 }
 
 
-/* v0.6.71: make StoneLight site-inspired Light/Dark visibly affect primary UI. */
+/* v1.0.0: make StoneLight site-inspired Light/Dark visibly affect primary UI. */
 html[data-theme="dark"] .app-shell,
 html[data-theme="light"] .app-shell {
   background:
@@ -3002,7 +3002,7 @@ html[data-theme="light"] .status-progress__fill {
 }
 
 
-/* v0.6.71: depth polish for Laconic, Laconic Light, Neon and Retro Future. */
+/* v1.0.0: depth polish for Laconic, Laconic Light, Neon and Retro Future. */
 html[data-theme="laconic"] .hero.card--strong,
 html[data-theme="laconic_light"] .hero.card--strong,
 html[data-theme="neon"] .hero.card--strong,
@@ -3182,7 +3182,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.71: Modrinth catalog stage 1. */
+/* v1.0.0: Modrinth catalog stage 1. */
 .catalog-panel {
   min-height: 100%;
   display: grid;
@@ -3416,7 +3416,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.71: keep normal folder rows compact when there are only a few files.
+/* v1.0.0: keep normal folder rows compact when there are only a few files.
    Applies to mods/resourcepacks/shaderpacks/config/saves only; screenshots/logs keep their own layouts. */
 #folderFileList[data-folder-key="mods"]:not(.screenshot-grid),
 #folderFileList[data-folder-key="resourcepacks"]:not(.screenshot-grid),
@@ -3458,7 +3458,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.71: make instance icons closer to Modrinth project icon scale. */
+/* v1.0.0: make instance icons closer to Modrinth project icon scale. */
 .instance-tile {
   min-height: 168px;
 }
@@ -3496,7 +3496,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.71: Modrinth result card height and clickable title polish. */
+/* v1.0.0: Modrinth result card height and clickable title polish. */
 .catalog-results {
   align-content: start;
   align-items: start;
@@ -3548,7 +3548,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.71: equalize Modrinth result cards without stretching rows to empty space.
+/* v1.0.0: equalize Modrinth result cards without stretching rows to empty space.
    Rows stay compact, but all cards inside a row keep the same visual height. */
 .catalog-results {
   align-content: start;
@@ -3582,7 +3582,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.71: Modrinth filter panel. */
+/* v1.0.0: Modrinth filter panel. */
 .catalog-filters {
   display: grid;
   gap: 12px;
@@ -3684,7 +3684,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.71: Modrinth version/snapshot filter polish. */
+/* v1.0.0: Modrinth version/snapshot filter polish. */
 .catalog-filters__actions {
   display: flex;
   flex-wrap: wrap;
@@ -3721,7 +3721,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.71: Modrinth search pagination. */
+/* v1.0.0: Modrinth search pagination. */
 .catalog-pagination {
   display: flex;
   justify-content: space-between;
@@ -3799,7 +3799,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.71: CurseForge catalog stage 1. */
+/* v1.0.0: CurseForge catalog stage 1. */
 .catalog-api-key {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 520px);
@@ -3845,7 +3845,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.71: Modrinth modpack update notice in instance window. */
+/* v1.0.0: Modrinth modpack update notice in instance window. */
 .modrinth-modpack-update {
   border-color: color-mix(in srgb, var(--accent) 28%, var(--line));
   background:
@@ -3854,7 +3854,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.71: refreshed top menu and About dialog. */
+/* v1.0.0: refreshed top menu and About dialog. */
 .about-dialog {
   width: min(860px, 100%);
 }
@@ -3929,10 +3929,10 @@ html[data-theme="laconic_light"] .tab.is-active {
   }
 }
 
-/* v0.6.71 about dialog hotfix: wider dialog and multi-line status cards. */
+/* v1.0.0 about dialog hotfix: wider dialog and multi-line status cards. */
 
 
-/* v0.6.71: compact hero without tagline. */
+/* v1.0.0: compact hero without tagline. */
 .hero__copy {
   align-self: center;
   display: grid;
@@ -3958,7 +3958,7 @@ html[data-theme="laconic_light"] .tab.is-active {
 }
 
 
-/* v0.6.71: subtle update-available indicator. */
+/* v1.0.0: subtle update-available indicator. */
 [data-action="check_updates"],
 [data-command="check-updates"] {
   position: relative;
@@ -4227,4 +4227,781 @@ body,
 .app-shell {
   min-width: 1180px;
   min-height: 760px;
+}
+
+
+/* Stage 12: dedicated per-instance console tab. */
+.instance-window__panel--console {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.console-panel-toolbar {
+  grid-area: auto;
+}
+
+.instance-console-output {
+  display: block;
+}
+
+.console-line {
+  padding: 1px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.console-line__source {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgb(255 255 255 / 7%);
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.console-line--empty {
+  color: var(--muted);
+}
+
+.console-line--error {
+  color: #ff9f9f;
+}
+
+.console-line--warn {
+  color: #ffd27a;
+}
+
+
+
+
+/* Stage 12.1: console layout polish. */
+.instance-window__panel--console.is-active {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  min-height: 0;
+}
+
+.console-panel-toolbar {
+  width: 100%;
+  min-width: 0;
+  grid-area: auto;
+}
+
+.console-panel-toolbar .mods-toolbar__actions {
+  flex-wrap: wrap;
+}
+
+.instance-window__panel--console .instance-console-output {
+  grid-area: auto;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  justify-self: stretch;
+  align-self: stretch;
+}
+
+
+/* Stage 12.2: mclo.gs upload link row. */
+.mclogs-link-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.mclogs-link-input {
+  width: 100%;
+  min-width: 0;
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .mclogs-link-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Stage 12.3: keep console toolbar actions inside the modal. */
+.instance-window__panel--console.is-active {
+  grid-template-rows: auto auto minmax(0, 1fr);
+  align-content: stretch;
+}
+
+.console-panel-toolbar {
+  min-height: auto;
+  height: auto;
+  overflow: visible;
+  align-items: start;
+}
+
+.console-panel-toolbar .mods-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.console-panel-toolbar .mods-toolbar__actions .button {
+  width: auto;
+  min-width: 112px;
+  max-width: 210px;
+  flex: 0 1 auto;
+  white-space: normal;
+}
+
+@media (max-width: 900px) {
+  .console-panel-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .console-panel-toolbar .mods-toolbar__actions {
+    justify-content: stretch;
+  }
+
+  .console-panel-toolbar .mods-toolbar__actions .button {
+    flex: 1 1 150px;
+    max-width: none;
+  }
+}
+
+
+/* Stage 12.4: stable console toolbar layout. */
+.instance-window__panel--console.is-active {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  min-height: 0;
+}
+
+.console-panel-toolbar.folder-panel-toolbar,
+.console-panel-toolbar {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.console-panel-toolbar > div:first-child {
+  min-width: 0;
+}
+
+.console-panel-toolbar .mods-toolbar__actions {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  justify-content: stretch;
+  align-items: stretch;
+}
+
+.console-panel-toolbar .mods-toolbar__actions .button {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  height: auto;
+  min-height: 36px;
+  white-space: normal;
+  line-height: 1.15;
+}
+
+@media (max-width: 860px) {
+  .console-panel-toolbar .mods-toolbar__actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mclogs-link-row {
+  width: 100%;
+  min-width: 0;
+}
+
+
+/* Stage 12.5: minor console button alignment polish. */
+.console-panel-toolbar .mods-toolbar__actions .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding-inline: 12px;
+}
+
+.console-panel-toolbar .mods-toolbar__actions {
+  align-items: stretch;
+}
+
+
+/* Stage 12.7: console buttons vertical centering polish. */
+.console-panel-toolbar.folder-panel-toolbar,
+.console-panel-toolbar {
+  grid-template-columns: minmax(110px, auto) minmax(0, 1fr) !important;
+  align-items: center !important;
+  padding-block: 8px;
+  gap: 12px;
+}
+
+.console-panel-toolbar .mods-toolbar__actions {
+  align-items: center !important;
+}
+
+.console-panel-toolbar .mods-toolbar__actions .button {
+  min-height: 34px;
+  padding-block: 0;
+}
+
+@media (max-width: 860px) {
+  .console-panel-toolbar.folder-panel-toolbar,
+  .console-panel-toolbar {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+
+/* Stage 13.0: custom content update inventory dialog. */
+.content-update-dialog {
+  width: min(1040px, calc(100vw - 42px));
+  max-height: calc(100vh - 42px);
+}
+
+.content-update-body {
+  padding: 14px 20px 0;
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+}
+
+.content-update-options {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.7fr) minmax(320px, 1.3fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.content-update-fieldset {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: var(--input);
+}
+
+.content-update-fieldset legend {
+  padding: 0 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.content-update-target {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.content-update-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.content-update-stat {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--input);
+  display: grid;
+  gap: 4px;
+}
+
+.content-update-stat span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.content-update-stat strong {
+  font-size: 18px;
+}
+
+.content-update-list {
+  max-height: min(420px, calc(100vh - 410px));
+  overflow: auto;
+  display: grid;
+  gap: 8px;
+  padding-right: 2px;
+  scrollbar-width: thin;
+}
+
+.content-update-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(150px, auto);
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--input);
+}
+
+.content-update-row__check {
+  display: grid;
+  place-items: center;
+}
+
+.content-update-row__body {
+  min-width: 0;
+}
+
+.content-update-row__title {
+  font-weight: 850;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.content-update-row__meta {
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.content-update-row__source {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  min-width: 0;
+}
+
+.content-update-row__source small {
+  color: var(--muted);
+  font-size: 11px;
+  text-align: right;
+}
+
+.content-source-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 850;
+  background: var(--button);
+}
+
+.content-source-badge--modrinth {
+  border-color: color-mix(in srgb, #19c37d 45%, var(--line));
+}
+
+.content-source-badge--curseforge {
+  border-color: color-mix(in srgb, #f16436 55%, var(--line));
+}
+
+.content-source-badge--unknown {
+  color: var(--muted);
+}
+
+.content-update-footer {
+  padding-top: 12px;
+}
+
+@media (max-width: 780px) {
+  .content-update-options,
+  .content-update-target,
+  .content-update-summary,
+  .content-update-row {
+    grid-template-columns: 1fr;
+  }
+
+  .content-update-row__source {
+    justify-items: start;
+  }
+}
+
+
+/* Stage 13.1: content update preview statuses. */
+.content-update-summary {
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+}
+
+.content-update-row__update {
+  color: var(--text);
+}
+
+.content-update-row__reason {
+  color: var(--muted);
+}
+
+.content-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 23px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 11px;
+  font-weight: 850;
+  background: var(--button);
+  text-align: center;
+}
+
+.content-status-badge--update_available {
+  border-color: color-mix(in srgb, var(--accent) 65%, var(--line));
+  background: color-mix(in srgb, var(--accent) 18%, var(--button));
+}
+
+.content-status-badge--up_to_date {
+  color: var(--muted);
+}
+
+.content-status-badge--manual_required,
+.content-status-badge--modified {
+  border-color: color-mix(in srgb, #ffb347 65%, var(--line));
+}
+
+.content-status-badge--error {
+  border-color: color-mix(in srgb, #ff6b6b 65%, var(--line));
+}
+
+
+/* Stage 13.2: content update footer button sizing. */
+.content-update-footer {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.9fr) minmax(150px, 1.2fr) minmax(150px, 1.2fr) minmax(96px, 0.7fr);
+  gap: 8px;
+  align-items: center;
+  padding: 10px 20px;
+}
+
+.content-update-footer .modal-card__footer-spacer {
+  display: none;
+}
+
+.content-update-footer .button {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 13px;
+  line-height: 1.1;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+@media (max-width: 820px) {
+  .content-update-footer {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .content-update-footer {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Stage 13.4: target Minecraft migration preview. */
+.content-status-badge--incompatible {
+  border-color: color-mix(in srgb, #ff6b6b 55%, var(--line));
+  background: color-mix(in srgb, #ff6b6b 13%, var(--button));
+}
+
+.content-update-row--incompatible {
+  border-color: color-mix(in srgb, #ff6b6b 35%, var(--line));
+}
+
+.content-update-target .input-action-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px;
+  gap: 8px;
+  align-items: center;
+}
+
+.content-update-target .input-action-row .icon-button {
+  height: 38px;
+  min-height: 38px;
+}
+
+
+/* Stage 13.5: migration target picker controls. */
+.content-update-target {
+  grid-template-columns: minmax(220px, 1.1fr) minmax(160px, 0.8fr) minmax(220px, 1fr);
+}
+
+.content-update-target .input-action-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px;
+  gap: 8px;
+  align-items: center;
+}
+
+.content-update-target .form-field:first-child .input-action-row {
+  grid-template-columns: minmax(0, 1fr) 38px 38px;
+}
+
+.content-update-target .input-action-row .icon-button {
+  height: 38px;
+  min-height: 38px;
+}
+
+@media (max-width: 900px) {
+  .content-update-target {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Stage 13.5.1: content update UX polish. */
+#contentUpdateStatus {
+  display: none !important;
+}
+
+.content-update-options {
+  align-items: stretch;
+  gap: 14px;
+}
+
+.content-update-target {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.1fr) minmax(170px, 0.72fr) minmax(240px, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.content-update-target .form-field {
+  display: grid;
+  grid-template-rows: 20px 38px 18px;
+  gap: 6px;
+  margin: 0;
+  min-width: 0;
+}
+
+.content-update-target .form-field > span {
+  display: flex;
+  align-items: center;
+  min-height: 20px;
+  line-height: 1.15;
+}
+
+.content-update-target .text-input,
+.content-update-target .select {
+  height: 38px;
+  min-height: 38px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.content-update-target .input-action-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.content-update-target .form-field:first-child .input-action-row {
+  grid-template-columns: minmax(0, 1fr) 38px 38px;
+}
+
+.content-update-target .input-action-row .icon-button {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  align-self: stretch;
+}
+
+.content-update-target .form-help {
+  min-height: 18px;
+  line-height: 1.25;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.content-update-dialog .content-update-body {
+  gap: 14px;
+}
+
+@media (max-width: 980px) {
+  .content-update-options,
+  .content-update-target {
+    grid-template-columns: 1fr;
+  }
+
+  .content-update-target .form-field {
+    grid-template-rows: auto 38px auto;
+  }
+}
+
+
+/* Stage 13.5.2: selectable content update rows and loader-version dropdown. */
+.content-update-target #contentUpdateLoaderVersionSelect {
+  min-width: 0;
+}
+
+.content-update-row__check input {
+  cursor: pointer;
+}
+
+.content-update-row--excluded {
+  opacity: 0.66;
+}
+
+.content-status-badge--excluded {
+  color: var(--muted);
+  border-color: var(--line);
+  background: color-mix(in srgb, var(--button) 70%, transparent);
+}
+
+
+/* Stage 13.5.3: loader version uses the shared Version Picker again. */
+.content-update-target .content-update-loader-version-field {
+  grid-template-rows: 20px 38px;
+}
+
+.content-update-target .content-update-loader-version-field .input-action-row {
+  grid-template-columns: minmax(0, 1fr) 38px;
+}
+
+.content-update-target #contentUpdateLoaderVersionInput:disabled {
+  opacity: 0.72;
+}
+
+
+/* Stage 13.5.4: keep Content Update target controls inside the modal. */
+.content-update-dialog {
+  overflow: hidden;
+}
+
+.content-update-body,
+.content-update-options,
+.content-update-target,
+.content-update-list,
+.content-update-row,
+.content-update-row__body {
+  min-width: 0;
+}
+
+.content-update-options {
+  display: grid;
+  grid-template-columns: minmax(185px, 0.42fr) minmax(0, 1.58fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.content-update-category--folders {
+  min-width: 0;
+}
+
+.content-update-category--folders label {
+  white-space: nowrap;
+}
+
+.content-update-target {
+  display: grid;
+  grid-template-columns:
+    minmax(145px, 0.95fr)
+    minmax(130px, 0.72fr)
+    minmax(145px, 0.95fr);
+  gap: 10px;
+  align-items: start;
+  min-width: 0;
+}
+
+.content-update-target .form-field {
+  min-width: 0;
+}
+
+.content-update-target .input-action-row {
+  min-width: 0;
+  gap: 6px;
+}
+
+.content-update-target .form-field:first-child .input-action-row {
+  grid-template-columns: minmax(0, 1fr) 34px 34px;
+}
+
+.content-update-target .content-update-loader-version-field .input-action-row {
+  grid-template-columns: minmax(0, 1fr) 34px;
+}
+
+.content-update-target .input-action-row .icon-button {
+  width: 34px;
+  min-width: 34px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0;
+}
+
+.content-update-target .text-input,
+.content-update-target .select {
+  min-width: 0;
+}
+
+.content-update-list {
+  overflow-x: hidden;
+}
+
+.content-update-row {
+  grid-template-columns: auto minmax(0, 1fr) minmax(118px, auto);
+}
+
+.content-update-row__source {
+  max-width: 132px;
+}
+
+.content-source-badge,
+.content-status-badge {
+  max-width: 132px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 980px) {
+  .content-update-options,
+  .content-update-target {
+    grid-template-columns: 1fr;
+  }
+
+  .content-update-target .form-field:first-child .input-action-row {
+    grid-template-columns: minmax(0, 1fr) 38px 38px;
+  }
+
+  .content-update-target .content-update-loader-version-field .input-action-row {
+    grid-template-columns: minmax(0, 1fr) 38px;
+  }
+
+  .content-update-target .input-action-row .icon-button {
+    width: 38px;
+    min-width: 38px;
+  }
 }

@@ -1,4 +1,4 @@
-# StoneLight Launcher v0.6.71
+# StoneLight Launcher v1.0.0
 
 Unofficial AI-coded Minecraft launcher with custom instances, account management and Modrinth integration.
 

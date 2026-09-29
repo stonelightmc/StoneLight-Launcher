@@ -19,6 +19,12 @@ BROWSER_FALLBACK_IDLE_TIMEOUT = 180
 BROWSER_FALLBACK_METHODS = {
     "get_app_state",
     "get_instance_window_data",
+    "get_content_update_inventory",
+    "check_content_updates",
+    "apply_content_updates",
+    "get_instance_console_history",
+    "clear_instance_console_history",
+    "upload_instance_latest_log",
     "open_instance_subfolder",
     "list_instance_folder",
     "set_folder_file_enabled",
@@ -245,7 +251,7 @@ def _serve_browser_fallback(root: Path, config: dict, reason: str = "") -> int:
     api.bind_window(bridge_window)
 
     class Handler(BaseHTTPRequestHandler):
-        server_version = "StoneLightLauncherBrowserFallback/0.6.71"
+        server_version = "StoneLightLauncherBrowserFallback/1.0.0"
 
         def log_message(self, format, *args):
             return
@@ -334,7 +340,7 @@ def _serve_browser_fallback(root: Path, config: dict, reason: str = "") -> int:
 
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     port = int(httpd.server_address[1])
-    url = f"http://127.0.0.1:{port}/web_ui/index.html?v={config.get('launcher_version', '0.6.71')}&transport=browser#desktop=1"
+    url = f"http://127.0.0.1:{port}/web_ui/index.html?v={config.get('launcher_version', '1.0.0')}&transport=browser#desktop=1"
 
     api._append_startup_log(f"Browser fallback started at {url}")
     if reason:
@@ -389,11 +395,11 @@ def _run_webview(root: Path, config: dict, icon_path: Path | None) -> None:
     # Serve the trusted local UI through pywebview's internal HTTP server.
     # Relative URLs are the supported path for static assets and the JS bridge.
     os.chdir(root)
-    desktop_url = f"web_ui/index.html?v={config.get('launcher_version', '0.6.71')}-cf-stage2&transport=webview#desktop=1"
+    desktop_url = f"web_ui/index.html?v={config.get('launcher_version', '1.0.0')}-cf-stage2&transport=webview#desktop=1"
 
     api = LauncherWebAPI()
     window_kwargs = {
-        "title": f"StoneLight Launcher v{config.get('launcher_version', '0.6.71')}",
+        "title": f"StoneLight Launcher v{config.get('launcher_version', '1.0.0')}",
         "url": desktop_url,
         "width": max(int(config.get("web_ui_width", 1280)), _webview_min_size(config)[0]),
         "height": max(int(config.get("web_ui_height", 800)), _webview_min_size(config)[1]),
@@ -429,7 +435,7 @@ def _run_webview(root: Path, config: dict, icon_path: Path | None) -> None:
         debug="--debug-web" in sys.argv,
         private_mode=False,
         http_server=True,
-        storage_path=str(root / "data" / "webview" / "0_6_71"),
+        storage_path=str(root / "data" / "webview" / "1_0_0"),
     )
 
 

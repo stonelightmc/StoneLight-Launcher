@@ -47,7 +47,11 @@ from instances import (
 from launcher_core import (
     LauncherCore,
     RUNNING_GAME_LOCK,
+    append_launcher_log,
+    ensure_utf8_sig_log_file,
     RUNNING_GAME_PROCESSES,
+    clear_console_history,
+    get_console_history,
     get_console_key_for_instance,
     get_loader_versions,
     get_minecraft_versions,
@@ -91,6 +95,17 @@ TOGGLEABLE_FOLDER_SUFFIXES = {
 }
 
 SCREENSHOT_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
+
+CONTENT_UPDATE_FOLDERS = {
+    "mods": {"label": "Mods", "project_type": "mod", "active_suffix": ".jar", "disabled_suffix": ".jar.disabled"},
+    "resourcepacks": {"label": "Resource packs", "project_type": "resourcepack", "active_suffix": ".zip", "disabled_suffix": ".zip.disabled"},
+    "shaderpacks": {"label": "Shaders", "project_type": "shader", "active_suffix": ".zip", "disabled_suffix": ".zip.disabled"},
+}
+
+
+MCLOGS_API_URL = "https://api.mclo.gs/1/log"
+MCLOGS_MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+MCLOGS_MAX_UPLOAD_LINES = 25000
 
 MODRINTH_PROJECT_TYPES = {"mod", "resourcepack", "shader", "modpack"}
 MODRINTH_REQUIRED_DEPENDENCY_TYPE = "required"
@@ -562,12 +577,7 @@ class LauncherWebAPI:
         self._append_startup_log("Web runtime state initialized.")
 
     def _append_startup_log(self, message: str):
-        try:
-            LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-            with LOG_PATH.open("a", encoding="utf-8") as handle:
-                handle.write(f"[web-ui] {message}\n")
-        except Exception:
-            pass
+        append_launcher_log(message, category="web-ui", root=ROOT)
 
     # ------------------------------------------------------------------
     # State loading
@@ -5444,7 +5454,7 @@ class LauncherWebAPI:
         return {
             "launcher": {
                 "name": self.config.get("launcher_name", "StoneLight Launcher"),
-                "version": self.config.get("launcher_version", "0.6.71"),
+                "version": self.config.get("launcher_version", "1.0.0"),
                 "github_url": self.config.get("github_url", "https://github.com/stonelightmc/StoneLight-Launcher"),
                 "bug_report_url": self.config.get("bug_report_url", "https://github.com/stonelightmc/StoneLight-Launcher/issues"),
                 "community_site_url": self.config.get("community_site_url", "https://stonelightmc.github.io"),
@@ -6145,6 +6155,1244 @@ class LauncherWebAPI:
         report = self._curseforge_modpack_install_report(instance)
         return {"ok": True, "report": report}
 
+    def _console_payload(self, instance: dict, message: str, source: str = "game") -> dict:
+        console_key = get_console_key_for_instance(instance)
+        return {
+            "instance_id": instance.get("id", ""),
+            "instance_name": instance.get("name", ""),
+            "console_key": console_key,
+            "source": source,
+            "message": str(message or ""),
+            "timestamp": int(time.time()),
+        }
+
+    def get_instance_console_history(self, instance_id: str = "", limit: int = 700) -> dict:
+        instance = self._instance_by_id_or_selected(instance_id)
+        if not instance:
+            return {
+                "ok": False,
+                "error": "Сборка не выбрана.",
+                "instance_id": "",
+                "console_key": "",
+                "lines": [],
+            }
+
+        try:
+            limit = max(100, min(int(limit or 700), 2000))
+        except Exception:
+            limit = 700
+
+        console_key = get_console_key_for_instance(instance)
+        lines = get_console_history(console_key, limit=limit)
+        return {
+            "ok": True,
+            "instance_id": instance.get("id", ""),
+            "instance_name": instance.get("name", ""),
+            "console_key": console_key,
+            "lines": lines,
+            "count": len(lines),
+        }
+
+    def clear_instance_console_history(self, instance_id: str = "") -> dict:
+        instance = self._instance_by_id_or_selected(instance_id)
+        if not instance:
+            return {"ok": False, "error": "Сборка не выбрана."}
+
+        console_key = get_console_key_for_instance(instance)
+        clear_console_history(console_key)
+        return {
+            "ok": True,
+            "instance_id": instance.get("id", ""),
+            "console_key": console_key,
+            "lines": [],
+            "count": 0,
+        }
+
+    def _read_latest_log_for_upload(self, instance: dict) -> tuple[Path, str, bool, str]:
+        log_path = self._instance_subfolder(instance, "logs") / "latest.log"
+        if not log_path.exists() or not log_path.is_file():
+            raise FileNotFoundError("latest.log не найден. Запустите сборку хотя бы один раз.")
+
+        raw = log_path.read_bytes()
+        truncated = False
+        note = ""
+
+        if len(raw) > MCLOGS_MAX_UPLOAD_BYTES:
+            raw = raw[-MCLOGS_MAX_UPLOAD_BYTES:]
+            truncated = True
+            note = "Лог был обрезан до последних 10 MiB перед отправкой."
+
+        text = raw.decode("utf-8", errors="replace")
+        lines = text.splitlines()
+        if len(lines) > MCLOGS_MAX_UPLOAD_LINES:
+            lines = lines[-MCLOGS_MAX_UPLOAD_LINES:]
+            text = "\n".join(lines)
+            truncated = True
+            note = "Лог был обрезан до последних 25 000 строк перед отправкой."
+
+        if not text.strip():
+            raise ValueError("latest.log пустой.")
+
+        return log_path, text, truncated, note
+
+    def upload_instance_latest_log(self, instance_id: str = "") -> dict:
+        instance = self._instance_by_id_or_selected(instance_id)
+        if not instance:
+            return {"ok": False, "error": "Сборка не выбрана."}
+
+        try:
+            log_path, content, truncated, note = self._read_latest_log_for_upload(instance)
+
+            payload = {
+                "content": content,
+                "source": "StoneLight Launcher",
+                "metadata": [
+                    {
+                        "key": "instance_name",
+                        "label": "Instance",
+                        "value": instance.get("name", ""),
+                        "visible": True,
+                    },
+                    {
+                        "key": "minecraft_version",
+                        "label": "Minecraft",
+                        "value": instance.get("minecraft_version", ""),
+                        "visible": True,
+                    },
+                    {
+                        "key": "loader",
+                        "label": "Loader",
+                        "value": instance.get("loader", ""),
+                        "visible": True,
+                    },
+                    {
+                        "key": "launcher_version",
+                        "label": "Launcher",
+                        "value": self.config.get("launcher_version", ""),
+                        "visible": True,
+                    },
+                ],
+            }
+
+            body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            request = urllib.request.Request(
+                MCLOGS_API_URL,
+                data=body,
+                headers={
+                    "Content-Type": "application/json; charset=utf-8",
+                    "Accept": "application/json",
+                    "User-Agent": "StoneLight-Launcher",
+                },
+                method="POST",
+            )
+
+            with urllib.request.urlopen(request, timeout=35) as response:
+                response_body = response.read().decode("utf-8", errors="replace")
+
+            try:
+                data = json.loads(response_body)
+            except Exception:
+                data = {}
+
+            if not data.get("success"):
+                error = data.get("error") or response_body or "mclo.gs вернул ошибку."
+                return {"ok": False, "error": str(error)}
+
+            url = data.get("url") or ""
+            if not url:
+                log_id = data.get("id") or ""
+                url = f"https://mclo.gs/{log_id}" if log_id else ""
+
+            return {
+                "ok": True,
+                "url": url,
+                "raw": data.get("raw", ""),
+                "id": data.get("id", ""),
+                "source_file": str(log_path),
+                "truncated": truncated,
+                "message": note or "latest.log отправлен на mclo.gs.",
+            }
+        except Exception as exc:
+            return {
+                "ok": False,
+                "error": str(exc),
+                "details": traceback.format_exc(),
+            }
+
+    def _content_update_supported_info(self, instance: dict) -> dict:
+        if not instance:
+            return {"supported": False, "reason": "Сборка не выбрана."}
+        if bool(instance.get("official") or instance.get("id") == "stonelight"):
+            return {"supported": False, "reason": "Официальная сборка обновляется через Центр обновлений."}
+        if bool(instance.get("locked")):
+            return {"supported": False, "reason": "Защищённую сборку нельзя обновлять как пользовательскую."}
+
+        sources_data = self._read_modrinth_sources_data(instance)
+        modpack_data = sources_data.get("modpack") if isinstance(sources_data.get("modpack"), dict) else {}
+        instance_source = instance.get("source") if isinstance(instance.get("source"), dict) else {}
+        if modpack_data or str(instance_source.get("project_type") or "").lower() == "modpack":
+            return {"supported": False, "reason": "Сборка связана с готовым модпаком. Используйте обновление модпака."}
+
+        return {"supported": True, "reason": ""}
+
+    def _content_update_source_records(self, instance: dict) -> dict[tuple[str, str], dict]:
+        data = self._read_modrinth_sources_data(instance)
+        records: dict[tuple[str, str], dict] = {}
+
+        content = data.get("content") if isinstance(data.get("content"), dict) else {}
+        for relative_path, record in content.items():
+            if not isinstance(record, dict):
+                continue
+            folder = str(record.get("folder") or "").strip().lower()
+            filename = str(record.get("filename") or Path(str(relative_path)).name).strip()
+            if folder and filename:
+                records[(folder, filename.casefold())] = dict(record)
+
+        modrinth_projects = (((data.get("modrinth") or {}).get("projects") or {}) if isinstance(data.get("modrinth"), dict) else {})
+        if isinstance(modrinth_projects, dict):
+            for _project_id, record in modrinth_projects.items():
+                if not isinstance(record, dict):
+                    continue
+                folder = str(record.get("folder") or "").strip().lower()
+                filename = str(record.get("filename") or "").strip()
+                if not folder or not filename:
+                    continue
+                normalized = dict(record)
+                normalized.setdefault("source", "modrinth")
+                normalized.setdefault("source_label", "Modrinth")
+                normalized.setdefault("title", record.get("title") or record.get("slug") or filename)
+                records[(folder, filename.casefold())] = normalized
+
+        curseforge_projects = (((data.get("curseforge") or {}).get("projects") or {}) if isinstance(data.get("curseforge"), dict) else {})
+        if isinstance(curseforge_projects, dict):
+            for _project_id, record in curseforge_projects.items():
+                if not isinstance(record, dict):
+                    continue
+                folder = str(record.get("folder") or "").strip().lower()
+                filename = str(record.get("filename") or "").strip()
+                if not folder or not filename:
+                    continue
+                normalized = dict(record)
+                normalized.setdefault("source", "curseforge")
+                normalized.setdefault("source_label", "CurseForge")
+                normalized.setdefault("title", record.get("title") or record.get("display_name") or filename)
+                records[(folder, filename.casefold())] = normalized
+
+        return records
+
+    def _content_update_hashes(self, path: Path) -> dict:
+        try:
+            data = path.read_bytes()
+            return {
+                "sha1": hashlib.sha1(data).hexdigest().lower(),
+                "md5": hashlib.md5(data).hexdigest().lower(),
+            }
+        except Exception:
+            return {}
+
+    def _content_update_file_item(self, instance: dict, folder_key: str, path: Path, record: dict | None = None) -> dict:
+        config = CONTENT_UPDATE_FOLDERS.get(folder_key, {})
+        name = path.name
+        lower = name.lower()
+        disabled_suffix = str(config.get("disabled_suffix") or ".disabled")
+        active_suffix = str(config.get("active_suffix") or path.suffix.lower())
+        enabled = not lower.endswith(disabled_suffix)
+        display_name = name[:-len(".disabled")] if lower.endswith(".disabled") else name
+
+        stat = None
+        try:
+            stat = path.stat()
+        except OSError:
+            pass
+
+        record = record if isinstance(record, dict) else {}
+        source = str(record.get("source") or "unknown").lower()
+        if source not in {"modrinth", "curseforge"}:
+            source = "unknown"
+
+        source_label = {
+            "modrinth": "Modrinth",
+            "curseforge": "CurseForge",
+            "unknown": "Unknown",
+        }.get(source, "Unknown")
+
+        relative_path = f"{folder_key}/{name}"
+        return {
+            "folder": folder_key,
+            "folder_label": config.get("label") or folder_key,
+            "project_type": record.get("project_type") or config.get("project_type") or "",
+            "filename": name,
+            "display_name": display_name,
+            "relative_path": relative_path,
+            "enabled": enabled,
+            "disabled": not enabled,
+            "size_bytes": int(stat.st_size) if stat else 0,
+            "modified": int(stat.st_mtime) if stat else 0,
+            "hashes": self._content_update_hashes(path),
+            "source": source,
+            "source_label": source_label,
+            "source_known": source != "unknown",
+            "source_title": record.get("title") or record.get("display_name") or record.get("slug") or "",
+            "project_id": record.get("project_id") or "",
+            "slug": record.get("slug") or "",
+            "version_id": record.get("version_id") or "",
+            "version_number": record.get("version_number") or record.get("display_name") or "",
+            "file_id": record.get("file_id") or "",
+            "installed_at": record.get("installed_at") or "",
+            "update_status": "not_checked",
+            "update_status_label": "Not checked",
+            "discovery": "known_source" if source != "unknown" else "needs_discovery",
+        }
+
+    def get_content_update_inventory(self, instance_id: str = "", options: dict | None = None) -> dict:
+        instance = self._instance_by_id_or_selected(instance_id)
+        if not instance:
+            return {"ok": False, "error": "Сборка не выбрана."}
+
+        support = self._content_update_supported_info(instance)
+        selected_folders = []
+        if isinstance(options, dict):
+            selected_folders = [str(item).strip().lower() for item in (options.get("folders") or [])]
+        if not selected_folders:
+            selected_folders = list(CONTENT_UPDATE_FOLDERS.keys())
+        selected_folders = [key for key in selected_folders if key in CONTENT_UPDATE_FOLDERS]
+
+        sources = self._content_update_source_records(instance)
+        items: list[dict] = []
+        folder_counts: dict[str, int] = {}
+
+        for folder_key in selected_folders:
+            folder = self._instance_subfolder(instance, folder_key)
+            folder.mkdir(parents=True, exist_ok=True)
+            config = CONTENT_UPDATE_FOLDERS[folder_key]
+            active_suffix = str(config.get("active_suffix") or "").lower()
+            disabled_suffix = str(config.get("disabled_suffix") or "").lower()
+
+            for path in sorted(folder.iterdir(), key=lambda item: item.name.lower()):
+                if not path.is_file() or path.name in {".gitkeep"}:
+                    continue
+                lower = path.name.lower()
+                if not (lower.endswith(active_suffix) or lower.endswith(disabled_suffix)):
+                    continue
+                record = sources.get((folder_key, path.name.casefold()))
+                if not record and lower.endswith(".disabled"):
+                    record = sources.get((folder_key, path.name[:-len(".disabled")].casefold()))
+                items.append(self._content_update_file_item(instance, folder_key, path, record))
+                folder_counts[folder_key] = folder_counts.get(folder_key, 0) + 1
+
+        known = sum(1 for item in items if item.get("source_known"))
+        unknown = len(items) - known
+        by_source = {
+            "modrinth": sum(1 for item in items if item.get("source") == "modrinth"),
+            "curseforge": sum(1 for item in items if item.get("source") == "curseforge"),
+            "unknown": unknown,
+        }
+
+        target_minecraft = str((options or {}).get("target_minecraft_version") or instance.get("minecraft_version") or "").strip()
+        target_loader = str((options or {}).get("target_loader") or instance.get("loader") or "vanilla").strip().lower()
+        target_loader_version = str((options or {}).get("target_loader_version") or instance.get("loader_version") or "").strip()
+
+        return {
+            "ok": True,
+            "supported": bool(support.get("supported")),
+            "reason": support.get("reason") or "",
+            "stage": "inventory",
+            "instance": self._safe_instance(instance),
+            "target": {
+                "minecraft_version": target_minecraft,
+                "loader": target_loader,
+                "loader_version": target_loader_version,
+                "migration": target_minecraft != str(instance.get("minecraft_version") or "").strip(),
+            },
+            "options": {
+                "folders": [
+                    {"key": key, "label": data["label"], "project_type": data["project_type"], "selected": key in selected_folders}
+                    for key, data in CONTENT_UPDATE_FOLDERS.items()
+                ],
+                "allow_disabled": False,
+                "can_change_game_version": True,
+                "can_change_loader_family": False,
+            },
+            "items": items,
+            "counts": {
+                "total": len(items),
+                "known_source": known,
+                "unknown_source": unknown,
+                "by_source": by_source,
+                "by_folder": folder_counts,
+            },
+            "message": "Инвентарь контента готов. Поиск обновлений будет добавлен следующим этапом.",
+        }
+
+    def _content_update_item_record(self, sources: dict, item: dict) -> dict:
+        folder = str(item.get("folder") or "").strip().lower()
+        filename = str(item.get("filename") or "").strip()
+        if not folder or not filename:
+            return {}
+
+        record = sources.get((folder, filename.casefold()))
+        lower = filename.lower()
+        if not record and lower.endswith(".disabled"):
+            record = sources.get((folder, filename[:-len(".disabled")].casefold()))
+        return dict(record) if isinstance(record, dict) else {}
+
+    def _content_update_item_path(self, instance: dict, item: dict) -> Path:
+        folder_key = str(item.get("folder") or "").strip().lower()
+        filename = str(item.get("filename") or "").strip()
+        folder = self._instance_subfolder(instance, folder_key)
+        return self._safe_folder_file(folder, filename)
+
+    def _content_update_project_type(self, item: dict, record: dict) -> str:
+        project_type = str(
+            item.get("project_type")
+            or record.get("project_type")
+            or CONTENT_UPDATE_FOLDERS.get(str(item.get("folder") or ""), {}).get("project_type")
+            or "mod"
+        ).strip().lower()
+        if project_type not in {"mod", "resourcepack", "shader"}:
+            project_type = CONTENT_UPDATE_FOLDERS.get(str(item.get("folder") or ""), {}).get("project_type", "mod")
+        return str(project_type or "mod")
+
+    def _content_update_file_changed(self, path: Path, source: str, record: dict) -> bool:
+        if not record:
+            return False
+        try:
+            if source == "modrinth":
+                hashes = record.get("hashes") if isinstance(record.get("hashes"), dict) else {}
+                if not hashes:
+                    return False
+                return not self._file_matches_modrinth_hashes(path, {"hashes": hashes})
+            if source == "curseforge":
+                hashes = record.get("hashes") if isinstance(record.get("hashes"), list) else []
+                if not hashes:
+                    return False
+                return not self._file_matches_curseforge_hashes(path, {"hashes": hashes})
+        except Exception:
+            return False
+        return False
+
+    def _content_update_base_result_item(self, item: dict) -> dict:
+        result = dict(item)
+        result.setdefault("latest", {})
+        result.setdefault("reason", "")
+        result.setdefault("safe_to_update", False)
+        result.setdefault("requires_manual", False)
+        result.setdefault("downloadable", False)
+        return result
+
+    def _content_update_compare_modrinth(self, instance: dict, target_instance: dict, item: dict, record: dict) -> dict:
+        result = self._content_update_base_result_item(item)
+        path = self._content_update_item_path(instance, item)
+        project_id = str(record.get("project_id") or item.get("project_id") or record.get("slug") or item.get("slug") or "").strip()
+        project_type = self._content_update_project_type(item, record)
+
+        if not project_id:
+            result.update({
+                "update_status": "error",
+                "reason": "Не указан project_id Modrinth в источнике файла.",
+            })
+            return result
+
+        try:
+            filters = {
+                "game_version": target_instance.get("minecraft_version") or instance.get("minecraft_version") or "",
+                "loader": target_instance.get("loader") or instance.get("loader") or "",
+            }
+            project, version, file_info = self._resolve_modrinth_version_and_file(
+                instance=target_instance,
+                project_id=project_id,
+                project_type=project_type,
+                filters=filters,
+            )
+
+            latest_version_id = str(version.get("id") or "").strip()
+            latest_version_number = str(version.get("version_number") or "").strip()
+            latest_filename = Path(str(file_info.get("filename") or "")).name
+            current_version_id = str(record.get("version_id") or item.get("version_id") or "").strip()
+            current_filename = str(item.get("display_name") or item.get("filename") or "").strip()
+            file_changed = self._content_update_file_changed(path, "modrinth", record)
+
+            result.update({
+                "source_title": project.get("title") or item.get("source_title") or record.get("title") or project_id,
+                "latest": {
+                    "source": "modrinth",
+                    "project_id": str(project.get("id") or project_id),
+                    "slug": project.get("slug") or "",
+                    "project_type": project_type,
+                    "version_id": latest_version_id,
+                    "version_number": latest_version_number,
+                    "filename": latest_filename,
+                    "folder": MODRINTH_INSTALL_FOLDERS.get(project_type, item.get("folder") or "mods"),
+                    "hashes": file_info.get("hashes") or {},
+                    "url": file_info.get("url") or "",
+                    "downloadable": bool(file_info.get("url")),
+                },
+                "downloadable": bool(file_info.get("url")),
+            })
+
+            if file_changed:
+                result.update({
+                    "update_status": "modified",
+                    "reason": "Файл отличается от сохранённого источника. Автозамена будет требовать подтверждения.",
+                    "safe_to_update": False,
+                })
+            elif latest_version_id and current_version_id and latest_version_id == current_version_id:
+                result.update({
+                    "update_status": "up_to_date",
+                    "reason": "",
+                    "safe_to_update": False,
+                })
+            elif latest_filename and latest_filename == current_filename and self._file_matches_modrinth_hashes(path, file_info):
+                result.update({
+                    "update_status": "up_to_date",
+                    "reason": "",
+                    "safe_to_update": False,
+                })
+            else:
+                result.update({
+                    "update_status": "update_available",
+                    "reason": "",
+                    "safe_to_update": bool(file_info.get("url")),
+                })
+
+            return result
+        except Exception as exc:
+            current_mc = str(instance.get("minecraft_version") or "").strip()
+            target_mc = str(target_instance.get("minecraft_version") or "").strip()
+            migration = bool(target_mc and target_mc != current_mc)
+            result.update({
+                "update_status": "incompatible" if migration else "error",
+                "reason": str(exc) if str(exc) else ("Совместимая версия для целевой Minecraft-версии не найдена." if migration else ""),
+                "safe_to_update": False,
+            })
+            return result
+
+    def _content_update_compare_curseforge(self, instance: dict, target_instance: dict, item: dict, record: dict) -> dict:
+        result = self._content_update_base_result_item(item)
+        path = self._content_update_item_path(instance, item)
+        project_id = str(record.get("project_id") or item.get("project_id") or "").strip()
+        project_type = self._content_update_project_type(item, record)
+
+        if not project_id:
+            result.update({
+                "update_status": "error",
+                "reason": "Не указан project_id CurseForge в источнике файла.",
+            })
+            return result
+
+        try:
+            filters = {
+                "game_version": target_instance.get("minecraft_version") or instance.get("minecraft_version") or "",
+                "loader": target_instance.get("loader") or instance.get("loader") or "",
+            }
+            files = self._curseforge_files_for_instance(project_id, project_type, target_instance, filters)
+            selected_file = self._choose_curseforge_file(files, project_type)
+            if not selected_file:
+                raise ValueError("Не найден совместимый файл CurseForge для выбранной сборки.")
+
+            latest_file_id = str(selected_file.get("id") or selected_file.get("fileId") or "").strip()
+            latest_filename = Path(str(selected_file.get("fileName") or selected_file.get("file_name") or "")).name
+            latest_version_number = str(selected_file.get("displayName") or selected_file.get("display_name") or "").strip()
+            current_file_id = str(record.get("file_id") or item.get("file_id") or "").strip()
+            file_changed = self._content_update_file_changed(path, "curseforge", record)
+
+            download_url = str(selected_file.get("downloadUrl") or selected_file.get("download_url") or "").strip()
+            manual_reason = ""
+            if latest_file_id and not download_url and (not current_file_id or latest_file_id != current_file_id):
+                try:
+                    download_info = self._curseforge_download_url(project_id, latest_file_id)
+                    download_url = str(download_info.get("downloadUrl") or "").strip()
+                except Exception as exc:
+                    manual_reason = str(exc)
+
+            result.update({
+                "source_title": item.get("source_title") or record.get("title") or record.get("display_name") or self._curseforge_project_title(project_id),
+                "latest": {
+                    "source": "curseforge",
+                    "project_id": project_id,
+                    "project_type": project_type,
+                    "file_id": latest_file_id,
+                    "version_number": latest_version_number,
+                    "filename": latest_filename,
+                    "folder": self._curseforge_install_folder(project_type),
+                    "hashes": selected_file.get("hashes") or [],
+                    "download_url": download_url,
+                    "downloadable": bool(download_url),
+                },
+                "downloadable": bool(download_url),
+            })
+
+            if file_changed:
+                result.update({
+                    "update_status": "modified",
+                    "reason": "Файл отличается от сохранённого источника. Автозамена будет требовать подтверждения.",
+                    "safe_to_update": False,
+                })
+            elif latest_file_id and current_file_id and latest_file_id == current_file_id:
+                result.update({
+                    "update_status": "up_to_date",
+                    "reason": "",
+                    "safe_to_update": False,
+                })
+            elif latest_filename and self._file_matches_curseforge_hashes(path, selected_file):
+                result.update({
+                    "update_status": "up_to_date",
+                    "reason": "",
+                    "safe_to_update": False,
+                })
+            elif not download_url:
+                result.update({
+                    "update_status": "manual_required",
+                    "reason": manual_reason or "CurseForge не вернул downloadUrl для этого файла.",
+                    "safe_to_update": False,
+                    "requires_manual": True,
+                })
+            else:
+                result.update({
+                    "update_status": "update_available",
+                    "reason": "",
+                    "safe_to_update": True,
+                    "requires_manual": False,
+                })
+
+            return result
+        except Exception as exc:
+            current_mc = str(instance.get("minecraft_version") or "").strip()
+            target_mc = str(target_instance.get("minecraft_version") or "").strip()
+            migration = bool(target_mc and target_mc != current_mc)
+            result.update({
+                "update_status": "incompatible" if migration else "error",
+                "reason": str(exc) if str(exc) else ("Совместимый файл для целевой Minecraft-версии не найден." if migration else ""),
+                "safe_to_update": False,
+            })
+            return result
+
+    def _content_update_record_source_from_discovery(self, instance: dict, item: dict, record: dict):
+        """Record a detected source for an existing file without changing the file."""
+        if not record:
+            return
+
+        path = self._modrinth_sources_path(instance)
+        try:
+            data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        except Exception:
+            data = {}
+
+        source = str(record.get("source") or "").strip().lower()
+        folder = str(record.get("folder") or item.get("folder") or "").strip()
+        filename = str(record.get("filename") or item.get("filename") or "").strip()
+        if not source or not folder or not filename:
+            return
+
+        if source == "modrinth":
+            bucket = data.setdefault("modrinth", {}).setdefault("projects", {})
+            key = str(record.get("project_id") or record.get("slug") or filename)
+        elif source == "curseforge":
+            bucket = data.setdefault("curseforge", {}).setdefault("projects", {})
+            key = str(record.get("project_id") or filename)
+        else:
+            return
+
+        existing = bucket.get(key) if isinstance(bucket.get(key), dict) else {}
+        merged = dict(existing)
+        merged.update(record)
+        merged.setdefault("source", source)
+        merged.setdefault("folder", folder)
+        merged.setdefault("filename", filename)
+        merged.setdefault("detected_at", time.strftime("%Y-%m-%d %H:%M:%S"))
+        bucket[key] = merged
+
+        # Keep normalized content index as a forward-compatible lookup.
+        content = data.setdefault("content", {})
+        content[f"{folder}/{filename}"] = dict(merged)
+
+        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    def _content_update_detect_modrinth_source(self, instance: dict, item: dict) -> dict:
+        sha1 = str(((item.get("hashes") or {}).get("sha1")) or "").strip().lower()
+        if not sha1:
+            return {}
+
+        try:
+            version = self._modrinth_read_json(f"version_file/{urllib.parse.quote(sha1, safe='')}", {"algorithm": "sha1"})
+            if not isinstance(version, dict) or not version.get("id"):
+                return {}
+
+            project = self._modrinth_project_for_version(version)
+            project_type = str(project.get("project_type") or item.get("project_type") or "mod").strip().lower()
+
+            selected_file = None
+            for file_info in version.get("files") or []:
+                if not isinstance(file_info, dict):
+                    continue
+                hashes = file_info.get("hashes") if isinstance(file_info.get("hashes"), dict) else {}
+                if str(hashes.get("sha1") or "").strip().lower() == sha1:
+                    selected_file = file_info
+                    break
+            if not selected_file and version.get("files"):
+                selected_file = version.get("files")[0]
+
+            filename = str(item.get("filename") or "").strip()
+            folder = str(item.get("folder") or MODRINTH_INSTALL_FOLDERS.get(project_type, "mods")).strip()
+
+            return {
+                "source": "modrinth",
+                "source_label": "Modrinth",
+                "project_id": project.get("id") or version.get("project_id") or "",
+                "slug": project.get("slug") or "",
+                "title": project.get("title") or project.get("slug") or item.get("display_name") or filename,
+                "project_type": project_type,
+                "version_id": version.get("id") or "",
+                "version_number": version.get("version_number") or "",
+                "folder": folder,
+                "filename": filename,
+                "url": (selected_file or {}).get("url") or "",
+                "hashes": (selected_file or {}).get("hashes") or item.get("hashes") or {},
+                "dependencies": version.get("dependencies") or [],
+                "discovered": True,
+                "discovery_source": "modrinth_hash",
+                "detected_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            }
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                return {}
+            raise
+        except Exception:
+            return {}
+
+    def _content_update_curseforge_fingerprint(self, path: Path) -> int:
+        """CurseForge Murmur2 fingerprint for non-whitespace bytes."""
+        data = path.read_bytes()
+        filtered = bytes(byte for byte in data if byte not in (9, 10, 13, 32))
+        m = 0x5bd1e995
+        seed = 1
+        length = len(filtered)
+        h = (seed ^ length) & 0xFFFFFFFF
+        rounded_end = length & 0xFFFFFFFC
+
+        for i in range(0, rounded_end, 4):
+            k = (
+                filtered[i]
+                | (filtered[i + 1] << 8)
+                | (filtered[i + 2] << 16)
+                | (filtered[i + 3] << 24)
+            ) & 0xFFFFFFFF
+            k = (k * m) & 0xFFFFFFFF
+            k ^= (k >> 24)
+            k = (k * m) & 0xFFFFFFFF
+            h = (h * m) & 0xFFFFFFFF
+            h ^= k
+
+        remaining = length & 3
+        if remaining == 3:
+            h ^= filtered[rounded_end + 2] << 16
+        if remaining >= 2:
+            h ^= filtered[rounded_end + 1] << 8
+        if remaining >= 1:
+            h ^= filtered[rounded_end]
+            h = (h * m) & 0xFFFFFFFF
+
+        h ^= (h >> 13)
+        h = (h * m) & 0xFFFFFFFF
+        h ^= (h >> 15)
+        return h & 0xFFFFFFFF
+
+    def _content_update_detect_curseforge_source(self, instance: dict, item: dict) -> dict:
+        try:
+            path = self._content_update_item_path(instance, item)
+            fingerprint = self._content_update_curseforge_fingerprint(path)
+            response = self._curseforge_proxy_post_json("fingerprints", {"fingerprints": [fingerprint]})
+            matches = response.get("exactMatches") or response.get("exact_matches") or response.get("matches") or []
+            if not matches:
+                return {}
+
+            match = matches[0]
+            project = match.get("mod") or match.get("project") or {}
+            file_info = match.get("file") or {}
+            if not isinstance(project, dict):
+                project = {}
+            if not isinstance(file_info, dict):
+                file_info = {}
+
+            project_id = str(project.get("id") or match.get("id") or match.get("projectId") or "").strip()
+            file_id = str(file_info.get("id") or file_info.get("fileId") or match.get("fileId") or "").strip()
+            if not project_id or not file_id:
+                return {}
+
+            class_id = int(project.get("classId") or project.get("class_id") or 0)
+            project_type = self._curseforge_project_type_from_class_id(class_id) or item.get("project_type") or "mod"
+            folder = str(item.get("folder") or self._curseforge_install_folder(project_type)).strip()
+            filename = str(item.get("filename") or "").strip()
+
+            return {
+                "source": "curseforge",
+                "source_label": "CurseForge",
+                "project_id": project_id,
+                "project_type": project_type,
+                "file_id": file_id,
+                "display_name": file_info.get("displayName") or file_info.get("display_name") or filename,
+                "title": project.get("name") or project.get("slug") or filename,
+                "filename": filename,
+                "folder": folder,
+                "url": file_info.get("downloadUrl") or "",
+                "game_versions": file_info.get("gameVersions") or [],
+                "hashes": file_info.get("hashes") or [],
+                "fingerprint": fingerprint,
+                "discovered": True,
+                "discovery_source": "curseforge_fingerprint",
+                "detected_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            }
+        except Exception:
+            return {}
+
+    def _content_update_detect_source(self, instance: dict, item: dict, *, record: bool = True) -> dict:
+        if item.get("source_known"):
+            return {}
+
+        detected = self._content_update_detect_modrinth_source(instance, item)
+        if not detected:
+            detected = self._content_update_detect_curseforge_source(instance, item)
+
+        if detected and record:
+            self._content_update_record_source_from_discovery(instance, item, detected)
+        return detected
+
+    def _content_update_excluded_paths(self, options: dict | None) -> set[str]:
+        if not isinstance(options, dict):
+            return set()
+
+        raw = options.get("excluded_relative_paths") or options.get("excluded_paths") or []
+        if not isinstance(raw, (list, tuple, set)):
+            return set()
+
+        result: set[str] = set()
+        for item in raw:
+            value = str(item or "").replace("\\", "/").strip().strip("/")
+            if not value or value.startswith("/") or "\x00" in value:
+                continue
+            parts = [part for part in value.split("/") if part]
+            if any(part in {".", ".."} for part in parts):
+                continue
+            result.add("/".join(parts))
+        return result
+
+    def check_content_updates(self, instance_id: str = "", options: dict | None = None) -> dict:
+        """Preview updates for known Modrinth/CurseForge content sources.
+
+        Stage 13.1 is read-only: it searches and classifies update candidates,
+        but does not download or replace files.
+        """
+        instance = self._instance_by_id_or_selected(instance_id)
+        if not instance:
+            return {"ok": False, "error": "Сборка не выбрана."}
+
+        inventory = self.get_content_update_inventory(instance_id, options)
+        if not inventory.get("ok"):
+            return inventory
+
+        if not inventory.get("supported"):
+            inventory["stage"] = "updates_preview"
+            return inventory
+
+        target = inventory.get("target") if isinstance(inventory.get("target"), dict) else {}
+        target_instance = dict(instance)
+        target_instance["minecraft_version"] = target.get("minecraft_version") or instance.get("minecraft_version") or ""
+        target_instance["loader"] = target.get("loader") or instance.get("loader") or "vanilla"
+        target_instance["loader_version"] = target.get("loader_version") or instance.get("loader_version") or ""
+        migration_target = (
+            str(target_instance.get("minecraft_version") or "").strip()
+            != str(instance.get("minecraft_version") or "").strip()
+        )
+
+        sources = self._content_update_source_records(instance)
+        result_items: list[dict] = []
+        update_counts = {
+            "update_available": 0,
+            "up_to_date": 0,
+            "manual_required": 0,
+            "unknown_source": 0,
+            "modified": 0,
+            "error": 0,
+            "source_detected": 0,
+            "incompatible": 0,
+            "excluded": 0,
+        }
+
+        excluded_paths = self._content_update_excluded_paths(options)
+
+        known_checked = 0
+        discovered_sources = 0
+        for item in inventory.get("items") or []:
+            if not isinstance(item, dict):
+                continue
+
+            relative_path = str(item.get("relative_path") or "").replace("\\", "/").strip().strip("/")
+            if relative_path and relative_path in excluded_paths:
+                checked = self._content_update_base_result_item(item)
+                checked.update({
+                    "update_status": "excluded",
+                    "reason": "Элемент исключён пользователем из этой операции.",
+                    "safe_to_update": False,
+                    "excluded": True,
+                })
+                update_counts["excluded"] += 1
+                result_items.append(checked)
+                continue
+
+            source = str(item.get("source") or "unknown").strip().lower()
+            record = self._content_update_item_record(sources, item)
+
+            if source == "modrinth":
+                checked = self._content_update_compare_modrinth(instance, target_instance, item, record)
+                known_checked += 1
+            elif source == "curseforge":
+                checked = self._content_update_compare_curseforge(instance, target_instance, item, record)
+                known_checked += 1
+            else:
+                detected_record = self._content_update_detect_source(instance, item, record=True)
+                if detected_record:
+                    detected_item = dict(item)
+                    detected_item.update({
+                        "source": detected_record.get("source") or "unknown",
+                        "source_label": detected_record.get("source_label") or "",
+                        "source_known": True,
+                        "source_title": detected_record.get("title") or detected_record.get("display_name") or "",
+                        "project_id": detected_record.get("project_id") or "",
+                        "slug": detected_record.get("slug") or "",
+                        "version_id": detected_record.get("version_id") or "",
+                        "version_number": detected_record.get("version_number") or detected_record.get("display_name") or "",
+                        "file_id": detected_record.get("file_id") or "",
+                        "discovery": detected_record.get("discovery_source") or "detected_source",
+                    })
+                    if detected_record.get("source") == "modrinth":
+                        checked = self._content_update_compare_modrinth(instance, target_instance, detected_item, detected_record)
+                    elif detected_record.get("source") == "curseforge":
+                        checked = self._content_update_compare_curseforge(instance, target_instance, detected_item, detected_record)
+                    else:
+                        checked = self._content_update_base_result_item(item)
+                        checked.update({
+                            "update_status": "unknown_source",
+                            "reason": "Источник файла не определён.",
+                            "safe_to_update": False,
+                        })
+                else:
+                    checked = self._content_update_base_result_item(item)
+                    checked.update({
+                        "update_status": "unknown_source",
+                        "reason": "Источник файла не определён.",
+                        "safe_to_update": False,
+                    })
+
+            if checked.get("source_known") and item.get("source") == "unknown":
+                discovered_sources += 1
+                update_counts["source_detected"] += 1
+
+            status = str(checked.get("update_status") or "error")
+            if status not in update_counts:
+                status = "error"
+                checked["update_status"] = status
+            update_counts[status] += 1
+            result_items.append(checked)
+
+        counts = dict(inventory.get("counts") or {})
+        counts["updates"] = update_counts
+        counts["known_checked"] = known_checked
+        counts["discovered_sources"] = discovered_sources
+
+        inventory.update({
+            "stage": "updates_preview",
+            "items": result_items,
+            "counts": counts,
+            "message": "contentUpdate.previewReady",
+            "read_only": True,
+            "migration_target": migration_target,
+        })
+        return inventory
+
+    def _content_update_safe_target(self, instance: dict, folder_key: str, filename: str, old_path: Path) -> Path:
+        folder = self._instance_subfolder(instance, folder_key)
+        target = self._safe_folder_file(folder, filename)
+        if target.exists() and target.resolve() != old_path.resolve():
+            raise ValueError(f"Целевой файл уже существует: {target.name}")
+        return target
+
+    def _content_update_remove_old_file(self, old_path: Path, new_path: Path):
+        if old_path.resolve() == new_path.resolve():
+            return
+        if old_path.exists():
+            old_path.unlink()
+
+    def _content_update_apply_modrinth(self, instance: dict, item: dict) -> dict:
+        latest = item.get("latest") if isinstance(item.get("latest"), dict) else {}
+        project_id = str(latest.get("project_id") or item.get("project_id") or "").strip()
+        project_type = str(latest.get("project_type") or item.get("project_type") or "mod").strip().lower()
+        folder_key = str(latest.get("folder") or item.get("folder") or MODRINTH_INSTALL_FOLDERS.get(project_type, "mods")).strip()
+        filename = Path(str(latest.get("filename") or "")).name
+        url = str(latest.get("url") or "").strip()
+
+        if not project_id or not filename or not url:
+            raise ValueError("Недостаточно данных Modrinth для обновления.")
+
+        old_path = self._content_update_item_path(instance, item)
+        target = self._content_update_safe_target(instance, folder_key, filename, old_path)
+
+        self._download_modrinth_file(
+            {
+                "url": url,
+                "filename": filename,
+                "hashes": latest.get("hashes") or {},
+            },
+            target,
+        )
+        self._content_update_remove_old_file(old_path, target)
+
+        project = {
+            "id": project_id,
+            "slug": latest.get("slug") or item.get("slug") or "",
+            "title": item.get("source_title") or item.get("display_name") or target.stem,
+            "project_type": project_type,
+        }
+        version = {
+            "id": latest.get("version_id") or "",
+            "version_number": latest.get("version_number") or "",
+            "dependencies": latest.get("dependencies") or [],
+        }
+        file_info = {
+            "url": url,
+            "filename": filename,
+            "hashes": latest.get("hashes") or {},
+        }
+        self._record_modrinth_source(instance, project, version, file_info, folder_key, target)
+
+        return {
+            "ok": True,
+            "source": "modrinth",
+            "filename": target.name,
+            "folder": folder_key,
+            "version_number": latest.get("version_number") or "",
+        }
+
+    def _content_update_apply_curseforge(self, instance: dict, item: dict) -> dict:
+        latest = item.get("latest") if isinstance(item.get("latest"), dict) else {}
+        project_id = str(latest.get("project_id") or item.get("project_id") or "").strip()
+        project_type = str(latest.get("project_type") or item.get("project_type") or "mod").strip().lower()
+        file_id = str(latest.get("file_id") or "").strip()
+        folder_key = str(latest.get("folder") or item.get("folder") or self._curseforge_install_folder(project_type)).strip()
+        filename = Path(str(latest.get("filename") or "")).name
+        download_url = str(latest.get("download_url") or "").strip()
+
+        if not project_id or not file_id or not filename or not download_url:
+            raise ValueError("Недостаточно данных CurseForge для обновления.")
+
+        old_path = self._content_update_item_path(instance, item)
+        target = self._content_update_safe_target(instance, folder_key, filename, old_path)
+
+        file_info = {
+            "id": file_id,
+            "fileId": file_id,
+            "fileName": filename,
+            "displayName": latest.get("version_number") or filename,
+            "hashes": latest.get("hashes") or [],
+            "gameVersions": latest.get("game_versions") or [],
+        }
+
+        self._download_curseforge_file(file_info, download_url, target)
+        self._content_update_remove_old_file(old_path, target)
+        self._record_curseforge_source(instance, project_id, project_type, file_info, folder_key, target, download_url)
+
+        return {
+            "ok": True,
+            "source": "curseforge",
+            "filename": target.name,
+            "folder": folder_key,
+            "file_id": file_id,
+        }
+
+    def _content_update_apply_item(self, instance: dict, item: dict) -> dict:
+        display_name = str(item.get("display_name") or item.get("filename") or "")
+        if item.get("update_status") != "update_available" or not item.get("safe_to_update"):
+            return {
+                "ok": True,
+                "skipped": True,
+                "filename": display_name,
+                "reason": item.get("reason") or "Элемент не готов к автообновлению.",
+            }
+
+        source = str(item.get("source") or "").strip().lower()
+        if source == "modrinth":
+            result = self._content_update_apply_modrinth(instance, item)
+        elif source == "curseforge":
+            result = self._content_update_apply_curseforge(instance, item)
+        else:
+            return {
+                "ok": True,
+                "skipped": True,
+                "filename": display_name,
+                "reason": "Источник не поддерживается для автообновления.",
+            }
+
+        result["old_filename"] = display_name
+        return result
+
+    def _content_update_migration_blockers(self, counts: dict) -> dict:
+        updates = counts.get("updates") if isinstance(counts.get("updates"), dict) else {}
+        blockers = {
+            "manual_required": int(updates.get("manual_required") or 0),
+            "unknown_source": int(updates.get("unknown_source") or 0),
+            "modified": int(updates.get("modified") or 0),
+            "error": int(updates.get("error") or 0),
+            "incompatible": int(updates.get("incompatible") or 0),
+        }
+        blockers["total"] = sum(blockers.values())
+        return blockers
+
+    def _content_update_apply_instance_target(self, data: dict, instance: dict, target: dict) -> bool:
+        target_mc = str(target.get("minecraft_version") or "").strip()
+        target_loader = str(target.get("loader") or instance.get("loader") or "vanilla").strip().lower()
+        target_loader_version = normalize_loader_version_for_install(
+            target_loader,
+            target_mc,
+            str(target.get("loader_version") or "").strip(),
+        )
+        if target_loader == "vanilla":
+            target_loader_version = ""
+
+        current_mc = str(instance.get("minecraft_version") or "").strip()
+        current_loader = str(instance.get("loader") or "vanilla").strip().lower()
+        current_loader_version = str(instance.get("loader_version") or "").strip()
+
+        if (
+            target_mc == current_mc
+            and target_loader == current_loader
+            and target_loader_version == current_loader_version
+        ):
+            return False
+
+        if not target_mc:
+            raise ValueError("Укажи целевую версию Minecraft.")
+        if target_loader not in ALLOWED_LOADERS:
+            raise ValueError("Неизвестный загрузчик.")
+
+        target["minecraft_version"] = target_mc
+        target["loader"] = target_loader
+        target["loader_version"] = target_loader_version
+
+        instance["minecraft_version"] = target_mc
+        instance["loader"] = target_loader
+        instance["loader_version"] = target_loader_version
+        instance["version_type"] = "snapshot" if any(ch.isalpha() for ch in target_mc.replace("pre", "").replace("rc", "")) else "release"
+        instance["icon_pack_id"] = target_loader if target_loader in {"fabric", "forge", "quilt", "neoforge"} else instance.get("icon_pack_id") or "vanilla"
+        return True
+
+    def apply_content_updates(self, instance_id: str = "", options: dict | None = None) -> dict:
+        """Apply safe updates for known sources.
+
+        Stage 13.2 updates only items that Stage 13.1 classified as
+        update_available + safe_to_update. Unknown/manual/modified/error items
+        are skipped.
+        """
+        instance = self._instance_by_id_or_selected(instance_id)
+        if not instance:
+            return {"ok": False, "error": "Сборка не выбрана."}
+
+        preview = self.check_content_updates(instance_id, options)
+        if not preview.get("ok"):
+            return preview
+
+        counts_before = preview.get("counts") if isinstance(preview.get("counts"), dict) else {}
+        target_before = preview.get("target") if isinstance(preview.get("target"), dict) else {}
+        migration_target = bool(preview.get("migration_target"))
+
+        migration_blockers = self._content_update_migration_blockers(counts_before)
+        if migration_target and migration_blockers.get("total", 0) > 0:
+            preview.update({
+                "stage": "migration_blocked",
+                "message": "contentUpdate.migrationBlocked",
+                "migration_blockers": migration_blockers,
+                "read_only": True,
+            })
+            self._emit("status", {
+                "busy": False,
+                "message": "contentUpdate.migrationBlocked",
+                "error": True,
+                "progress": 1.0,
+            })
+            return preview
+
+        results = []
+        applied = 0
+        skipped = 0
+        errors = 0
+
+        for item in preview.get("items") or []:
+            if not isinstance(item, dict):
+                continue
+
+            if item.get("update_status") != "update_available" or not item.get("safe_to_update"):
+                skipped += 1
+                continue
+
+            try:
+                applied_result = self._content_update_apply_item(instance, item)
+                if applied_result.get("skipped"):
+                    skipped += 1
+                elif applied_result.get("ok"):
+                    applied += 1
+                results.append(applied_result)
+            except Exception as exc:
+                errors += 1
+                results.append({
+                    "ok": False,
+                    "filename": item.get("display_name") or item.get("filename") or "",
+                    "error": str(exc),
+                })
+
+        migration_applied = False
+        if migration_target and errors == 0:
+            data = self._load_instances_optional()
+            target_instance = next(
+                (entry for entry in data.get("instances", []) if entry.get("id") == instance_id),
+                None,
+            )
+            if not target_instance:
+                raise ValueError("Сборка не найдена для применения миграции.")
+            migration_applied = self._content_update_apply_instance_target(data, target_instance, target_before)
+            if migration_applied:
+                self._save_instances_optional(data)
+                instance = target_instance
+
+        fresh = self.check_content_updates(instance_id, options)
+        if not fresh.get("ok"):
+            fresh = preview
+
+        stage_name = "migration_applied" if migration_applied else "updates_applied"
+        message_key = "contentUpdate.migrationDone" if migration_applied else "contentUpdate.applyDone"
+        fresh.update({
+            "stage": stage_name,
+            "message": message_key,
+            "apply_results": results,
+            "apply_counts": {
+                "applied": applied,
+                "skipped": skipped,
+                "errors": errors,
+            },
+            "migration_applied": migration_applied,
+            "state": self.get_app_state() if migration_applied else None,
+            "read_only": False,
+        })
+
+        # Download helpers emit progress up to ~98%. Make sure the global status
+        # bar is finalized even when the update API call returns directly to the
+        # WebView without another launcher event.
+        self._emit("status", {
+            "busy": False,
+            "message": "status.ready",
+            "error": bool(errors),
+            "progress": 1.0,
+        })
+        return fresh
+
+
     def get_instance_window_data(self, instance_id: str = "") -> dict:
         instance = self._instance_by_id_or_selected(instance_id)
         if not instance:
@@ -6178,7 +7426,9 @@ class LauncherWebAPI:
             "modrinth_modpack_update": self._modrinth_modpack_source_info(instance),
             "curseforge_modpack_install_report": self._curseforge_modpack_install_report(instance),
             "curseforge_modpack_update": self._curseforge_modpack_source_info(instance),
+            "content_update": self.get_content_update_inventory(instance.get("id", ""), {"folders": ["mods", "resourcepacks", "shaderpacks"]}),
             "folders": folders,
+            "console": self.get_instance_console_history(instance.get("id", ""), 700),
             "folder_files": {
                 key: self.list_instance_folder(instance.get("id", ""), key).get("files", [])
                 for key in ("mods", "resourcepacks", "shaderpacks", "screenshots")
@@ -6401,7 +7651,7 @@ class LauncherWebAPI:
             session = {
                 "id": session_id,
                 "status": "waiting",
-                "message": "Ожидаю вход Microsoft в браузере...",
+                "message": "account.microsoftWaiting",
                 "error": "",
                 "client_id": client_id,
                 "client_secret": client_secret,
@@ -6475,7 +7725,7 @@ class LauncherWebAPI:
             return {
                 "ok": True,
                 "session_id": session_id,
-                "message": "Открыт браузер Microsoft login. Заверши вход в браузере.",
+                "message": "account.microsoftOpening",
             }
         except Exception as exc:
             self._append_startup_log(f"Microsoft login start failed: {exc}")
@@ -6487,7 +7737,7 @@ class LauncherWebAPI:
             return
 
         session["status"] = "processing"
-        session["message"] = "Получен callback Microsoft. Завершаю вход..."
+        session["message"] = "account.microsoftCallback"
 
         try:
             import minecraft_launcher_lib.microsoft_account as microsoft_account
@@ -6914,8 +8164,7 @@ class LauncherWebAPI:
 
     def open_log(self) -> dict:
         LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        if not LOG_PATH.exists():
-            LOG_PATH.write_text("", encoding="utf-8")
+        ensure_utf8_sig_log_file(LOG_PATH)
         return {"ok": self._open_path(LOG_PATH), "path": str(LOG_PATH)}
 
     def open_github(self) -> dict:
@@ -7263,9 +8512,19 @@ class LauncherWebAPI:
         return {"ok": True, "started": True, "action": action}
 
     def _make_core(self, instance: dict) -> LauncherCore:
+        def console_event(message: str, *, source: str = "game"):
+            self._emit("console", self._console_payload(instance, message, source=source))
+
+        def launcher_log(message: str):
+            # Keep the global launcher log drawer behavior, but also surface
+            # instance-scoped launcher messages in the instance console while
+            # the operation is live.
+            self._emit("log", {"message": message})
+            console_event(message, source="launcher")
+
         return LauncherCore(
             instance=instance,
-            log_callback=lambda message: self._emit("log", {"message": message}),
+            log_callback=launcher_log,
             status_callback=lambda message: self._emit(
                 "status",
                 {"message": message, "busy": True, "action": self._busy_action},
@@ -7278,7 +8537,7 @@ class LauncherWebAPI:
                     "progress": (current / total) if total else 0,
                 },
             ),
-            console_callback=lambda message: self._emit("log", {"message": message}),
+            console_callback=lambda message: console_event(message, source="game"),
         )
 
     def _operation_worker(self, action: str, instance: dict):
@@ -7357,7 +8616,10 @@ class LauncherWebAPI:
             return
         try:
             event_json = json.dumps(event_name, ensure_ascii=False)
-            payload_json = json.dumps(self._localize_value(payload), ensure_ascii=False)
+            if event_name == "console":
+                payload_json = json.dumps(payload, ensure_ascii=False)
+            else:
+                payload_json = json.dumps(self._localize_value(payload), ensure_ascii=False)
             script = (
                 "window.StoneLightBridge && "
                 f"window.StoneLightBridge.receive({event_json}, {payload_json});"

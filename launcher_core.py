@@ -15,7 +15,7 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from app_paths import app_root, ensure_runtime_files
-from i18n import tr
+from i18n import tr, set_language
 from typing import Callable, Optional
 
 import requests
@@ -42,6 +42,189 @@ CONSOLE_HISTORY: dict[str, list[str]] = {}
 CONSOLE_LISTENERS: dict[str, list[Callable[[str], None]]] = {}
 CONSOLE_LOCK = threading.Lock()
 CONSOLE_HISTORY_LIMIT = 1200
+LAUNCHER_LOG_LOCK = threading.Lock()
+
+LAUNCHER_LOG_EXACT_TRANSLATIONS = {
+    "en": {
+        "Minecraft process started.": "Minecraft process started.",
+        "Browser fallback idle timeout reached; exiting.": "Browser fallback idle timeout reached; exiting.",
+        "Web runtime state initialized.": "Web runtime state initialized.",
+    },
+    "uk": {
+        "Minecraft process started.": "Процес Minecraft запущено.",
+        "Browser fallback idle timeout reached; exiting.": "Час очікування резервного режиму браузера вичерпано; вихід.",
+        "Web runtime state initialized.": "Стан Web runtime ініціалізовано.",
+    },
+    "kk": {
+        "Minecraft process started.": "Minecraft процесі іске қосылды.",
+        "Browser fallback idle timeout reached; exiting.": "Браузердің резервтік режимін күту уақыты аяқталды; шығу.",
+        "Web runtime state initialized.": "Web runtime күйі инициализацияланды.",
+    },
+}
+
+LAUNCHER_LOG_PREFIX_TRANSLATIONS = {
+    "en": {
+        "Browser fallback started at ": "Browser fallback started at ",
+        "WebView failure reason: ": "WebView failure reason: ",
+        "Microsoft login started in Web UI: ": "Microsoft login started in Web UI: ",
+        "Microsoft login failed: ": "Microsoft login failed: ",
+        "Microsoft login start failed: ": "Microsoft login start failed: ",
+        "Microsoft callback server started: ": "Microsoft callback server started: ",
+        "Browser fallback idle timeout reached; exiting.": "Browser fallback idle timeout reached; exiting.",
+    },
+    "uk": {
+        "Browser fallback started at ": "Резервний режим браузера запущено за адресою ",
+        "WebView failure reason: ": "Причина збою WebView: ",
+        "Microsoft login started in Web UI: ": "Вхід Microsoft запущено у Web UI: ",
+        "Microsoft login failed: ": "Помилка входу Microsoft: ",
+        "Microsoft login start failed: ": "Не вдалося запустити вхід Microsoft: ",
+        "Microsoft callback server started: ": "Callback-сервер Microsoft запущено: ",
+    },
+    "kk": {
+        "Browser fallback started at ": "Браузердің резервтік режимі мына мекенжайда іске қосылды: ",
+        "WebView failure reason: ": "WebView қатесінің себебі: ",
+        "Microsoft login started in Web UI: ": "Microsoft кіруі Web UI ішінде іске қосылды: ",
+        "Microsoft login failed: ": "Microsoft кіру қатесі: ",
+        "Microsoft login start failed: ": "Microsoft кіруін іске қосу сәтсіз аяқталды: ",
+        "Microsoft callback server started: ": "Microsoft callback сервері іске қосылды: ",
+    },
+}
+
+
+def launcher_log_language(root: Path = ROOT) -> str:
+    """Return the current UI language used for launcher.log messages."""
+    for relative in ("user_settings.json", "config.json"):
+        try:
+            path = Path(root) / relative
+            if not path.exists():
+                continue
+            data = json.loads(path.read_text(encoding="utf-8"))
+            language = (
+                data.get("language")
+                or data.get("default_language")
+                or data.get("locale")
+                or ""
+            )
+            language = str(language).strip().lower()
+            if language in {"ua", "uk-ua", "ukrainian"}:
+                return "uk"
+            if language in {"kz", "kk-kz", "kazakh"}:
+                return "kk"
+            if language in {"en", "uk", "kk"}:
+                return language
+        except Exception:
+            continue
+    return "en"
+
+
+def localize_launcher_log_message(message: str, root: Path = ROOT) -> str:
+    """Translate launcher.log message text using the selected UI language.
+
+    This intentionally localizes only launcher/system messages. Minecraft stdout
+    itself is not written to launcher.log, and latest.log stays untouched.
+    """
+    source = str(message or "").rstrip("\n")
+    if not source:
+        return source
+
+    language = launcher_log_language(root)
+    try:
+        set_language(language)
+    except Exception:
+        pass
+
+    exact = LAUNCHER_LOG_EXACT_TRANSLATIONS.get(language, {}).get(source)
+    if exact is not None:
+        return exact
+
+    exit_match = re.fullmatch(r"Minecraft process exited with code (-?\d+)\.", source)
+    if exit_match:
+        code = exit_match.group(1)
+        if language == "uk":
+            return f"Процес Minecraft завершено з кодом {code}."
+        if language == "kk":
+            return f"Minecraft процесі {code} кодымен аяқталды."
+        return source
+
+    read_error_match = re.fullmatch(r"Ошибка чтения вывода Minecraft: (.*)", source)
+    if read_error_match:
+        detail = read_error_match.group(1)
+        if language == "uk":
+            return f"Помилка читання виводу Minecraft: {detail}"
+        if language == "kk":
+            return f"Minecraft шығысын оқу қатесі: {detail}"
+        return f"Error reading Minecraft output: {detail}"
+
+    for prefix, translated_prefix in LAUNCHER_LOG_PREFIX_TRANSLATIONS.get(language, {}).items():
+        if source.startswith(prefix):
+            return translated_prefix + source[len(prefix):]
+
+    translated = tr(source)
+    if translated:
+        return str(translated)
+    return source
+
+
+def ensure_utf8_sig_log_file(path: Path):
+    """Create/convert a text log so Windows editors reliably detect UTF-8."""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.exists() or path.stat().st_size == 0:
+            path.write_text("", encoding="utf-8-sig")
+            return
+
+        raw = path.read_bytes()
+        if raw.startswith(b"\xef\xbb\xbf"):
+            return
+
+        path.write_bytes(b"\xef\xbb\xbf" + raw)
+    except Exception:
+        pass
+
+
+def append_launcher_log(
+    message: str,
+    *,
+    category: str = "launcher",
+    root: Path = ROOT,
+    instance_id: str = "",
+    instance_name: str = "",
+):
+    """Append one system-level line to data/launcher.log.
+
+    The launcher log is intentionally for launcher/runtime events, not the full
+    Minecraft stdout stream. Per-instance game output is kept in the instance
+    console and Minecraft's own logs/latest.log.
+    """
+    if message is None:
+        return
+
+    text = localize_launcher_log_message(str(message), root)
+    if not text:
+        return
+
+    log_path = Path(root) / "data" / "launcher.log"
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+
+    context = ""
+    if instance_id or instance_name:
+        parts = []
+        if instance_id:
+            parts.append(f"id={instance_id}")
+        if instance_name:
+            parts.append(f"name={instance_name}")
+        context = " [" + " ".join(parts) + "]"
+
+    line = f"[{timestamp}] [{category}]{context} {text}"
+
+    try:
+        with LAUNCHER_LOG_LOCK:
+            ensure_utf8_sig_log_file(log_path)
+            with log_path.open("a", encoding="utf-8", newline="\n") as handle:
+                handle.write(line + "\n")
+    except Exception:
+        pass
+
 
 MOJANG_COMPONENT_DOWNLOAD_ERROR_MESSAGE = "Не удалось скачать компонент Minecraft с серверов Mojang. Проверьте интернет/антивирус/VPN и повторите установку."
 
@@ -80,6 +263,13 @@ def get_console_history(key: str, limit: int = 500) -> list[str]:
     with CONSOLE_LOCK:
         history = list(CONSOLE_HISTORY.get(key, []))
     return history[-limit:]
+
+
+def clear_console_history(key: str):
+    if not key:
+        return
+    with CONSOLE_LOCK:
+        CONSOLE_HISTORY.pop(key, None)
 
 
 def _record_console_history(key: str, message: str):
@@ -346,6 +536,15 @@ class LauncherCore:
     def instance_process_key(self) -> str:
         return normalize_console_key(self.minecraft_dir)
 
+    def append_launcher_log(self, message: str, *, category: str = "core"):
+        append_launcher_log(
+            message,
+            category=category,
+            root=self.root,
+            instance_id=str(self.config.get("instance_id") or ""),
+            instance_name=str(self.config.get("instance_name") or ""),
+        )
+
     def get_running_process(self) -> subprocess.Popen | None:
         key = self.instance_process_key()
         with RUNNING_GAME_LOCK:
@@ -395,12 +594,7 @@ class LauncherCore:
 
     def emit_log(self, message: str):
         message = tr(message)
-        line = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {message}"
-        try:
-            with self.log_path.open("a", encoding="utf-8") as f:
-                f.write(line + "\n")
-        except Exception:
-            pass
+        self.append_launcher_log(message, category="core")
 
         if self.log_callback:
             self.log_callback(message)
@@ -412,12 +606,9 @@ class LauncherCore:
         if not message:
             return
 
-        try:
-            with self.log_path.open("a", encoding="utf-8") as f:
-                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [GAME] {message}\n")
-        except Exception:
-            pass
-
+        # Do not mirror the entire Minecraft stdout stream into launcher.log.
+        # It belongs to the per-instance live console and to Minecraft's own
+        # logs/latest.log. This keeps launcher.log useful for launcher diagnostics.
         key = self.instance_process_key()
         _record_console_history(key, message)
 
@@ -430,15 +621,8 @@ class LauncherCore:
 
     def emit_status(self, message: str):
         message = tr(message)
-        # Status messages used to go through emit_log() and then status_callback,
-        # which made the GUI console show many lines twice. Keep file logging,
-        # but call only the status callback for UI output.
-        line = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {message}"
-        try:
-            with self.log_path.open("a", encoding="utf-8") as f:
-                f.write(line + "\n")
-        except Exception:
-            pass
+        # Status messages are launcher events, so keep them in launcher.log.
+        self.append_launcher_log(message, category="status")
 
         if self.status_callback:
             self.status_callback(message)
@@ -2504,7 +2688,7 @@ class LauncherCore:
         """
         window_mode = str(window_mode or "unchanged").lower()
         if window_mode not in {"windowed", "fullscreen"}:
-            self.emit_log("Global launch setting: window mode unchanged")
+            self.emit_log("Глобальные настройки запуска: режим окна не изменять")
             return
 
         options_path = self.game_dir / "options.txt"
@@ -2532,7 +2716,7 @@ class LauncherCore:
             new_lines.append(f"fullscreen:{value}")
 
         options_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-        self.emit_log(f"Global launch setting: fullscreen={value}")
+        self.emit_log(f"Глобальные настройки запуска: fullscreen={value}")
 
 
     def update_options_txt_values(self, updates: dict[str, str]):
@@ -2603,9 +2787,9 @@ class LauncherCore:
 
         if updates:
             self.update_options_txt_values(updates)
-            self.emit_log("Global game options applied: " + ", ".join(sorted(updates.keys())))
+            self.emit_log("Глобальные игровые настройки применены: " + ", ".join(sorted(updates.keys())))
         else:
-            self.emit_log("Global game options: unchanged")
+            self.emit_log("Глобальные игровые настройки: не изменять")
 
     def build_auth_options(self, account: dict | None, fallback_username: str) -> dict:
         account = account or {}
@@ -2701,10 +2885,10 @@ class LauncherCore:
 
         leftovers = [part for part in patched if "${" in part and "}" in part]
         if leftovers:
-            self.emit_log("Launch auth patch: остались неразрешённые шаблоны: " + ", ".join(leftovers[:5]))
+            self.emit_log("Патч авторизации запуска: остались неразрешённые шаблоны: " + ", ".join(leftovers[:5]))
         else:
             self.emit_log(
-                "Launch auth patch: "
+                "Патч авторизации запуска: "
                 f"userType={user_type}, "
                 f"xuid={'set' if xuid != '0' else '0'}, "
                 f"clientId={'set' if client_id != '0' else '0'}"
@@ -2725,11 +2909,11 @@ class LauncherCore:
 
         self.apply_window_mode_preference(window_mode)
         self.apply_game_options_preferences(global_launch)
-        self.emit_log(f"Global launch memory: Xms={ram_min_mb}M, Xmx={ram_max_mb}M")
+        self.emit_log(f"Глобальные настройки памяти запуска: Xms={ram_min_mb}M, Xmx={ram_max_mb}M")
         if window_width and window_height:
-            self.emit_log(f"Global launch window size: {window_width}x{window_height}")
+            self.emit_log(f"Глобальный размер окна запуска: {window_width}x{window_height}")
         else:
-            self.emit_log("Global launch window size: default")
+            self.emit_log("Глобальный размер окна запуска: по умолчанию")
 
         auth_options = self.build_auth_options(account, username)
 
@@ -2792,7 +2976,7 @@ class LauncherCore:
             # Не используем STARTF_USESHOWWINDOW/SW_HIDE для игры:
             # на старом Forge/LWJGL это может спрятать само окно Minecraft.
             creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-            self.emit_log("Windows launch: CREATE_NO_WINDOW включён, SW_HIDE отключён.")
+            self.emit_log("Запуск Windows: CREATE_NO_WINDOW включён, SW_HIDE отключён.")
 
         process = subprocess.Popen(
             command,
@@ -2801,12 +2985,14 @@ class LauncherCore:
             stderr=subprocess.STDOUT,
             stdin=subprocess.DEVNULL,
             text=True,
+            encoding="utf-8",
             errors="replace",
             bufsize=1,
             creationflags=creationflags
         )
 
         self.register_running_process(process)
+        self.append_launcher_log("Minecraft process started.", category="game")
         threading.Thread(target=self._read_process_output, args=(process,), daemon=True).start()
         self.emit_status("Minecraft запущен.")
         return process
@@ -2817,8 +3003,10 @@ class LauncherCore:
                 for line in process.stdout:
                     self.emit_console(line)
             code = process.wait()
+            self.append_launcher_log(f"Minecraft process exited with code {code}.", category="game")
             self.emit_console(f"=== Minecraft process exited with code {code} ===")
         except Exception as exc:
+            self.append_launcher_log(f"Ошибка чтения вывода Minecraft: {exc}", category="game-error")
             self.emit_console(f"=== Ошибка чтения вывода Minecraft: {exc} ===")
         finally:
             self.unregister_running_process(process)
@@ -2950,7 +3138,7 @@ QUILT_LOADER_META_URL = "https://meta.quiltmc.org/v3/versions/loader/{minecraft_
 NEOFORGE_MAVEN_METADATA_URL = "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml"
 
 HTTP_HEADERS = {
-    "User-Agent": "StoneLightLauncher/0.6.71 (+https://github.com/stonelightmc/StoneLight-Launcher)",
+    "User-Agent": "StoneLightLauncher/1.0.0 (+https://github.com/stonelightmc/StoneLight-Launcher)",
     "Accept": "application/json, text/xml, application/xml, text/plain, */*",
 }
 

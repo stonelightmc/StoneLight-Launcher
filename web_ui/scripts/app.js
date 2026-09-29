@@ -12,11 +12,15 @@
     instanceWindowId: "",
     instanceWindowData: null,
     currentFolderKey: "mods",
+    consoleLogsByInstance: {},
+    consoleMaxLines: 1200,
     screenshotPreviewFiles: [],
     screenshotPreviewIndex: -1,
     launchSettingsLoaded: false,
     updateCenterData: null,
     updateAutoCheckData: null,
+    contentUpdateData: null,
+    contentUpdateExcludedPaths: new Set(),
     iconPickerInstanceId: "",
     iconPickerIcons: [],
     iconPickerCategories: ["All"],
@@ -143,7 +147,7 @@
       this.renderStatus(window.SLLState.status || {});
       this.updateActionStates();
       this.renderUpdateIndicator();
-      $("#versionLabel").textContent = `v${window.SLLState.launcher?.version || "0.6.71"}`;
+      $("#versionLabel").textContent = `v${window.SLLState.launcher?.version || "1.0.0"}`;
     },
 
     renderMenuControls() {
@@ -295,13 +299,31 @@
       );
     },
 
+    setStatus(status = {}) {
+      window.SLLState.status = {
+        ...window.SLLState.status,
+        ...status
+      };
+      this.renderStatus(window.SLLState.status || {});
+      this.updateActionStates();
+    },
+
     renderStatus(status) {
       const busy = Boolean(status.busy);
+      const error = Boolean(status.error);
       const dot = $("#statusDot");
       dot.classList.toggle("is-busy", busy);
-      dot.classList.toggle("is-error", Boolean(status.error));
-      $("#statusText").textContent = status.message ? this.localizeMessage(status.message) : this.t("status.ready");
-      const progress = Math.max(0, Math.min(1, Number(status.progress || 0)));
+      dot.classList.toggle("is-error", error);
+
+      // When the operation is over, the global bar should return to a neutral
+      // Ready state. Completed action details belong to toast/logs, not to the
+      // persistent status strip.
+      const message = (!busy && !error)
+        ? this.t("status.ready")
+        : (status.message ? this.localizeMessage(status.message) : this.t("status.ready"));
+      $("#statusText").textContent = message;
+
+      const progress = busy ? Math.max(0, Math.min(1, Number(status.progress || 0))) : 0;
       $("#progressBar").style.width = `${progress * 100}%`;
     },
 
@@ -461,6 +483,33 @@
       });
       $("#refreshFolderButton")?.addEventListener("click", () => this.refreshCurrentFolder());
       $("#openCurrentFolderButton")?.addEventListener("click", () => this.openInstanceSubfolder(this.currentFolderKey));
+      $("#clearInstanceConsoleButton")?.addEventListener("click", () => this.clearInstanceConsole());
+      $("#openInstanceLogsFolderButton")?.addEventListener("click", () => this.openInstanceSubfolder("logs"));
+      $("#uploadLatestLogButton")?.addEventListener("click", () => this.uploadLatestLogToMclogs());
+      $("#copyMclogsLinkButton")?.addEventListener("click", () => this.copyMclogsLink());
+      $("#contentUpdateClose")?.addEventListener("click", () => this.closeContentUpdateDialog());
+      $("#contentUpdateCancel")?.addEventListener("click", () => this.closeContentUpdateDialog());
+      $("#contentUpdateBackdrop")?.addEventListener("click", event => {
+        if (event.target.id === "contentUpdateBackdrop") this.closeContentUpdateDialog();
+      });
+      $("#contentUpdateRefresh")?.addEventListener("click", () => this.loadContentUpdateInventory(false));
+      $("#contentUpdateFind")?.addEventListener("click", () => this.findContentUpdates());
+      $("#contentUpdateApply")?.addEventListener("click", () => this.applyContentUpdates());
+      $("#contentUpdateLoadMinecraftVersionsButton")?.addEventListener("click", () => this.loadContentUpdateMinecraftVersionOptions());
+      $("#contentUpdateResetMinecraftButton")?.addEventListener("click", () => this.resetContentUpdateTargetMinecraft());
+      $("#contentUpdateLoadLoaderVersionsButton")?.addEventListener("click", () => this.loadContentUpdateLoaderVersionOptions());
+      $("#contentUpdateLoaderSelect")?.addEventListener("change", () => {
+        this.syncContentUpdateTargetFields();
+        this.loadContentUpdateInventory(false);
+      });
+      $("#contentUpdateMinecraftInput")?.addEventListener("change", () => {
+        this.syncContentUpdateTargetFields();
+        this.loadContentUpdateInventory(false);
+      });
+      $("#contentUpdateLoaderVersionInput")?.addEventListener("change", () => this.loadContentUpdateInventory(false));
+      $$('[data-content-update-folder]').forEach(input => {
+        input.addEventListener("change", () => this.loadContentUpdateInventory(false));
+      });
       $("#screenshotPreviewClose")?.addEventListener("click", () => this.closeScreenshotPreview());
       $("#screenshotPreviewPrev")?.addEventListener("click", () => this.showAdjacentScreenshot(-1));
       $("#screenshotPreviewNext")?.addEventListener("click", () => this.showAdjacentScreenshot(1));
@@ -1048,12 +1097,26 @@
     modrinthChoiceLabels() {
       return {
         en: {
+          "console.clear": "Clear console",
+          "console.openLogs": "Open logs folder",
+          "console.uploadDone": "latest.log uploaded.",
+          "console.linkCopied": "Link copied.",
+          "console.copyLink": "Copy link",
+          "console.uploading": "Uploading…",
+          "console.uploadLatest": "Upload latest.log",
           "": "Any",
           client: "Client",
           server: "Server",
           both: "Client + Server"
         },
         uk: {
+          "console.clear": "Очистити консоль",
+          "console.openLogs": "Відкрити папку logs",
+          "console.uploadDone": "latest.log надіслано.",
+          "console.linkCopied": "Посилання скопійовано.",
+          "console.copyLink": "Копіювати",
+          "console.uploading": "Надсилання…",
+          "console.uploadLatest": "Надіслати latest.log",
           "": "Будь-який",
           client: "Клієнт",
           server: "Сервер",
@@ -1161,6 +1224,13 @@
           "semi-realistic": "Напівреалістичні"
         },
         kk: {
+          "console.clear": "Консольді тазарту",
+          "console.openLogs": "logs қалтасын ашу",
+          "console.uploadDone": "latest.log жіберілді.",
+          "console.linkCopied": "Сілтеме көшірілді.",
+          "console.copyLink": "Көшіру",
+          "console.uploading": "Жіберілуде…",
+          "console.uploadLatest": "latest.log жіберу",
           "": "Кез келген",
           client: "Клиент",
           server: "Сервер",
@@ -1560,6 +1630,56 @@
       }
     },
 
+
+    instanceWindowText(key) {
+      const value = this.t(key);
+      if (value && value !== key) return value;
+
+      const lang = window.SLLState?.preferences?.language || "en";
+      const fallback = {
+        en: {
+          "instanceWindow.console": "Console",
+          "console.hint": "Live output for this instance only.",
+          "console.openLogs": "Open logs folder",
+          "console.uploadLatest": "Upload latest.log",
+          "console.uploading": "Uploading…",
+          "console.copyLink": "Copy link",
+          "console.linkCopied": "Link copied.",
+          "console.uploadDone": "latest.log uploaded.",
+          "console.clear": "Clear console",
+          "console.cleared": "Console cleared for this instance.",
+          "console.empty": "Console is empty. Launch this instance to see its output here."
+        },
+        uk: {
+          "instanceWindow.console": "Консоль",
+          "console.hint": "Живий вивід лише цієї збірки.",
+          "console.openLogs": "Відкрити папку logs",
+          "console.uploadLatest": "Надіслати latest.log",
+          "console.uploading": "Надсилання…",
+          "console.copyLink": "Копіювати",
+          "console.linkCopied": "Посилання скопійовано.",
+          "console.uploadDone": "latest.log надіслано.",
+          "console.clear": "Очистити консоль",
+          "console.cleared": "Консоль цієї збірки очищено.",
+          "console.empty": "Консоль порожня. Запустіть цю збірку, щоб побачити її вивід."
+        },
+        kk: {
+          "instanceWindow.console": "Консоль",
+          "console.hint": "Тек осы жинақтың тірі шығысы.",
+          "console.openLogs": "logs қалтасын ашу",
+          "console.uploadLatest": "latest.log жіберу",
+          "console.uploading": "Жіберілуде…",
+          "console.copyLink": "Көшіру",
+          "console.linkCopied": "Сілтеме көшірілді.",
+          "console.uploadDone": "latest.log жіберілді.",
+          "console.clear": "Консольді тазарту",
+          "console.cleared": "Осы жинақтың консолі тазартылды.",
+          "console.empty": "Консоль бос. Осы жинақты іске қосқанда шығыс осында көрінеді."
+        }
+      };
+
+      return fallback[lang]?.[key] || fallback.uk?.[key] || fallback.en?.[key] || key;
+    },
 
     instanceToolText(key) {
       const value = this.t(key);
@@ -3445,7 +3565,7 @@
     openAboutDialog() {
       const launcher = window.SLLState?.launcher || {};
       const name = launcher.name || "StoneLight Launcher";
-      const version = launcher.version || "0.6.71";
+      const version = launcher.version || "1.0.0";
       const versionLabel = $("#aboutVersion");
       if (versionLabel) {
         versionLabel.textContent = `${name} v${version}`;
@@ -3503,7 +3623,36 @@
       $$("[data-instance-window-panel]").forEach(panel => {
         panel.classList.toggle("is-active", panel.dataset.instanceWindowPanel === tabName);
       });
+      if (tabName === "console") {
+        this.localizeInstanceConsoleChrome();
+        this.renderInstanceConsole(true);
+      }
     },
+
+    setConsoleButtonText() {
+      const clear = $("#clearInstanceConsoleButton");
+      if (clear) clear.textContent = this.instanceWindowText("console.clear");
+
+      const openLogs = $("#openInstanceLogsFolderButton");
+      if (openLogs) openLogs.textContent = this.instanceWindowText("console.openLogs");
+
+      const upload = $("#uploadLatestLogButton");
+      if (upload && !upload.disabled) upload.textContent = this.instanceWindowText("console.uploadLatest");
+
+      const copy = $("#copyMclogsLinkButton");
+      if (copy) copy.textContent = this.instanceWindowText("console.copyLink");
+    },
+
+    localizeInstanceConsoleChrome() {
+      const tab = document.querySelector('[data-instance-window-tab="console"]');
+      if (tab) tab.textContent = this.instanceWindowText("instanceWindow.console");
+
+      const title = $("#instanceConsoleTitle");
+      if (title) title.textContent = this.instanceWindowText("instanceWindow.console");
+
+      this.setConsoleButtonText();
+    },
+
 
     renderInstanceWindow(data) {
       this.instanceWindowData = data;
@@ -3531,15 +3680,635 @@
       this.renderOfficialUpdateNotice(data.official_update || null);
       this.renderModrinthModpackUpdateNotice(data.modrinth_modpack_update || null);
       this.renderCurseForgeModpackUpdateNotice(data.curseforge_modpack_update || null);
+      this.renderContentUpdateButton(data.content_update || null);
       const curseforgeReportButton = $("#curseforgeModpackReportButton");
       if (curseforgeReportButton) {
         curseforgeReportButton.classList.add("hidden");
         curseforgeReportButton.textContent = this.curseforgeModpackReportLabel();
       }
 
+      this.setMclogsLink("");
+      this.loadInstanceConsoleFromData(data);
       this.renderFolderSubtabs(data.folders || []);
+      this.localizeInstanceConsoleChrome();
+      this.renderInstanceConsole(true);
       this.populateWindowSettings(instance);
     },
+
+    contentUpdateText(key) {
+      const value = this.t(key);
+      if (value && value !== key) return value;
+      const lang = window.SLLState?.preferences?.language || "en";
+      const fallback = {
+        "en": {
+                "contentUpdate.open": "Update content",
+                "contentUpdate.eyebrow": "Content updates",
+                "contentUpdate.title": "Content update",
+                "contentUpdate.whatToUpdate": "What to update",
+                "contentUpdate.targetMinecraft": "Target Minecraft version",
+                "contentUpdate.targetLoader": "Mod loader",
+                "contentUpdate.targetLoaderVersion": "Loader version",
+                "contentUpdate.resetTarget": "Reset to instance version",
+                "contentUpdate.refreshInventory": "Refresh inventory",
+                "contentUpdate.findUpdates": "Find updates",
+                "contentUpdate.applyUpdates": "Apply updates",
+                "contentUpdate.applyMigration": "Migrate instance",
+                "contentUpdate.applying": "Applying updates…",
+                "contentUpdate.applyDone": "Updates applied.",
+                "contentUpdate.migrationDone": "Instance migrated.",
+                "contentUpdate.migrationBlocked": "Migration blocked by unresolved items",
+                "contentUpdate.inventoryOnly": "Content inventory is ready. Change the target version/loader and click Find updates.",
+                "contentUpdate.unsupported": "Content updates are not available for this instance.",
+                "contentUpdate.noItems": "No supported content files found.",
+                "contentUpdate.total": "Total files",
+                "contentUpdate.known": "Known source",
+                "contentUpdate.unknown": "Unknown source",
+                "contentUpdate.source": "Source",
+                "contentUpdate.notChecked": "Not checked yet",
+                "contentUpdate.detectLater": "Needs source detection",
+                "contentUpdate.knownSource": "Known source",
+                "contentUpdate.searching": "Searching for updates…",
+                "contentUpdate.previewReady": "Update search completed. Preview is read-only until Apply updates.",
+                "contentUpdate.migrationPreviewReady": "Migration preview completed. Apply is available only when there are no blockers.",
+                "contentUpdate.updatesAvailable": "Updates",
+                "contentUpdate.upToDate": "Up to date",
+                "contentUpdate.manualRequired": "Manual",
+                "contentUpdate.modified": "Modified",
+                "contentUpdate.errors": "Errors",
+                "contentUpdate.sourceDetected": "Detected",
+                "contentUpdate.incompatible": "Incompatible",
+                "contentUpdate.excluded": "Excluded",
+                "contentUpdate.applied": "Applied",
+                "contentUpdate.skipped": "Skipped",
+                "contentUpdate.status.update_available": "Update available",
+                "contentUpdate.status.up_to_date": "Up to date",
+                "contentUpdate.status.manual_required": "Manual install required",
+                "contentUpdate.status.unknown_source": "Source unknown",
+                "contentUpdate.status.modified": "File changed manually",
+                "contentUpdate.status.incompatible": "Incompatible",
+                "contentUpdate.status.excluded": "Excluded",
+                "contentUpdate.status.error": "Error",
+                "contentUpdate.status.not_checked": "Not checked yet",
+                "contentUpdate.current": "Current",
+                "contentUpdate.latest": "Latest"
+        },
+        "uk": {
+                "contentUpdate.open": "Оновити контент",
+                "contentUpdate.eyebrow": "Оновлення контенту",
+                "contentUpdate.title": "Оновлення контенту",
+                "contentUpdate.whatToUpdate": "Що оновлювати",
+                "contentUpdate.targetMinecraft": "Цільова версія Minecraft",
+                "contentUpdate.targetLoader": "Модлоадер",
+                "contentUpdate.targetLoaderVersion": "Версія модлоадера",
+                "contentUpdate.resetTarget": "Повернути версію збірки",
+                "contentUpdate.refreshInventory": "Оновити список",
+                "contentUpdate.findUpdates": "Знайти оновлення",
+                "contentUpdate.applyUpdates": "Застосувати оновлення",
+                "contentUpdate.applyMigration": "Мігрувати збірку",
+                "contentUpdate.applying": "Застосовую оновлення…",
+                "contentUpdate.applyDone": "Оновлення застосовано.",
+                "contentUpdate.migrationDone": "Збірку мігровано.",
+                "contentUpdate.migrationBlocked": "Міграцію заблоковано невирішеними елементами",
+                "contentUpdate.inventoryOnly": "Інвентар контенту готовий. Змініть цільову версію/модлоадер і натисніть «Знайти оновлення».",
+                "contentUpdate.unsupported": "Оновлення контенту недоступне для цієї збірки.",
+                "contentUpdate.noItems": "Підтримувані файли контенту не знайдені.",
+                "contentUpdate.total": "Усього файлів",
+                "contentUpdate.known": "Відоме джерело",
+                "contentUpdate.unknown": "Невідоме джерело",
+                "contentUpdate.source": "Джерело",
+                "contentUpdate.notChecked": "Ще не перевірено",
+                "contentUpdate.detectLater": "Потрібно визначити джерело",
+                "contentUpdate.knownSource": "Джерело відоме",
+                "contentUpdate.searching": "Шукаю оновлення…",
+                "contentUpdate.previewReady": "Пошук оновлень завершено. Це попередній перегляд до натискання «Застосувати оновлення».",
+                "contentUpdate.migrationPreviewReady": "Попередній перегляд міграції завершено. Застосування доступне лише без блокувальних елементів.",
+                "contentUpdate.updatesAvailable": "Оновлення",
+                "contentUpdate.upToDate": "Актуальні",
+                "contentUpdate.manualRequired": "Вручну",
+                "contentUpdate.modified": "Змінені",
+                "contentUpdate.errors": "Помилки",
+                "contentUpdate.sourceDetected": "Визначено",
+                "contentUpdate.incompatible": "Несумісні",
+                "contentUpdate.excluded": "Виключені",
+                "contentUpdate.applied": "Застосовано",
+                "contentUpdate.skipped": "Пропущено",
+                "contentUpdate.status.update_available": "Є оновлення",
+                "contentUpdate.status.up_to_date": "Актуально",
+                "contentUpdate.status.manual_required": "Потрібне ручне встановлення",
+                "contentUpdate.status.unknown_source": "Джерело невідоме",
+                "contentUpdate.status.modified": "Файл змінено вручну",
+                "contentUpdate.status.incompatible": "Несумісно",
+                "contentUpdate.status.excluded": "Виключено",
+                "contentUpdate.status.error": "Помилка",
+                "contentUpdate.status.not_checked": "Ще не перевірено",
+                "contentUpdate.current": "Поточна",
+                "contentUpdate.latest": "Остання"
+        },
+        "kk": {
+                "contentUpdate.open": "Контентті жаңарту",
+                "contentUpdate.eyebrow": "Контент жаңартулары",
+                "contentUpdate.title": "Контентті жаңарту",
+                "contentUpdate.whatToUpdate": "Нені жаңарту",
+                "contentUpdate.targetMinecraft": "Мақсатты Minecraft нұсқасы",
+                "contentUpdate.targetLoader": "Модлоадер",
+                "contentUpdate.targetLoaderVersion": "Модлоадер нұсқасы",
+                "contentUpdate.resetTarget": "Жинақ нұсқасына қайтару",
+                "contentUpdate.refreshInventory": "Тізімді жаңарту",
+                "contentUpdate.findUpdates": "Жаңартуларды табу",
+                "contentUpdate.applyUpdates": "Жаңартуларды қолдану",
+                "contentUpdate.applyMigration": "Жинақты көшіру",
+                "contentUpdate.applying": "Жаңартулар қолданылуда…",
+                "contentUpdate.applyDone": "Жаңартулар қолданылды.",
+                "contentUpdate.migrationDone": "Жинақ көшірілді.",
+                "contentUpdate.migrationBlocked": "Миграция шешілмеген элементтермен бұғатталды",
+                "contentUpdate.inventoryOnly": "Контент инвентаризациясы дайын. Мақсатты нұсқа/модлоадерді өзгертіп, жаңартуларды табыңыз.",
+                "contentUpdate.unsupported": "Бұл жинақ үшін контент жаңартулары қолжетімсіз.",
+                "contentUpdate.noItems": "Қолдау көрсетілетін контент файлдары табылмады.",
+                "contentUpdate.total": "Барлық файлдар",
+                "contentUpdate.known": "Белгілі дереккөз",
+                "contentUpdate.unknown": "Белгісіз дереккөз",
+                "contentUpdate.source": "Дереккөз",
+                "contentUpdate.notChecked": "Әлі тексерілмеді",
+                "contentUpdate.detectLater": "Дереккөзді анықтау қажет",
+                "contentUpdate.knownSource": "Дереккөз белгілі",
+                "contentUpdate.searching": "Жаңартулар ізделуде…",
+                "contentUpdate.previewReady": "Жаңарту іздеу аяқталды. Бұл «Жаңартуларды қолдану» батырмасына дейінгі алдын ала қарау.",
+                "contentUpdate.migrationPreviewReady": "Миграцияны алдын ала қарау аяқталды. Қолдану тек бұғаттаушы элементтер жоқ болса қолжетімді.",
+                "contentUpdate.updatesAvailable": "Жаңартулар",
+                "contentUpdate.upToDate": "Өзекті",
+                "contentUpdate.manualRequired": "Қолмен",
+                "contentUpdate.modified": "Өзгертілген",
+                "contentUpdate.errors": "Қателер",
+                "contentUpdate.sourceDetected": "Анықталды",
+                "contentUpdate.incompatible": "Үйлесімсіз",
+                "contentUpdate.excluded": "Алынып тасталды",
+                "contentUpdate.applied": "Қолданылды",
+                "contentUpdate.skipped": "Өткізілді",
+                "contentUpdate.status.update_available": "Жаңарту бар",
+                "contentUpdate.status.up_to_date": "Өзекті",
+                "contentUpdate.status.manual_required": "Қолмен орнату қажет",
+                "contentUpdate.status.unknown_source": "Дереккөз белгісіз",
+                "contentUpdate.status.modified": "Файл қолмен өзгертілген",
+                "contentUpdate.status.incompatible": "Үйлесімсіз",
+                "contentUpdate.status.excluded": "Алынып тасталды",
+                "contentUpdate.status.error": "Қате",
+                "contentUpdate.status.not_checked": "Әлі тексерілмеді",
+                "contentUpdate.current": "Ағымдағы",
+                "contentUpdate.latest": "Соңғы"
+        }
+};
+      return fallback[lang]?.[key] || fallback.uk?.[key] || fallback.en?.[key] || key;
+    },
+
+    renderContentUpdateButton(info) {
+      const button = $("#contentUpdateButton");
+      if (!button) return;
+      button.textContent = this.contentUpdateText("contentUpdate.open");
+      button.classList.toggle("hidden", !info?.supported);
+    },
+
+    selectedContentUpdateFolders() {
+      const selected = $$('[data-content-update-folder]')
+        .filter(input => input.checked)
+        .map(input => input.dataset.contentUpdateFolder);
+      return selected.length ? selected : ["mods", "resourcepacks", "shaderpacks"];
+    },
+
+    isContentUpdateItemExcluded(relativePath) {
+      return Boolean(relativePath && this.contentUpdateExcludedPaths?.has(relativePath));
+    },
+
+    toggleContentUpdateItem(relativePath, checked) {
+      if (!relativePath) return;
+      if (!this.contentUpdateExcludedPaths) this.contentUpdateExcludedPaths = new Set();
+
+      if (checked) this.contentUpdateExcludedPaths.delete(relativePath);
+      else this.contentUpdateExcludedPaths.add(relativePath);
+
+      if (this.contentUpdateData) {
+        this.renderContentUpdateDialog(this.contentUpdateData, this.contentUpdateData.stage === "updates_preview");
+      }
+    },
+
+    contentUpdateOptions() {
+      const minecraftInput = $("#contentUpdateMinecraftInput");
+      const loaderSelect = $("#contentUpdateLoaderSelect");
+      const loaderVersionInput = $("#contentUpdateLoaderVersionInput");
+      const targetMinecraft = (minecraftInput?.value || this.contentUpdateData?.target?.minecraft_version || "").trim();
+      const targetLoader = (loaderSelect?.value || this.contentUpdateData?.target?.loader || "vanilla").trim().toLowerCase();
+      const targetLoaderVersion = (loaderVersionInput?.value || this.contentUpdateData?.target?.loader_version || "").trim();
+      return {
+        folders: this.selectedContentUpdateFolders(),
+        target_minecraft_version: targetMinecraft,
+        target_loader: targetLoader,
+        target_loader_version: targetLoaderVersion,
+        excluded_relative_paths: Array.from(this.contentUpdateExcludedPaths || []),
+      };
+    },
+
+    resetContentUpdateTargetMinecraft() {
+      const input = $("#contentUpdateMinecraftInput");
+      const original = this.contentUpdateData?.instance?.minecraft_version || "";
+      if (input) input.value = original;
+      this.loadContentUpdateInventory(false);
+    },
+
+    syncContentUpdateTargetFields() {
+      const loader = ($("#contentUpdateLoaderSelect")?.value || "vanilla").toLowerCase();
+      const loaderInput = $("#contentUpdateLoaderVersionInput");
+      const loaderButton = $("#contentUpdateLoadLoaderVersionsButton");
+
+      if (loaderInput) loaderInput.disabled = loader === "vanilla";
+      if (loaderButton) loaderButton.disabled = loader === "vanilla";
+      if (loader === "vanilla" && loaderInput) {
+        loaderInput.value = "";
+      }
+    },
+
+    async loadContentUpdateMinecraftVersionOptions() {
+      const button = $("#contentUpdateLoadMinecraftVersionsButton");
+      const note = $("#contentUpdateMinecraftVersionsNote");
+      if (!button) return;
+
+      button.disabled = true;
+      if (note) note.textContent = this.t("picker.loading");
+      try {
+        const result = await window.SLLApi.call("get_minecraft_version_options", false);
+        if (!result?.ok) {
+          if (note) note.textContent = result?.error || this.t("editor.versionsFailed");
+          return;
+        }
+        const versions = result.versions || [];
+        if (note) note.textContent = versions.length ? `${this.t("picker.loaded")}: ${versions.length}` : this.t("editor.noVersions");
+        this.openVersionPicker("content-update-minecraft", versions, this.t("picker.minecraft"), $("#contentUpdateMinecraftInput")?.value?.trim() || "");
+      } catch (error) {
+        if (note) note.textContent = error?.message || String(error);
+      } finally {
+        button.disabled = false;
+      }
+    },
+
+    async loadContentUpdateLoaderVersionOptions() {
+      const loader = $("#contentUpdateLoaderSelect")?.value || "vanilla";
+      const minecraftVersion = $("#contentUpdateMinecraftInput")?.value?.trim() || "";
+      const input = $("#contentUpdateLoaderVersionInput");
+      const button = $("#contentUpdateLoadLoaderVersionsButton");
+
+      if (loader === "vanilla") {
+        if (input) input.value = "";
+        return;
+      }
+      if (!minecraftVersion) {
+        this.toast(this.t("editor.minecraftFirst"), true);
+        return;
+      }
+
+      if (button) button.disabled = true;
+      try {
+        const result = await window.SLLApi.call("get_loader_version_options", loader, minecraftVersion, true);
+        if (!result?.ok) {
+          this.toast(result?.error || this.t("editor.versionsFailed"), true);
+          return;
+        }
+
+        const versions = result.versions || [];
+        if (!versions.length) {
+          this.toast(this.t("editor.noVersions"), true);
+          return;
+        }
+
+        this.openVersionPicker(
+          "content-update-loader",
+          versions,
+          `${this.t("picker.loader")} · ${this.capitalize(loader)} ${minecraftVersion}`,
+          input?.value?.trim() || ""
+        );
+      } catch (error) {
+        this.toast(error?.message || String(error), true);
+      } finally {
+        if (button) button.disabled = false;
+      }
+    },
+
+
+    localizeContentUpdateChrome() {
+      const dialog = $("#contentUpdateDialog");
+      if (!dialog) return;
+
+      dialog.querySelectorAll("[data-i18n]").forEach(element => {
+        const key = element.dataset.i18n;
+        if (key && key.startsWith("contentUpdate.")) {
+          element.textContent = this.contentUpdateText(key);
+        }
+      });
+
+      const refresh = $("#contentUpdateRefresh");
+      if (refresh) refresh.textContent = this.contentUpdateText("contentUpdate.refreshInventory");
+
+      const find = $("#contentUpdateFind");
+      if (find) find.textContent = this.contentUpdateText("contentUpdate.findUpdates");
+
+      const apply = $("#contentUpdateApply");
+      if (apply && !apply.disabled) apply.textContent = this.contentUpdateText("contentUpdate.applyUpdates");
+
+      const reset = $("#contentUpdateResetMinecraftButton");
+      if (reset) reset.title = this.contentUpdateText("contentUpdate.resetTarget");
+
+      const loadMc = $("#contentUpdateLoadMinecraftVersionsButton");
+      if (loadMc) loadMc.title = this.t("editor.loadVersions");
+
+      const loadLoader = $("#contentUpdateLoadLoaderVersionsButton");
+      if (loadLoader) loadLoader.title = this.t("editor.loadVersions");
+    },
+
+    async openContentUpdateDialog() {
+      if (!this.instanceWindowId) return;
+      this.contentUpdateExcludedPaths = new Set();
+      const backdrop = $("#contentUpdateBackdrop");
+      if (!backdrop) return;
+      this.localizeContentUpdateChrome();
+      backdrop.classList.remove("hidden");
+      backdrop.setAttribute("aria-hidden", "false");
+      await this.loadContentUpdateInventory(false);
+    },
+
+    closeContentUpdateDialog() {
+      const backdrop = $("#contentUpdateBackdrop");
+      if (!backdrop) return;
+      backdrop.classList.add("hidden");
+      backdrop.setAttribute("aria-hidden", "true");
+    },
+
+    contentUpdateStatusText(status) {
+      return this.contentUpdateText(`contentUpdate.status.${status || "not_checked"}`);
+    },
+
+    async findContentUpdates() {
+      if (!this.instanceWindowId) return;
+      const status = $("#contentUpdateStatus");
+      const button = $("#contentUpdateFind");
+      const previousText = button?.textContent || "";
+
+      if (status) {
+        status.classList.remove("hidden");
+        status.textContent = this.contentUpdateText("contentUpdate.searching");
+      }
+      if (button) {
+        button.disabled = true;
+        button.textContent = this.contentUpdateText("contentUpdate.searching");
+      }
+
+      try {
+        const result = await window.SLLApi.call("check_content_updates", this.instanceWindowId, this.contentUpdateOptions());
+
+        if (!result?.ok) {
+          if (status) status.textContent = result?.error || this.t("error.generic");
+          this.toast(result?.error || this.t("error.generic"), true);
+          return;
+        }
+
+        this.contentUpdateData = result;
+        this.renderContentUpdateDialog(result, true);
+        this.setStatus({
+          busy: false,
+          message: this.contentUpdateText("contentUpdate.previewReady"),
+          error: false,
+          progress: 1
+        });
+      } catch (error) {
+        const message = error?.message || String(error);
+        if (status) status.textContent = message;
+        this.toast(message, true);
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.textContent = previousText || this.contentUpdateText("contentUpdate.findUpdates");
+        }
+        this.localizeContentUpdateChrome();
+      }
+    },
+
+    async applyContentUpdates() {
+      if (!this.instanceWindowId) return;
+      const status = $("#contentUpdateStatus");
+      const button = $("#contentUpdateApply");
+      const previousText = button?.textContent || "";
+
+      if (status) {
+        status.classList.remove("hidden");
+        status.textContent = this.contentUpdateText("contentUpdate.applying");
+      }
+      if (button) {
+        button.disabled = true;
+        button.textContent = this.contentUpdateText("contentUpdate.applying");
+      }
+
+      try {
+        const result = await window.SLLApi.call("apply_content_updates", this.instanceWindowId, this.contentUpdateOptions());
+
+        if (!result?.ok) {
+          if (status) status.textContent = result?.error || this.t("error.generic");
+          this.toast(result?.error || this.t("error.generic"), true);
+          return;
+        }
+
+        this.contentUpdateData = result;
+        if (result.state) this.setState(result.state);
+        this.renderContentUpdateDialog(result, true);
+
+        const counts = result.apply_counts || {};
+        const applied = counts.applied || 0;
+        const errors = counts.errors || 0;
+
+        this.setStatus({
+          busy: false,
+          message: this.contentUpdateText(result.migration_applied ? "contentUpdate.migrationDone" : "contentUpdate.applyDone"),
+          error: errors > 0,
+          progress: 1
+        });
+
+        this.toast(`${this.contentUpdateText("contentUpdate.applied")}: ${applied}${errors ? ` · ${this.contentUpdateText("contentUpdate.errors")}: ${errors}` : ""}`, errors > 0);
+      } catch (error) {
+        const message = error?.message || String(error);
+        if (status) status.textContent = message;
+        this.toast(message, true);
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.textContent = previousText || this.contentUpdateText("contentUpdate.applyUpdates");
+        }
+        this.localizeContentUpdateChrome();
+      }
+    },
+
+    async loadContentUpdateInventory(findUpdates = false) {
+      const status = $("#contentUpdateStatus");
+      if (status) {
+        status.classList.remove("hidden");
+        status.textContent = findUpdates
+          ? this.contentUpdateText("contentUpdate.inventoryOnly")
+          : this.t("status.loading");
+      }
+
+      const result = await window.SLLApi.call("get_content_update_inventory", this.instanceWindowId, this.contentUpdateOptions());
+
+      if (!result?.ok) {
+        if (status) status.textContent = result?.error || this.t("error.generic");
+        this.toast(result?.error || this.t("error.generic"), true);
+        return;
+      }
+
+      this.contentUpdateData = result;
+      this.renderContentUpdateDialog(result, findUpdates);
+    },
+
+    renderContentUpdateDialog(data, findUpdates = false) {
+      const instance = data.instance || {};
+      const target = data.target || {};
+      const isPreview = data.stage === "updates_preview";
+      this.localizeContentUpdateChrome();
+
+      $("#contentUpdateTitle").textContent = this.contentUpdateText("contentUpdate.title");
+      const targetMinecraft = target.minecraft_version || instance.minecraft_version || "";
+      const migration = Boolean(target.migration || data.migration_target || (targetMinecraft && instance.minecraft_version && targetMinecraft !== instance.minecraft_version));
+      $("#contentUpdateSubtitle").textContent = migration
+        ? `${instance.name || "—"} · Minecraft ${instance.minecraft_version || "?"} → ${targetMinecraft}`
+        : `${instance.name || "—"} · Minecraft ${targetMinecraft || "?"}`;
+      $("#contentUpdateMinecraftInput").value = targetMinecraft || "";
+      const targetLoader = target.loader || instance.loader || "vanilla";
+      const targetLoaderVersion = target.loader_version || "";
+      const loaderSelect = $("#contentUpdateLoaderSelect");
+      if (loaderSelect) loaderSelect.value = targetLoader;
+      const loaderVersionInput = $("#contentUpdateLoaderVersionInput");
+      if (loaderVersionInput) loaderVersionInput.value = targetLoaderVersion || "";
+      this.syncContentUpdateTargetFields();
+
+      const status = $("#contentUpdateStatus");
+      if (status) {
+        status.classList.remove("hidden");
+        if (!data.supported) {
+          status.textContent = data.reason || this.contentUpdateText("contentUpdate.unsupported");
+        } else if (data.stage === "migration_blocked") {
+          const blockers = data.migration_blockers || {};
+          status.textContent = `${this.contentUpdateText("contentUpdate.migrationBlocked")} (${blockers.total || 0})`;
+        } else if (isPreview) {
+          status.textContent = migration
+            ? this.contentUpdateText("contentUpdate.migrationPreviewReady")
+            : this.contentUpdateText(data.message || "contentUpdate.previewReady");
+        } else {
+          status.textContent = data.message || this.contentUpdateText("contentUpdate.inventoryOnly");
+        }
+      }
+
+      const counts = data.counts || {};
+      const bySource = counts.by_source || {};
+      const updates = counts.updates || null;
+      const applyCounts = data.apply_counts || null;
+      const summaryRows = applyCounts
+        ? [
+            [this.contentUpdateText("contentUpdate.applied"), applyCounts.applied || 0],
+            [this.contentUpdateText("contentUpdate.skipped"), applyCounts.skipped || 0],
+            [this.contentUpdateText("contentUpdate.errors"), applyCounts.errors || 0],
+            [this.contentUpdateText("contentUpdate.updatesAvailable"), updates?.update_available || 0],
+          ]
+        : updates
+        ? [
+            [this.contentUpdateText("contentUpdate.total"), counts.total || 0],
+            [this.contentUpdateText("contentUpdate.updatesAvailable"), updates.update_available || 0],
+            [this.contentUpdateText("contentUpdate.upToDate"), updates.up_to_date || 0],
+            [this.contentUpdateText("contentUpdate.manualRequired"), updates.manual_required || 0],
+            [this.contentUpdateText("contentUpdate.sourceDetected"), updates.source_detected || 0],
+            [this.contentUpdateText("contentUpdate.incompatible"), updates.incompatible || 0],
+            [this.contentUpdateText("contentUpdate.unknown"), updates.unknown_source || 0],
+            [this.contentUpdateText("contentUpdate.errors"), (updates.error || 0) + (updates.modified || 0)],
+          ]
+        : [
+            [this.contentUpdateText("contentUpdate.total"), counts.total || 0],
+            ["Modrinth", bySource.modrinth || 0],
+            ["CurseForge", bySource.curseforge || 0],
+            [this.contentUpdateText("contentUpdate.unknown"), bySource.unknown || 0],
+          ];
+
+      $("#contentUpdateSummary").innerHTML = summaryRows.map(([label, value]) => `
+        <div class="content-update-stat">
+          <span>${this.escape(label)}</span>
+          <strong>${this.escape(value)}</strong>
+        </div>
+      `).join("");
+
+      const applyButton = $("#contentUpdateApply");
+      if (applyButton) {
+        const available = updates?.update_available || 0;
+        const rawBlockers = (updates?.manual_required || 0) + (updates?.unknown_source || 0) + (updates?.modified || 0) + (updates?.error || 0) + (updates?.incompatible || 0);
+        const excludedCount = this.contentUpdateExcludedPaths?.size || 0;
+        const blockers = Math.max(0, rawBlockers - excludedCount);
+        const canApply = isPreview && (migration ? blockers === 0 : available > 0);
+        applyButton.classList.toggle("hidden", !canApply);
+        applyButton.textContent = migration
+          ? this.contentUpdateText("contentUpdate.applyMigration")
+          : this.contentUpdateText("contentUpdate.applyUpdates");
+      }
+
+      const list = $("#contentUpdateList");
+      const items = data.items || [];
+      if (!items.length) {
+        list.innerHTML = `<div class="form-note">${this.escape(this.contentUpdateText("contentUpdate.noItems"))}</div>`;
+        return;
+      }
+
+      list.innerHTML = items.map(item => {
+        const relativePath = item.relative_path || `${item.folder || ""}/${item.filename || ""}`;
+        const excluded = this.isContentUpdateItemExcluded(relativePath);
+        const source = item.source || "unknown";
+        const sourceLabel = source === "unknown"
+          ? this.contentUpdateText("contentUpdate.unknown")
+          : (item.source_label || (source === "modrinth" ? "Modrinth" : source === "curseforge" ? "CurseForge" : source));
+        const sourceClass = source === "modrinth" ? "modrinth" : source === "curseforge" ? "curseforge" : "unknown";
+        const statusKey = excluded ? "excluded" : (item.update_status || (item.source_known ? "not_checked" : "unknown_source"));
+        const statusText = excluded
+          ? this.contentUpdateText("contentUpdate.status.excluded")
+          : (isPreview
+            ? this.contentUpdateStatusText(statusKey)
+            : (item.source_known ? this.contentUpdateText("contentUpdate.knownSource") : this.contentUpdateText("contentUpdate.detectLater")));
+        const statusClass = statusKey.replace(/[^a-z0-9_-]/gi, "_");
+        const version = item.version_number || item.file_id || item.version_id || "";
+        const latest = item.latest || {};
+        const latestVersion = latest.version_number || latest.file_id || latest.version_id || "";
+        const latestBits = [];
+        if (isPreview && latestVersion) latestBits.push(`${this.contentUpdateText("contentUpdate.latest")}: ${latestVersion}`);
+        if (isPreview && latest.filename && latest.filename !== item.display_name && latest.filename !== item.filename) latestBits.push(latest.filename);
+        const reason = item.reason || "";
+        const latestLine = isPreview && (latestBits.length || reason)
+          ? `<div class="content-update-row__meta content-update-row__update">${this.escape(latestBits.join(" · ") || reason)}</div>`
+          : "";
+
+        return `
+          <article class="content-update-row content-update-row--${statusClass}">
+            <label class="content-update-row__check">
+              <input type="checkbox" data-content-update-item="${this.escape(relativePath)}" ${excluded ? "" : "checked"}>
+            </label>
+            <div class="content-update-row__body">
+              <div class="content-update-row__title">${this.escape(item.display_name || item.filename || "")}</div>
+              <div class="content-update-row__meta">
+                ${this.escape(item.folder || "")} · ${this.formatBytes(item.size_bytes || 0)}${version ? ` · ${this.contentUpdateText("contentUpdate.current")}: ${this.escape(version)}` : ""}
+              </div>
+              <div class="content-update-row__meta">${this.escape(item.relative_path || "")}</div>
+              ${latestLine}
+              ${isPreview && reason && latestBits.length ? `<div class="content-update-row__meta content-update-row__reason">${this.escape(reason)}</div>` : ""}
+            </div>
+            <div class="content-update-row__source">
+              <span class="content-source-badge content-source-badge--${sourceClass}">${this.escape(sourceLabel)}</span>
+              <span class="content-status-badge content-status-badge--${statusClass}">${this.escape(statusText)}</span>
+            </div>
+          </article>
+        `;
+      }).join("");
+
+      $$("[data-content-update-item]", list).forEach(input => {
+        input.addEventListener("change", () => this.toggleContentUpdateItem(input.dataset.contentUpdateItem, input.checked));
+      });
+    },
+
 
     renderModrinthModpackUpdateNotice(update) {
       const box = $("#modrinthModpackUpdateNotice");
@@ -3831,8 +4600,8 @@
     },
 
     renderFolderSubtabs(folders) {
-      const preferred = ["mods", "resourcepacks", "shaderpacks", "config", "saves", "screenshots", "logs"];
-      const available = folders.filter(folder => folder.key !== "root");
+      const preferred = ["mods", "resourcepacks", "shaderpacks", "config", "saves", "screenshots"];
+      const available = folders.filter(folder => folder.key !== "root" && folder.key !== "logs");
       const sorted = available.sort((a, b) => preferred.indexOf(a.key) - preferred.indexOf(b.key));
       if (!sorted.some(folder => folder.key === this.currentFolderKey)) {
         this.currentFolderKey = sorted[0]?.key || "mods";
@@ -3859,10 +4628,6 @@
       $$(".folder-subtab").forEach(button => {
         button.classList.toggle("is-active", button.dataset.folderSubtab === key);
       });
-      if (key === "logs") {
-        this.renderFolderFiles("logs", []);
-        return;
-      }
       await this.refreshCurrentFolder();
     },
 
@@ -3871,21 +4636,12 @@
       $("#folderPanelTitle").textContent = this.t(`folder.${folderKey}`) || folderKey;
       $("#folderPanelPath").textContent = folder?.path || "";
 
-      $("#refreshFolderButton").textContent = this.t(folderKey === "logs" ? "console.clear" : "instanceWindow.refreshMods");
+      $("#refreshFolderButton").textContent = this.t("instanceWindow.refreshMods");
       $("#openCurrentFolderButton").textContent = this.t("instanceWindow.openFolder");
 
       const list = $("#folderFileList");
       list.dataset.folderKey = folderKey;
 
-      if (folderKey === "logs") {
-        list.classList.add("hidden");
-        $("#folderFileEmpty").classList.add("hidden");
-        $("#instanceConsoleOutput").classList.remove("hidden");
-        this.renderInstanceConsole();
-        return;
-      }
-
-      $("#instanceConsoleOutput").classList.add("hidden");
       list.classList.remove("hidden");
       $("#folderFileEmpty").classList.toggle("hidden", files.length > 0);
 
@@ -3987,10 +4743,6 @@
 
     async refreshCurrentFolder() {
       if (!this.instanceWindowId) return;
-      if (this.currentFolderKey === "logs") {
-        this.clearInstanceConsole();
-        return;
-      }
       const result = await window.SLLApi.call("list_instance_folder", this.instanceWindowId, this.currentFolderKey);
       if (!result?.ok) {
         this.toast(result?.error || this.t("error.generic"), true);
@@ -4263,6 +5015,8 @@
         await this.runAction("stop");
       } else if (action === "folder") {
         await this.openInstanceSubfolder("root");
+      } else if (action === "content-update") {
+        await this.openContentUpdateDialog();
       } else if (action === "curseforge-modpack-report") {
         const report = this.instanceWindowData?.curseforge_modpack_install_report;
         if (report?.supported) {
@@ -4516,7 +5270,7 @@
       const button = $("#addMicrosoftAccountButton");
       const previousText = button.textContent;
       button.disabled = true;
-      button.textContent = this.t("account.microsoftOpening");
+      button.textContent = this.localizeMessage("account.microsoftOpening");
 
       try {
         const start = await window.SLLApi.call("start_microsoft_login");
@@ -4525,8 +5279,8 @@
           return;
         }
 
-        this.toast(start.message || this.t("account.microsoftOpening"));
-        this.setAccountManagerError(this.t("account.microsoftWaiting"));
+        this.toast(this.localizeMessage(start.message || "account.microsoftOpening"));
+        this.setAccountManagerError(this.localizeMessage("account.microsoftWaiting"));
 
         const done = await this.pollMicrosoftLoginStatus(start.session_id);
         if (!done?.ok) {
@@ -4541,7 +5295,7 @@
         }
 
         this.setAccountManagerError("");
-        this.toast(done.message || this.t("account.microsoftAdded"));
+        this.toast(this.localizeMessage(done.message || "account.microsoftAdded"));
       } catch (error) {
         this.setAccountManagerError(error?.message || String(error));
       } finally {
@@ -4569,7 +5323,7 @@
         }
 
         if (status.message) {
-          this.setAccountManagerError(status.message);
+          this.setAccountManagerError(this.localizeMessage(status.message));
         }
       }
 
@@ -4717,7 +5471,7 @@
 
       this.syncInstanceEditorFields();
 
-      // v0.6.71: version pickers open only by pressing the load buttons.
+      // v1.0.0: version pickers open only by pressing the load buttons.
       // Opening settings must not immediately pop up extra modal windows.
       const backdrop = $("#instanceEditorBackdrop");
       backdrop.classList.remove("hidden");
@@ -4921,6 +5675,21 @@
       if (this.versionPickerTarget === "window-loader") {
         $("#windowSettingsLoaderVersion").value = value;
         this.closeVersionPicker();
+        return;
+      }
+
+      if (this.versionPickerTarget === "content-update-minecraft") {
+        $("#contentUpdateMinecraftInput").value = value;
+        this.closeVersionPicker();
+        this.syncContentUpdateTargetFields();
+        this.loadContentUpdateInventory(false);
+        return;
+      }
+
+      if (this.versionPickerTarget === "content-update-loader") {
+        $("#contentUpdateLoaderVersionInput").value = value;
+        this.closeVersionPicker();
+        this.loadContentUpdateInventory(false);
       }
     },
 
@@ -5234,30 +6003,204 @@
       const output = $("#logOutput");
       output.textContent = logs.join("\n");
       output.scrollTop = output.scrollHeight;
-
-      this.renderInstanceConsole();
     },
 
-    renderInstanceConsole() {
+    instanceConsoleId(instanceId = "") {
+      return instanceId || this.instanceWindowId || window.SLLState?.selected_instance_id || "default";
+    },
+
+    loadInstanceConsoleFromData(data) {
+      const instanceId = data?.instance?.id || "";
+      if (!instanceId) return;
+
+      const history = data?.console?.lines || [];
+      this.consoleLogsByInstance[instanceId] = history.map(line => ({
+        message: String(line || ""),
+        source: "history"
+      })).slice(-this.consoleMaxLines);
+    },
+
+    appendInstanceConsole(payload) {
+      if (!payload) return;
+      const instanceId = this.instanceConsoleId(payload.instance_id || "");
+      const message = String(payload.message || "");
+      if (!message) return;
+
+      const lines = this.consoleLogsByInstance[instanceId] || (this.consoleLogsByInstance[instanceId] = []);
+      lines.push({
+        message,
+        source: payload.source || "game",
+        timestamp: payload.timestamp || Date.now()
+      });
+
+      if (lines.length > this.consoleMaxLines) {
+        lines.splice(0, lines.length - this.consoleMaxLines);
+      }
+
+      if (this.instanceWindowId === instanceId) {
+        this.localizeInstanceConsoleChrome();
+        this.renderInstanceConsole(false);
+      }
+    },
+
+    currentInstanceConsoleLines() {
+      const instanceId = this.instanceConsoleId();
+      return this.consoleLogsByInstance[instanceId] || [];
+    },
+
+    consoleLineLevel(line) {
+      const text = String(line?.message || line || "");
+      const lower = text.toLowerCase();
+
+      if (
+        /(fatal|error|severe)/i.test(text)
+        || /exception|traceback|caused by:|crash report|crashed|failed|could not/i.test(text)
+        || /^\s*at\s+[\w.$]+/i.test(text)
+      ) {
+        return "error";
+      }
+
+      if (/(warn|warning)/i.test(text) || /deprecated|missing|mismatch|incompatible/i.test(lower)) {
+        return "warn";
+      }
+
+      return "info";
+    },
+
+    renderInstanceConsole(forceBottom = false) {
       const output = $("#instanceConsoleOutput");
       if (!output) return;
 
-      const logs = window.SLLState.logs || [];
-      output.textContent = logs.length ? logs.join("\n") : this.t("console.empty");
-      output.scrollTop = output.scrollHeight;
+      const lines = this.currentInstanceConsoleLines();
+      if (!lines.length) {
+        output.innerHTML = `<div class="console-line console-line--empty">${this.escape(this.instanceWindowText("console.empty"))}</div>`;
+        return;
+      }
+
+      const shouldStickToBottom = forceBottom || output.scrollTop + output.clientHeight >= output.scrollHeight - 40;
+      output.innerHTML = lines.map(line => {
+        const level = this.consoleLineLevel(line);
+        const source = line.source && line.source !== "game" && line.source !== "history"
+          ? `<span class="console-line__source">${this.escape(line.source)}</span> `
+          : "";
+        const className = level === "error" || level === "warn" ? `console-line console-line--${level}` : "console-line";
+        return `<div class="${className}">${source}${this.escape(line.message || line)}</div>`;
+      }).join("");
+
+      if (shouldStickToBottom) {
+        requestAnimationFrame(() => {
+          output.scrollTop = output.scrollHeight;
+        });
+      }
     },
 
-    clearInstanceConsole() {
-      window.SLLState.logs = [];
-      $("#logOutput").textContent = "";
-      this.renderInstanceConsole();
-      this.toast(this.t("console.cleared"));
+    async clearInstanceConsole() {
+      const instanceId = this.instanceWindowId || window.SLLState.selected_instance_id || "";
+      if (instanceId) {
+        const result = await window.SLLApi.call("clear_instance_console_history", instanceId);
+        if (!result?.ok) {
+          this.toast(result?.error || this.t("error.generic"), true);
+          return;
+        }
+      }
+
+      if (instanceId) this.consoleLogsByInstance[instanceId] = [];
+      this.renderInstanceConsole(true);
+      this.toast(this.instanceWindowText("console.cleared"));
+    },
+
+    setMclogsLink(url = "") {
+      const row = $("#mclogsLinkRow");
+      const input = $("#mclogsLinkInput");
+      if (!row || !input) return;
+      input.value = url || "";
+      row.classList.toggle("hidden", !url);
+    },
+
+    async uploadLatestLogToMclogs() {
+      if (!this.instanceWindowId) return;
+
+      const button = $("#uploadLatestLogButton");
+      const previousText = button?.textContent || "";
+      if (button) {
+        button.disabled = true;
+        button.textContent = this.instanceWindowText("console.uploading");
+      }
+
+      try {
+        const result = await window.SLLApi.call("upload_instance_latest_log", this.instanceWindowId);
+        if (!result?.ok) {
+          this.toast(result?.error || this.t("error.generic"), true);
+          return;
+        }
+
+        this.setMclogsLink(result.url || "");
+        this.toast(this.localizeMessage(result.message || this.instanceWindowText("console.uploadDone")));
+      } catch (error) {
+        this.toast(error?.message || String(error), true);
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.textContent = this.instanceWindowText("console.uploadLatest");
+        }
+        this.localizeInstanceConsoleChrome();
+      }
+    },
+
+    async copyMclogsLink() {
+      const input = $("#mclogsLinkInput");
+      const value = input?.value || "";
+      if (!value) return;
+
+      try {
+        await navigator.clipboard.writeText(value);
+      } catch (_error) {
+        try {
+          input.focus();
+          input.select();
+          document.execCommand("copy");
+        } catch (__error) {
+          input.focus();
+          input.select();
+        }
+      }
+
+      this.toast(this.instanceWindowText("console.linkCopied"));
     },
 
     localizeMessage(message) {
       if (message === null || message === undefined) return message;
+
+      const text = String(message);
+      const keyLike = /^[a-z][a-z0-9]*(?:\.[a-zA-Z0-9_-]+)+$/.test(text);
+      if (keyLike) {
+        const translated = this.t(text);
+        if (translated && translated !== text) return translated;
+      }
+
+      const rawAccountMessages = {
+        "Открываю вход Microsoft...": "account.microsoftOpening",
+        "Открываю вход Microsoft…": "account.microsoftOpening",
+        "Открыт браузер Microsoft login. Заверши вход в браузере.": "account.microsoftOpening",
+        "Ожидаю вход Microsoft в браузере...": "account.microsoftWaiting",
+        "Ожидаю вход Microsoft в браузере…": "account.microsoftWaiting",
+        "Получен callback Microsoft. Завершаю вход...": "account.microsoftCallback",
+        "Получен callback Microsoft. Завершаю вход…": "account.microsoftCallback",
+        "Opening Microsoft login...": "account.microsoftOpening",
+        "Opening Microsoft sign-in...": "account.microsoftOpening",
+        "Waiting for Microsoft login in the browser...": "account.microsoftWaiting",
+        "Waiting for Microsoft sign-in in browser...": "account.microsoftWaiting",
+        "Microsoft callback received. Completing sign-in...": "account.microsoftCallback"
+      };
+
+      const accountKey = rawAccountMessages[text];
+      if (accountKey) {
+        const translated = this.t(accountKey);
+        if (translated && translated !== accountKey) return translated;
+      }
+
       if (window.sllTranslateMessage) return window.sllTranslateMessage(message);
-      return String(message);
+      return text;
     },
 
     toast(message, error = false) {
@@ -5275,34 +6218,32 @@
         case "log":
           this.appendLog(payload?.message || payload);
           break;
+        case "console":
+          this.appendInstanceConsole(payload);
+          break;
         case "status":
-          window.SLLState.status = { ...window.SLLState.status, ...payload };
-          this.renderStatus(window.SLLState.status);
-          this.updateActionStates();
+          this.setStatus(payload || {});
           break;
         case "progress":
-          window.SLLState.status = {
-            ...window.SLLState.status,
+          this.setStatus({
             busy: true,
             progress: payload?.progress || 0
-          };
-          this.renderStatus(window.SLLState.status);
+          });
           break;
         case "done":
-          window.SLLState.status = {
-            ...window.SLLState.status,
+          this.setStatus({
             busy: false,
             progress: payload?.ok ? 1 : 0,
             message: payload?.message || this.t("status.ready"),
             error: !payload?.ok
-          };
-          this.renderStatus(window.SLLState.status);
-          this.updateActionStates();
+          });
           this.toast(payload?.message, !payload?.ok);
           if (!payload?.ok && payload?.details) this.appendLog(payload.details);
+          this.localizeInstanceConsoleChrome();
           break;
         case "state":
           this.setState(payload);
+          this.localizeInstanceConsoleChrome();
           break;
       }
     },

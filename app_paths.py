@@ -21,6 +21,20 @@ def bundled_root() -> Path:
     return Path(__file__).resolve().parent
 
 
+
+def ensure_utf8_sig_file(path: Path):
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.exists() or path.stat().st_size == 0:
+            path.write_text("", encoding="utf-8-sig")
+            return
+        raw = path.read_bytes()
+        if not raw.startswith(b"\xef\xbb\xbf"):
+            path.write_bytes(b"\xef\xbb\xbf" + raw)
+    except Exception:
+        pass
+
+
 def bundled_path(relative_path: str) -> Path:
     return bundled_root() / relative_path
 
@@ -74,4 +88,4 @@ def ensure_runtime_files():
         (root / relative).mkdir(parents=True, exist_ok=True)
 
     log_path = root / "data" / "launcher.log"
-    log_path.touch(exist_ok=True)
+    ensure_utf8_sig_file(log_path)
