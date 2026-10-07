@@ -5274,6 +5274,35 @@ class LauncherWebAPI:
                 return name
             counter += 1
 
+    def _remove_tree_robust(self, path: Path):
+        path = Path(path)
+        if not path.exists():
+            return
+
+        def onerror(func, p, _exc_info):
+            try:
+                os.chmod(p, 0o700)
+                func(p)
+            except Exception:
+                pass
+
+        try:
+            shutil.rmtree(path, onerror=onerror)
+        except TypeError:
+            shutil.rmtree(path, ignore_errors=True)
+
+    def _clone_instance_paths_occupied(self, clone_id: str) -> bool:
+        if not clone_id:
+            return True
+        instances_root = (ROOT / "data" / "instances").resolve()
+        root_path = (instances_root / clone_id).resolve()
+        game_dir_path = root_path / ".minecraft"
+        try:
+            root_path.relative_to(instances_root)
+        except ValueError:
+            return True
+        return root_path.exists() or game_dir_path.exists()
+
     def _copy_instance_game_directory_without_worlds(self, source_game_dir: Path, target_game_dir: Path) -> dict:
         source_game_dir = source_game_dir.resolve()
         target_game_dir = target_game_dir.resolve()
@@ -5282,7 +5311,8 @@ class LauncherWebAPI:
             raise ValueError("Папка исходной сборки не найдена.")
         if not source_game_dir.is_dir():
             raise ValueError("Путь исходной сборки не является папкой.")
-        if target_game_dir.exists():
+        target_root = target_game_dir.parent if target_game_dir.name == ".minecraft" else target_game_dir
+        if target_game_dir.exists() or target_root.exists():
             raise ValueError("Папка новой сборки уже существует.")
 
         allowed_root = (ROOT / "data" / "instances").resolve()
@@ -5360,14 +5390,21 @@ class LauncherWebAPI:
             clone_id = clone_slug
             existing_ids = {str(item.get("id") or "") for item in data.get("instances", [])}
             suffix = 2
-            while clone_id in existing_ids:
+            while clone_id in existing_ids or self._clone_instance_paths_occupied(clone_id):
                 clone_id = f"{clone_slug}_{suffix}"
                 suffix += 1
 
             source_game_dir = self._absolute_path(source.get("game_directory") or "")
-            target_game_dir = (ROOT / "data" / "instances" / clone_id / ".minecraft").resolve()
+            target_root = (ROOT / "data" / "instances" / clone_id).resolve()
+            target_game_dir = (target_root / ".minecraft").resolve()
+            temp_root = (ROOT / "data" / "instances" / f"{clone_id}.__cloning__").resolve()
+            temp_game_dir = (temp_root / ".minecraft").resolve()
 
-            copy_result = self._copy_instance_game_directory_without_worlds(source_game_dir, target_game_dir)
+            if temp_root.exists():
+                self._remove_tree_robust(temp_root)
+
+            copy_result = self._copy_instance_game_directory_without_worlds(source_game_dir, temp_game_dir)
+            temp_root.replace(target_root)
 
             cloned = copy.deepcopy(source)
             cloned.update({
@@ -5414,18 +5451,21 @@ class LauncherWebAPI:
                 "state": self.get_app_state(),
             }
         except Exception as exc:
-            # Remove half-created folder if metadata was not written.
-            try:
-                if 'target_game_dir' in locals():
-                    target_root = target_game_dir.parent if target_game_dir.name == ".minecraft" else target_game_dir
-                    allowed_root = (ROOT / "data" / "instances").resolve()
-                    target_root = target_root.resolve()
-                    if target_root.exists() and target_root != allowed_root:
-                        target_root.relative_to(allowed_root)
-                        shutil.rmtree(target_root, ignore_errors=True)
-            except Exception:
-                pass
-            return {"ok": False, "error": str(exc)}
+            # Remove half-created folders if metadata was not written.
+            for cleanup_name in ("temp_root", "target_root"):
+                try:
+                    cleanup_root = locals().get(cleanup_name)
+                    if cleanup_root:
+                        cleanup_root = Path(cleanup_root).resolve()
+                        allowed_root = (ROOT / "data" / "instances").resolve()
+                        if cleanup_root.exists() and cleanup_root != allowed_root:
+                            cleanup_root.relative_to(allowed_root)
+                            self._remove_tree_robust(cleanup_root)
+                except Exception:
+                    pass
+            error_message = f"Не удалось клонировать сборку: {exc}"
+            self._append_startup_log(error_message)
+            return {"ok": False, "error": error_message}
 
     def _selected_account(self) -> dict | None:
         accounts = load_accounts()
@@ -5454,7 +5494,7 @@ class LauncherWebAPI:
         return {
             "launcher": {
                 "name": self.config.get("launcher_name", "StoneLight Launcher"),
-                "version": self.config.get("launcher_version", "1.0.0"),
+                "version": self.config.get("launcher_version", "1.0.1"),
                 "github_url": self.config.get("github_url", "https://github.com/stonelightmc/StoneLight-Launcher"),
                 "bug_report_url": self.config.get("bug_report_url", "https://github.com/stonelightmc/StoneLight-Launcher/issues"),
                 "community_site_url": self.config.get("community_site_url", "https://stonelightmc.github.io"),

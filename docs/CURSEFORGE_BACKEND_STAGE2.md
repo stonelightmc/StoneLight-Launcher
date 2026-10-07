@@ -1,6 +1,6 @@
 # CurseForge backend integration — local Stage 2 snapshot
 
-This is a local development snapshot based on StoneLight Launcher 1.0.0.
+This is a local development snapshot based on StoneLight Launcher 1.0.1.
 It is not intended as a GitHub release yet.
 
 ## Included changes

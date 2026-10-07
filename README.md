@@ -1,4 +1,4 @@
-# StoneLight Launcher v1.0.0
+# StoneLight Launcher v1.0.1
 
 Unofficial AI-coded Minecraft launcher with custom instances, account management and Modrinth integration.
 
@@ -12,12 +12,12 @@ Unofficial AI-coded Minecraft launcher with custom instances, account management
 - Portable Java manager with automatic version presets.
 - Global launch settings: RAM, Java, window mode and graphics options.
 - Instance window with folders, mods, resource packs, shader packs, screenshots, logs and settings.
-- Modrinth and Curseforge integration:
+- Modrinth integration:
   - project search;
   - filters by Minecraft version, loader and categories;
   - mods, resource packs, shaders and modpacks;
   - direct installation into the selected instance;
-  - modpack update checks;
+  - Modrinth modpack update checks;
   - conservative cleanup of obsolete modpack files.
 - Official launcher updates through GitHub Releases.
 - Soft automatic update check, no more than once per day.
@@ -42,7 +42,7 @@ and [SECURITY.md](SECURITY.md) for details.
 
 ---
 
-# StoneLight Launcher v0.6.71
+# StoneLight Launcher v1.0.1
 
 Неофіційний Minecraft-лаунчер, створений за допомогою ШІ з підтримкою користувацьких збірок, керування акаунтами та інтеграції Modrinth.
 
@@ -56,12 +56,12 @@ and [SECURITY.md](SECURITY.md) for details.
 - Портативний менеджер Java з автоматичними пресетами версій.
 - Глобальні налаштування запуску: RAM, Java, режим вікна та графічні параметри.
 - Вікно збірки з папками, модами, ресурспаками, шейдерами, скриншотами, логами та налаштуваннями.
-- Інтеграція з Modrinth та Curseforge:
+- Інтеграція Modrinth:
   - пошук проєктів;
   - фільтри за версією Minecraft, завантажувачем і категоріями;
   - моди, ресурспаки, шейдери та модпаки;
   - встановлення напряму у вибрану збірку;
-  - перевірка оновлень модпаків;
+  - перевірка оновлень Modrinth-модпаків;
   - обережне очищення застарілих файлів модпака.
 - Оновлення лаунчера через GitHub Releases.
 - М’яка автоматична перевірка оновлень не частіше одного разу на добу.

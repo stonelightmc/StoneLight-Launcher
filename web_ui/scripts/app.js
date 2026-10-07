@@ -147,7 +147,7 @@
       this.renderStatus(window.SLLState.status || {});
       this.updateActionStates();
       this.renderUpdateIndicator();
-      $("#versionLabel").textContent = `v${window.SLLState.launcher?.version || "1.0.0"}`;
+      $("#versionLabel").textContent = `v${window.SLLState.launcher?.version || "1.0.1"}`;
     },
 
     renderMenuControls() {
@@ -1689,16 +1689,19 @@
       const fallback = {
         en: {
           "instanceTools.clone": "Clone instance",
+          "instanceTools.cloning": "Cloning instance...",
           "instanceTools.cloned": "Instance cloned.",
           "instanceTools.clonedNamed": "Instance cloned: {name}"
         },
         uk: {
           "instanceTools.clone": "Клонувати збірку",
+          "instanceTools.cloning": "Клоную збірку...",
           "instanceTools.cloned": "Збірку клоновано.",
           "instanceTools.clonedNamed": "Збірку клоновано: {name}"
         },
         kk: {
           "instanceTools.clone": "Жинақты клондау",
+          "instanceTools.cloning": "Жинақ клондалуда...",
           "instanceTools.cloned": "Жинақ клондалды.",
           "instanceTools.clonedNamed": "Жинақ клондалды: {name}"
         }
@@ -3565,7 +3568,7 @@
     openAboutDialog() {
       const launcher = window.SLLState?.launcher || {};
       const name = launcher.name || "StoneLight Launcher";
-      const version = launcher.version || "1.0.0";
+      const version = launcher.version || "1.0.1";
       const versionLabel = $("#aboutVersion");
       if (versionLabel) {
         versionLabel.textContent = `${name} v${version}`;
@@ -5471,7 +5474,7 @@
 
       this.syncInstanceEditorFields();
 
-      // v1.0.0: version pickers open only by pressing the load buttons.
+      // v1.0.1: version pickers open only by pressing the load buttons.
       // Opening settings must not immediately pop up extra modal windows.
       const backdrop = $("#instanceEditorBackdrop");
       backdrop.classList.remove("hidden");
@@ -5950,19 +5953,51 @@
 
     async cloneInstance(instanceId) {
       if (!instanceId) return;
-      const result = await window.SLLApi.call("clone_instance", instanceId);
-      if (!result?.ok) {
-        this.toast(this.localizeMessage(result?.error || this.t("error.generic")), true);
-        return;
-      }
 
-      if (result.state) this.setState(result.state);
-      const name = result.cloned_instance_name || "";
-      this.toast(
-        name
-          ? this.instanceToolText("instanceTools.clonedNamed").replace("{name}", name)
-          : this.instanceToolText("instanceTools.cloned")
-      );
+      this.setStatus({
+        busy: true,
+        message: this.instanceToolText("instanceTools.cloning") || this.instanceToolText("instanceTools.clone"),
+        progress: 0.35,
+        error: false
+      });
+
+      try {
+        const result = await window.SLLApi.call("clone_instance", instanceId);
+        if (!result?.ok) {
+          this.setStatus({ busy: false, error: true, message: result?.error || this.t("error.generic"), progress: 0 });
+          this.toast(this.localizeMessage(result?.error || this.t("error.generic")), true);
+          return;
+        }
+
+        // Refresh explicitly after clone. This protects the UI from stale state if
+        // the bridge returns before the local state object is fully repainted.
+        let freshState = result.state || null;
+        try {
+          freshState = await window.SLLApi.call("get_app_state");
+        } catch (_error) {}
+
+        if (freshState) this.setState(freshState);
+
+        const clonedId = result.cloned_instance_id || "";
+        if (clonedId) {
+          try {
+            const selected = await window.SLLApi.call("select_instance", clonedId);
+            if (selected?.state) this.setState(selected.state);
+          } catch (_error) {}
+        }
+
+        this.setStatus({ busy: false, error: false, message: this.t("status.ready"), progress: 1 });
+        const name = result.cloned_instance_name || "";
+        this.toast(
+          name
+            ? this.instanceToolText("instanceTools.clonedNamed").replace("{name}", name)
+            : this.instanceToolText("instanceTools.cloned")
+        );
+      } catch (error) {
+        const message = error?.message || String(error);
+        this.setStatus({ busy: false, error: true, message, progress: 0 });
+        this.toast(this.localizeMessage(message), true);
+      }
     },
 
     async runContextAction(action) {
