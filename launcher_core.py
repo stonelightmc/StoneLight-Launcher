@@ -6,6 +6,9 @@ import shutil
 import urllib.request
 import urllib.parse
 import urllib.error
+from ssl_support import configure_ssl_certificates, ssl_context
+
+configure_ssl_certificates()
 import subprocess
 import threading
 import tempfile
@@ -975,7 +978,7 @@ class LauncherCore:
                 "Accept": "application/vnd.github+json",
             },
         )
-        with urllib.request.urlopen(request, timeout=20) as response:
+        with urllib.request.urlopen(request, timeout=20, context=ssl_context()) as response:
             return json.loads(response.read().decode("utf-8", errors="replace"))
 
     def _score_modpack_asset(self, asset: dict) -> int:
@@ -3138,7 +3141,7 @@ QUILT_LOADER_META_URL = "https://meta.quiltmc.org/v3/versions/loader/{minecraft_
 NEOFORGE_MAVEN_METADATA_URL = "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml"
 
 HTTP_HEADERS = {
-    "User-Agent": "StoneLightLauncher/1.0.1 (+https://github.com/stonelightmc/StoneLight-Launcher)",
+    "User-Agent": "StoneLightLauncher/1.0.3 (+https://github.com/stonelightmc/StoneLight-Launcher)",
     "Accept": "application/json, text/xml, application/xml, text/plain, */*",
 }
 

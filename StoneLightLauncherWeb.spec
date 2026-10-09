@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 from pathlib import Path
+from PyInstaller.utils.hooks import collect_data_files
 
 ROOT = Path.cwd()
 block_cipher = None
@@ -16,6 +17,8 @@ datas = [
     ("requirements.txt", "."),
 ]
 
+datas += collect_data_files("certifi")
+
 hiddenimports = [
     "webview",
     "webview.platforms.edgechromium",
@@ -28,6 +31,7 @@ hiddenimports = [
     "minecraft_launcher_lib.quilt",
     "minecraft_launcher_lib.natives",
     "requests",
+    "certifi",
     "PIL",
     "PIL.Image",
     "PIL.ImageTk",

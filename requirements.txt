@@ -4,3 +4,4 @@ customtkinter>=5.2.2
 pywebview>=6.0
 
 Pillow>=10.0
+certifi

@@ -147,7 +147,7 @@
       this.renderStatus(window.SLLState.status || {});
       this.updateActionStates();
       this.renderUpdateIndicator();
-      $("#versionLabel").textContent = `v${window.SLLState.launcher?.version || "1.0.1"}`;
+      $("#versionLabel").textContent = `v${window.SLLState.launcher?.version || "1.0.3"}`;
     },
 
     renderMenuControls() {
@@ -3568,7 +3568,7 @@
     openAboutDialog() {
       const launcher = window.SLLState?.launcher || {};
       const name = launcher.name || "StoneLight Launcher";
-      const version = launcher.version || "1.0.1";
+      const version = launcher.version || "1.0.3";
       const versionLabel = $("#aboutVersion");
       if (versionLabel) {
         versionLabel.textContent = `${name} v${version}`;
@@ -5474,7 +5474,7 @@
 
       this.syncInstanceEditorFields();
 
-      // v1.0.1: version pickers open only by pressing the load buttons.
+      // v1.0.3: version pickers open only by pressing the load buttons.
       // Opening settings must not immediately pop up extra modal windows.
       const backdrop = $("#instanceEditorBackdrop");
       backdrop.classList.remove("hidden");

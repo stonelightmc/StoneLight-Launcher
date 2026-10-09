@@ -16,6 +16,9 @@ import traceback
 import urllib.error
 import urllib.parse
 import urllib.request
+from ssl_support import configure_ssl_certificates, ssl_context
+
+configure_ssl_certificates()
 import uuid
 import webbrowser
 import zipfile
@@ -989,7 +992,7 @@ class LauncherWebAPI:
 
         for attempt in range(1, retries + 1):
             try:
-                with urllib.request.urlopen(request, timeout=timeout) as response:
+                with urllib.request.urlopen(request, timeout=timeout, context=ssl_context()) as response:
                     return json.loads(response.read().decode("utf-8"))
             except (TimeoutError, socket.timeout) as exc:
                 last_error = TimeoutError("Modrinth API не ответил вовремя. Проверь соединение и повтори попытку.")
@@ -1445,7 +1448,7 @@ class LauncherWebAPI:
                     "progress": 0,
                 })
 
-                with urllib.request.urlopen(request, timeout=timeout) as response, tmp.open("wb") as fh:
+                with urllib.request.urlopen(request, timeout=timeout, context=ssl_context()) as response, tmp.open("wb") as fh:
                     total_raw = response.headers.get("Content-Length") or response.headers.get("content-length") or "0"
                     try:
                         total = int(total_raw)
@@ -2880,7 +2883,7 @@ class LauncherWebAPI:
                 attempted.append(base_url)
                 try:
                     request = urllib.request.Request(url, data=body, headers=headers, method="POST")
-                    with urllib.request.urlopen(request, timeout=timeout) as response:
+                    with urllib.request.urlopen(request, timeout=timeout, context=ssl_context()) as response:
                         return json.loads(response.read().decode("utf-8"))
                 except (TimeoutError, socket.timeout) as exc:
                     last_error = TimeoutError(f"CurseForge backend timeout: {base_url}")
@@ -2929,7 +2932,7 @@ class LauncherWebAPI:
                 attempted.append(base_url)
                 try:
                     request = urllib.request.Request(url, headers=headers)
-                    with urllib.request.urlopen(request, timeout=timeout) as response:
+                    with urllib.request.urlopen(request, timeout=timeout, context=ssl_context()) as response:
                         return json.loads(response.read().decode("utf-8"))
                 except (TimeoutError, socket.timeout) as exc:
                     last_error = TimeoutError(f"CurseForge backend timeout: {base_url}")
@@ -3427,7 +3430,7 @@ class LauncherWebAPI:
                     "progress": 0,
                 })
 
-                with urllib.request.urlopen(request, timeout=timeout) as response, tmp.open("wb") as fh:
+                with urllib.request.urlopen(request, timeout=timeout, context=ssl_context()) as response, tmp.open("wb") as fh:
                     total_raw = response.headers.get("Content-Length") or response.headers.get("content-length") or "0"
                     try:
                         total = int(total_raw)
@@ -5494,7 +5497,7 @@ class LauncherWebAPI:
         return {
             "launcher": {
                 "name": self.config.get("launcher_name", "StoneLight Launcher"),
-                "version": self.config.get("launcher_version", "1.0.1"),
+                "version": self.config.get("launcher_version", "1.0.3"),
                 "github_url": self.config.get("github_url", "https://github.com/stonelightmc/StoneLight-Launcher"),
                 "bug_report_url": self.config.get("bug_report_url", "https://github.com/stonelightmc/StoneLight-Launcher/issues"),
                 "community_site_url": self.config.get("community_site_url", "https://stonelightmc.github.io"),
@@ -6326,7 +6329,7 @@ class LauncherWebAPI:
                 method="POST",
             )
 
-            with urllib.request.urlopen(request, timeout=35) as response:
+            with urllib.request.urlopen(request, timeout=35, context=ssl_context()) as response:
                 response_body = response.read().decode("utf-8", errors="replace")
 
             try:

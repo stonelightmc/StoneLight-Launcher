@@ -1,6 +1,6 @@
 # Updates
 
-StoneLight Launcher v1.0.1 adds the first update system.
+StoneLight Launcher v1.0.3 adds the first update system.
 
 ## Launcher updates
 
@@ -60,7 +60,7 @@ data/
 ```
 
 
-## v1.0.1 official pre-launch update
+## v1.0.3 official pre-launch update
 
 When the selected instance is the official `StoneLight` instance, the launcher now checks the official modpack release before launching the game.
 
@@ -88,7 +88,7 @@ server settings
 ```
 
 
-## v1.0.1
+## v1.0.3
 
 Manual update check behavior:
 
@@ -98,7 +98,7 @@ Manual update check behavior:
 - The Install button performs only local install/reinstall using current metadata.
 
 
-## v1.0.1
+## v1.0.3
 
 Update check timeout:
 
@@ -109,7 +109,7 @@ update_check_timeout_seconds = 12
 If GitHub/update checks do not complete in time, the launcher clears the busy state and writes a localized timeout message.
 
 
-## v1.0.1 Windows EXE self-update
+## v1.0.3 Windows EXE self-update
 
 Self-update is now aware of two launcher package types:
 
@@ -150,7 +150,7 @@ instances.json
 ```
 
 
-## v1.0.1 nested Windows update fix
+## v1.0.3 nested Windows update fix
 
 Fixed an update-script fallback that could copy the whole unpacked ZIP root into the launcher folder.
 

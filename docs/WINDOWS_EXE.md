@@ -1,6 +1,6 @@
 # Windows EXE build
 
-v1.0.1 adds Windows executable packaging support.
+v1.0.3 adds Windows executable packaging support.
 
 ## Build
 
@@ -50,10 +50,10 @@ StoneLightLauncher_v0_5_50_GitHub.zip
 ```
 
 
-## v1.0.1 config/runtime-file fix
+## v1.0.3 config/runtime-file fix
 
 PyInstaller one-folder builds may place bundled data under `_internal`.
-The launcher expects writable files next to the `.exe`, so v1.0.1 adds two protections:
+The launcher expects writable files next to the `.exe`, so v1.0.3 adds two protections:
 
 1. `build_windows_exe.cmd` copies these files next to the exe after build:
 
@@ -70,12 +70,12 @@ assets/
 2. At runtime, `app_paths.ensure_runtime_files()` copies missing bundled resources from `_internal` to the exe folder on first launch.
 
 
-## v1.0.1 self-update note
+## v1.0.3 self-update note
 
 For executable releases, publish the built folder as:
 
 ```text
-StoneLightLauncher_v1_0_1_Windows.zip
+StoneLightLauncher_v1_0_3_Windows.zip
 ```
 
 The ZIP should contain the whole folder:
@@ -92,12 +92,12 @@ StoneLight Launcher/
 The executable launcher will prefer the `Windows.zip` release asset for self-updates.
 
 
-## v1.0.1 update ZIP layout recommendation
+## v1.0.3 update ZIP layout recommendation
 
 Recommended release ZIP layout:
 
 ```text
-StoneLightLauncher_v1_0_1_Windows.zip
+StoneLightLauncher_v1_0_3_Windows.zip
 └─ StoneLight Launcher/
    ├─ StoneLight Launcher.exe
    ├─ _internal/
@@ -109,7 +109,7 @@ StoneLightLauncher_v1_0_1_Windows.zip
 Also supported:
 
 ```text
-StoneLightLauncher_v1_0_1_Windows.zip
+StoneLightLauncher_v1_0_3_Windows.zip
 ├─ StoneLight Launcher.exe
 ├─ _internal/
 ├─ config.json
@@ -120,7 +120,7 @@ StoneLightLauncher_v1_0_1_Windows.zip
 Do not include a `dist/` wrapper level.
 
 
-## v1.0.1 icon note
+## v1.0.3 icon note
 
 The executable icon was replaced with the new StoneLight glowing block icon.
 PyInstaller will use:
@@ -135,7 +135,7 @@ when building:
 build_windows_exe.cmd
 ```
 
-## v1.0.1 icon rebuild
+## v1.0.3 icon rebuild
 
 The executable icon was rebuilt from the cleaner 1024px PNG.
 
