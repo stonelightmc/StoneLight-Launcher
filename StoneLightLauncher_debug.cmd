@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 
-echo === StoneLight Launcher v1.0.4 debug run ===
+echo === StoneLight Launcher v1.0.5 debug run ===
 echo Project dir: %CD%
 echo.
 

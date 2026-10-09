@@ -147,7 +147,7 @@
       this.renderStatus(window.SLLState.status || {});
       this.updateActionStates();
       this.renderUpdateIndicator();
-      $("#versionLabel").textContent = `v${window.SLLState.launcher?.version || "1.0.4"}`;
+      $("#versionLabel").textContent = `v${window.SLLState.launcher?.version || "1.0.5"}`;
     },
 
     renderMenuControls() {
@@ -3575,7 +3575,7 @@
     openAboutDialog() {
       const launcher = window.SLLState?.launcher || {};
       const name = launcher.name || "StoneLight Launcher";
-      const version = launcher.version || "1.0.4";
+      const version = launcher.version || "1.0.5";
       const versionLabel = $("#aboutVersion");
       if (versionLabel) {
         versionLabel.textContent = `${name} v${version}`;
@@ -5481,7 +5481,7 @@
 
       this.syncInstanceEditorFields();
 
-      // v1.0.4: version pickers open only by pressing the load buttons.
+      // v1.0.5: version pickers open only by pressing the load buttons.
       // Opening settings must not immediately pop up extra modal windows.
       const backdrop = $("#instanceEditorBackdrop");
       backdrop.classList.remove("hidden");
@@ -5911,12 +5911,24 @@
         return categoryOk && (!search || haystack.includes(search));
       });
 
-      $("#iconPickerGrid").innerHTML = filtered.map(icon => `
-        <button class="icon-choice${icon.id === this.iconPickerSelected ? " is-selected" : ""}" type="button" data-icon-id="${this.escape(icon.id)}" title="${this.escape(icon.label)}">
-          <span class="icon-choice__image"><img src="${this.escape(icon.url)}" alt="" loading="lazy"></span>
-          <span class="icon-choice__label">${this.escape(icon.label)}</span>
-        </button>
-      `).join("");
+      $("#iconPickerGrid").innerHTML = filtered.map(icon => {
+        const url = icon.url || "";
+        const label = icon.label || icon.id || "?";
+        const letter = this.escape(label.slice(0, 1).toUpperCase());
+        const escapedUrl = this.escape(url);
+        const pngFallback = url.includes("assets/instance_icons/") && url.endsWith(".svg")
+          ? this.escape(url.replace(/\.svg$/i, ".png"))
+          : "";
+        const onerror = pngFallback
+          ? `if(!this.dataset.pngFallback){this.dataset.pngFallback='1';this.src='${pngFallback}';}else{this.closest('.icon-choice__image').textContent='${letter}';}`
+          : `this.closest('.icon-choice__image').textContent='${letter}'`;
+        return `
+          <button class="icon-choice${icon.id === this.iconPickerSelected ? " is-selected" : ""}" type="button" data-icon-id="${this.escape(icon.id)}" title="${this.escape(label)}">
+            <span class="icon-choice__image"><img src="${escapedUrl}" alt="" loading="lazy" onerror="${onerror}"></span>
+            <span class="icon-choice__label">${this.escape(label)}</span>
+          </button>
+        `;
+      }).join("");
 
       $("#iconPickerGrid").querySelectorAll("[data-icon-id]").forEach(button => {
         button.addEventListener("click", () => this.selectIconFromPicker(button.dataset.iconId));
