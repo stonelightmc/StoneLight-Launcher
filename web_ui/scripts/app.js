@@ -147,7 +147,7 @@
       this.renderStatus(window.SLLState.status || {});
       this.updateActionStates();
       this.renderUpdateIndicator();
-      $("#versionLabel").textContent = `v${window.SLLState.launcher?.version || "1.0.3"}`;
+      $("#versionLabel").textContent = `v${window.SLLState.launcher?.version || "1.0.4"}`;
     },
 
     renderMenuControls() {
@@ -195,7 +195,14 @@
       const letter = this.escape((instance?.name || "I").slice(0, 1).toUpperCase());
       const className = `instance-tile__icon${extraClass ? ` ${extraClass}` : ""}`;
       if (url) {
-        return `<div class="${className} instance-tile__icon--image"><img src="${this.escape(url)}" alt="" loading="lazy" onerror="this.closest('.instance-tile__icon').textContent='${letter}'"></div>`;
+        const escapedUrl = this.escape(url);
+        const pngFallback = url.includes("assets/instance_icons/") && url.endsWith(".svg")
+          ? this.escape(url.replace(/\.svg$/i, ".png"))
+          : "";
+        const onerror = pngFallback
+          ? `if(!this.dataset.pngFallback){this.dataset.pngFallback='1';this.src='${pngFallback}';}else{this.closest('.instance-tile__icon').textContent='${letter}';}`
+          : `this.closest('.instance-tile__icon').textContent='${letter}'`;
+        return `<div class="${className} instance-tile__icon--image"><img src="${escapedUrl}" alt="" loading="lazy" onerror="${onerror}"></div>`;
       }
       return `<div class="${className}">${letter}</div>`;
     },
@@ -3568,7 +3575,7 @@
     openAboutDialog() {
       const launcher = window.SLLState?.launcher || {};
       const name = launcher.name || "StoneLight Launcher";
-      const version = launcher.version || "1.0.3";
+      const version = launcher.version || "1.0.4";
       const versionLabel = $("#aboutVersion");
       if (versionLabel) {
         versionLabel.textContent = `${name} v${version}`;
@@ -5474,7 +5481,7 @@
 
       this.syncInstanceEditorFields();
 
-      // v1.0.3: version pickers open only by pressing the load buttons.
+      // v1.0.4: version pickers open only by pressing the load buttons.
       // Opening settings must not immediately pop up extra modal windows.
       const backdrop = $("#instanceEditorBackdrop");
       backdrop.classList.remove("hidden");

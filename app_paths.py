@@ -67,6 +67,27 @@ def ensure_external_dir(relative_path: str, *, overwrite: bool = False) -> Path:
     return target
 
 
+def sync_bundled_dir(relative_path: str, *, remove_extra: bool = False) -> Path:
+    """Synchronize a bundled resource directory into the writable app root.
+
+    This is for launcher-owned resources only. Do not use it for user data.
+    """
+    target = app_root() / relative_path
+    source = bundled_path(relative_path)
+
+    if not source.exists() or not source.is_dir():
+        target.mkdir(parents=True, exist_ok=True)
+        return target
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    if remove_extra and target.exists():
+        shutil.rmtree(target, ignore_errors=True)
+
+    shutil.copytree(source, target, dirs_exist_ok=True)
+    return target
+
+
 def ensure_runtime_files():
     """Copy bundled resources and create the writable runtime layout."""
     ensure_external_file("config.json")
@@ -77,6 +98,12 @@ def ensure_runtime_files():
     ensure_external_dir("docs")
     ensure_external_dir("assets")
     ensure_external_dir("web_ui")
+
+    # UI icon assets are launcher-owned resources. After auto-update the
+    # writable web_ui folder may already exist from an older version; a copy-only
+    # strategy can leave stale icon files. Keep the bundled instance icon pack in
+    # sync on every startup without touching user data.
+    sync_bundled_dir("web_ui/assets/instance_icons", remove_extra=True)
 
     root = app_root()
     for relative in (
