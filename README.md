@@ -1,4 +1,4 @@
-# StoneLight Launcher v1.0.5
+# StoneLight Launcher v1.0.5 maintained by Ihor Bozhko
 
 Unofficial AI-coded Minecraft launcher with custom instances, account management and Modrinth/Curseforge integration.
 
