@@ -3,7 +3,7 @@
 Maintained by Ihor Bozhko.
 GitHub profile: https://github.com/stonelightmc
 
-StoneLight Launcher is a free open-source, unofficial Minecraft launcher for the StoneLight
+StoneLight Launcher is a free open-source, AI-coded, unofficial Minecraft launcher for the StoneLight
 community and user-created Minecraft instances. It supports custom instances, account management,
 portable Java, Modrinth and CurseForge browsing, and direct installation of mods, resource packs,
 shader packs, and modpacks.
@@ -80,7 +80,7 @@ restrictions.
 Супроводжує: Ihor Bozhko.
 GitHub профіль: https://github.com/stonelightmc
 
-StoneLight Launcher - це безкоштовний open-source, неофіційний Minecraft-лаунчер для спільноти
+StoneLight Launcher - це безкоштовний open-source, створений за допомогою штучного інтелекту, неофіційний Minecraft-лаунчер для спільноти
 StoneLight і користувацьких збірок Minecraft. Він підтримує користувацькі збірки, керування
 акаунтами, портативну Java, перегляд Modrinth і CurseForge, а також пряме встановлення модів,
 ресурспаків, шейдерів і модпаків.
