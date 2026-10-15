@@ -68,6 +68,7 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=str(ROOT / "assets" / "stonelight_launcher.ico"),
+    version=str(ROOT / "version_info.txt"),
 )
 
 coll = COLLECT(

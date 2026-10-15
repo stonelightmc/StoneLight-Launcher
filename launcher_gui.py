@@ -65,7 +65,7 @@ from updater import (
 )
 
 
-APP_TITLE = "StoneLight Launcher v1.0.5"
+APP_TITLE = "StoneLight Launcher v1.1.0"
 JAVA_PRESET_VALUES = ["auto", "global", "java8", "java16", "java17", "java21", "java25", "manual"]
 
 UI_FONT = "Segoe UI Variable"
@@ -3470,7 +3470,7 @@ class StoneLightLauncherApp(ctk.CTk):
 
         self.log_box = ctk.CTkTextbox(status_frame, height=96)
         self.log_box.grid(row=3, column=0, padx=14, pady=(0, 8), sticky="ew")
-        self.log_box.insert("end", tr_service("Добро пожаловать в StoneLight Launcher v1.0.5") + "\n")
+        self.log_box.insert("end", tr_service("Добро пожаловать в StoneLight Launcher v1.1.0") + "\n")
         self.log_box.configure(state="disabled")
         self.apply_danger_button_styles()
 

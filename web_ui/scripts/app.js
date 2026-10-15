@@ -147,7 +147,7 @@
       this.renderStatus(window.SLLState.status || {});
       this.updateActionStates();
       this.renderUpdateIndicator();
-      $("#versionLabel").textContent = `v${window.SLLState.launcher?.version || "1.0.5"}`;
+      $("#versionLabel").textContent = `v${window.SLLState.launcher?.version || "1.1.0"}`;
     },
 
     renderMenuControls() {
@@ -3575,7 +3575,7 @@
     openAboutDialog() {
       const launcher = window.SLLState?.launcher || {};
       const name = launcher.name || "StoneLight Launcher";
-      const version = launcher.version || "1.0.5";
+      const version = launcher.version || "1.1.0";
       const versionLabel = $("#aboutVersion");
       if (versionLabel) {
         versionLabel.textContent = `${name} v${version}`;

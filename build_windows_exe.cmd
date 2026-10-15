@@ -19,6 +19,14 @@ echo Spec:
 echo   StoneLightLauncherWeb.spec
 echo.
 
+for /f "delims=" %%V in ('powershell -NoProfile -Command "$v = (Get-Content -Raw 'config.json' | ConvertFrom-Json).launcher_version; $v.Replace('.', '_')"') do set "RELEASE_VERSION=%%V"
+if not defined RELEASE_VERSION (
+  echo ERROR: Could not read launcher_version from config.json.
+  pause
+  exit /b 1
+)
+set "RELEASE_ARCHIVE=StoneLightLauncher_v%RELEASE_VERSION%_Windows.zip"
+
 if not exist "StoneLightLauncherWeb.spec" (
   echo ERROR: StoneLightLauncherWeb.spec was not found.
   pause
@@ -105,7 +113,7 @@ if exist "web_ui" (
 
 echo.
 echo Creating release archive...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path 'StoneLightLauncher_v1_0_5_Windows.zip') { Remove-Item 'StoneLightLauncher_v1_0_5_Windows.zip' -Force }; Compress-Archive -Path 'dist\StoneLight Launcher\*' -DestinationPath 'StoneLightLauncher_v1_0_5_Windows.zip'"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path '%RELEASE_ARCHIVE%') { Remove-Item '%RELEASE_ARCHIVE%' -Force }; Compress-Archive -Path 'dist\StoneLight Launcher\*' -DestinationPath '%RELEASE_ARCHIVE%'"
 if errorlevel 1 (
   echo Archive creation failed, but exe build is complete.
   echo Folder:
@@ -121,6 +129,6 @@ echo Executable:
 echo   dist\StoneLight Launcher\StoneLight Launcher.exe
 echo.
 echo Release archive:
-echo   StoneLightLauncher_v1_0_5_Windows.zip
+echo   %RELEASE_ARCHIVE%
 echo.
 pause
